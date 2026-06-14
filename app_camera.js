@@ -241,23 +241,37 @@ window.processCameraPhoto = function(event) {
             ctx.fillText(`📝 Note: Captured by SVY21/MM2000 GPS CONVERTER`, textX, currentY);
 
             // --- SAVE IMAGE (WEB FALLBACK) ---
-            let base64Image = canvas.toDataURL("image/jpeg", 0.9);
-            document.getElementById('cam_placeholder').style.display = 'none';
-            let previewImg = document.getElementById('cam_preview_img');
-            previewImg.src = base64Image;
-            previewImg.style.display = 'block';
+                        let base64Image = canvas.toDataURL("image/jpeg", 0.9);
+                        document.getElementById('cam_placeholder').style.display = 'none';
+                        let previewImg = document.getElementById('cam_preview_img');
+                        previewImg.src = base64Image;
+                        previewImg.style.display = 'block';
 
-            if (window.AndroidNative && window.AndroidNative.saveImageToGallery) {
-                let fileName = `Survey_${pName}_${new Date().getTime()}.jpg`;
-                window.AndroidNative.saveImageToGallery(base64Image.split(',')[1], fileName);
-                statusBox.style.color = "#16a34a"; statusBox.innerText = `✅ Photo saved to Gallery!`;
-            } else {
-                statusBox.style.color = "#2563eb";
-                statusBox.innerHTML = `✅ Photo generated successfully!<br><span style="font-size:11px; color:#475569;">Long-press (Tap & Hold) the image above to save it to your Photos.</span>`;
-            }
-        };
-        img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-    event.target.value = '';
-};
+                        if (window.AndroidNative && window.AndroidNative.saveImageToGallery) {
+                            let fileName = `Survey_${pName}_${new Date().getTime()}.jpg`;
+                            window.AndroidNative.saveImageToGallery(base64Image.split(',')[1], fileName);
+                            statusBox.style.color = "#16a34a"; statusBox.innerText = `✅ Photo saved to Gallery!`;
+                        } else {
+                            statusBox.style.color = "#2563eb";
+
+                            // 🔴 Download Button အသစ် ဖန်တီးခြင်း
+                            let fileName = `Survey_${pName}_${new Date().getTime()}.jpg`;
+                            statusBox.innerHTML = `✅ Photo generated successfully!<br>
+                            <button onclick="downloadWebImage('${base64Image}', '${fileName}')" style="margin-top:10px; width:100%; background:#2563eb; color:white; padding:12px; border:none; border-radius:8px; font-size:14px; font-weight:bold; cursor:pointer;">📥 Download Photo</button>`;
+                        }
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+                event.target.value = '';
+            };
+
+            // 🔴 Web ကနေ ပုံကို တိုက်ရိုက် Download ချပေးမည့် Function
+            window.downloadWebImage = function(dataUrl, fileName) {
+                let link = document.createElement('a');
+                link.href = dataUrl;
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            };
