@@ -1,121 +1,4 @@
 // ==========================================
-// --- OFFLINE MAP ENGINE ---
-// ==========================================
-L.TileLayer.Offline = L.TileLayer.extend({
-    createTile: function (coords, done) {
-        var tile = document.createElement('img');
-        var url = this.getTileUrl(coords);
-        var key = coords.z + '_' + coords.x + '_' + coords.y;
-        if (this.options.crossOrigin) { tile.crossOrigin = ''; }
-        tile.alt = '';
-        if (window.mapDB) {
-            var tx = window.mapDB.transaction("tiles", "readonly");
-            var getReq = tx.objectStore("tiles").get(key);
-            getReq.onsuccess = function(e) {
-                if (e.target.result) {
-                    var blobUrl = URL.createObjectURL(e.target.result);
-                    tile.src = blobUrl;
-                    tile.onload = function() { URL.revokeObjectURL(blobUrl); };
-                    done(null, tile);
-                } else { tile.src = url; done(null, tile); }
-            };
-            getReq.onerror = function() { tile.src = url; done(null, tile); };
-        } else { tile.src = url; done(null, tile); }
-        return tile;
-    }
-});
-
-window.promptOfflineDownload = function() {
-    if (!window.leafletMap) return alert("Please wait for map to load.");
-    if (window.isDownloadingMap) return;
-    let currentZ = window.leafletMap.getZoom();
-    if (currentZ < 14) { return alert("⚠️ Please zoom in closer to your project area (Zoom 14 or higher) before downloading.\n\nYou are currently at Zoom: " + currentZ); }
-
-    document.getElementById('dl_progress_modal').style.display = 'block';
-    document.getElementById('dl_confirm_btn').style.display = 'none';
-    document.getElementById('dl_progress_fill').style.width = '0%';
-
-    let bounds = window.leafletMap.getBounds();
-    window.tilesToDownload = [];
-    let targetMaxZ = 20;
-
-    for (let z = currentZ; z <= targetMaxZ; z++) {
-        let min = window.leafletMap.project(bounds.getNorthWest(), z).divideBy(256).floor();
-        let max = window.leafletMap.project(bounds.getSouthEast(), z).divideBy(256).floor();
-        for (let x = min.x; x <= max.x; x++) {
-            for (let y = min.y; y <= max.y; y++) { window.tilesToDownload.push({z:z, x:x, y:y}); }
-        }
-    }
-    let totalTiles = window.tilesToDownload.length;
-    let estSizeMB = (totalTiles * 0.02).toFixed(1);
-
-    if (totalTiles > 25000) { document.getElementById('dl_status_text').innerHTML = `⚠️ Area too large!<br>Found ${totalTiles} tiles (~${estSizeMB} MB).<br>Please zoom in closer to reduce file size.`; }
-    else { document.getElementById('dl_status_text').innerHTML = `Found ${totalTiles} tiles (~${estSizeMB} MB).<br>Download for offline use?`; document.getElementById('dl_confirm_btn').style.display = 'block'; }
-};
-
-window.cancelOfflineDownload = function() { window.isDownloadingMap = false; document.getElementById('dl_progress_modal').style.display = 'none'; };
-
-window.startTileDownload = function() {
-    window.isDownloadingMap = true; document.getElementById('dl_confirm_btn').style.display = 'none';
-    let total = window.tilesToDownload.length; let count = 0;
-    function downloadNext() {
-        if (!window.isDownloadingMap) return;
-        if (window.tilesToDownload.length === 0) {
-            document.getElementById('dl_status_text').innerHTML = `✅ Download Complete!`;
-            setTimeout(() => { document.getElementById('dl_progress_modal').style.display = 'none'; window.isDownloadingMap = false; }, 2000);
-            return;
-        }
-        let t = window.tilesToDownload.shift();
-        let url = window.mapTileUrl.replace('{x}', t.x).replace('{y}', t.y).replace('{z}', t.z);
-        let key = t.z + '_' + t.x + '_' + t.y;
-
-        fetch(url)
-        .then(res => { if (!res.ok) throw new Error("Google Blocked"); return res.blob(); })
-        .then(blob => {
-            let tx = window.mapDB.transaction("tiles", "readwrite"); tx.objectStore("tiles").put(blob, key); count++;
-            let pct = Math.floor((count / total) * 100);
-            document.getElementById('dl_progress_fill').style.width = pct + '%'; document.getElementById('dl_status_text').innerHTML = `Downloading... ${pct}%`;
-            setTimeout(downloadNext, 10);
-        }).catch(err => { count++; setTimeout(downloadNext, 10); });
-    }
-    for(let i=0; i<3; i++) downloadNext();
-};
-
-window.clearOfflineMap = function() {
-    if(!confirm("Are you sure you want to delete ALL offline maps to free up storage?")) return;
-    if(window.mapDB) {
-        let tx = window.mapDB.transaction("tiles", "readwrite"); tx.objectStore("tiles").clear();
-        tx.oncomplete = function() { alert("✅ Offline Maps Cleared!"); if(window.leafletMap) { window.leafletMap.eachLayer(function(layer) { if (layer instanceof L.TileLayer) layer.redraw(); }); } };
-    }
-};
-
-// ==========================================
-// --- MAP MEASUREMENT TOOL ---
-// ==========================================
-window.toggleMeasureMode = function() {
-    window.isMeasuring = !window.isMeasuring; let btn = document.getElementById('measureBtn');
-    if (window.isMeasuring) {
-        btn.style.background = "#dc2626"; btn.style.borderColor = "#991b1b"; window.measureLatLngs = [];
-        if(window.measureLineLayer) window.leafletMap.removeLayer(window.measureLineLayer); if(window.measureMarkersLayer) window.leafletMap.removeLayer(window.measureMarkersLayer);
-        window.measureLineLayer = L.polyline([], {color: '#dc2626', weight: 4, dashArray: '5, 5'}).addTo(window.leafletMap); window.measureMarkersLayer = L.layerGroup().addTo(window.leafletMap);
-        alert("📏 Measure Mode ON.\nTap on the map or points to measure distances.");
-    } else {
-        btn.style.background = "#f59e0b"; btn.style.borderColor = "#d97706";
-        if(window.measureLineLayer) window.leafletMap.removeLayer(window.measureLineLayer); if(window.measureMarkersLayer) window.leafletMap.removeLayer(window.measureMarkersLayer);
-        window.measureLineLayer = null; window.measureMarkersLayer = null;
-    }
-};
-
-function getSnapPoint(lat, lon, zoomLevel) {
-    if (!window.rawDxfEntities || window.rawDxfEntities.length === 0) return { lat, lon, snapped: false };
-    let snapRadiusMeters = zoomLevel >= 20 ? 1.5 : (zoomLevel >= 18 ? 3 : 8);
-    let bestPt = null; let minDist = snapRadiusMeters;
-    const checkPt = (pX, pY) => { let p = window.dxfToLatLon(pX, pY); if (isNaN(p.lat)) return; let d = calcDistance(lat, lon, p.lat, p.lon); if (d < minDist) { minDist = d; bestPt = { lat: p.lat, lon: p.lon, snapped: true }; } };
-    window.rawDxfEntities.forEach(ent => { try { if (ent.type === 'LINE') { checkPt(ent.vertices[0].x, ent.vertices[0].y); checkPt(ent.vertices[1].x, ent.vertices[1].y); } else if (ent.type === 'POLYLINE' || ent.type === 'LWPOLYLINE') { ent.vertices.forEach(v => checkPt(v.x, v.y)); } else if (ent.type === 'POINT' || ent.type === 'CIRCLE') { let px = ent.center ? ent.center.x : (ent.position ? ent.position.x : ent.x); let py = ent.center ? ent.center.y : (ent.position ? ent.position.y : ent.y); checkPt(px, py); } } catch(e) {} });
-    return bestPt ? bestPt : { lat, lon, snapped: false };
-}
-
-// ==========================================
 // --- ONLINE MAP ENGINE ---
 // ==========================================
 
@@ -144,10 +27,13 @@ function getSnapPoint(lat, lon, zoomLevel) {
 
 window.initMap = function() {
     window.leafletMap = L.map('map_view', {
-        zoomControl: true, maxZoom: 24, updateWhenZooming: false, updateWhenIdle: true
+        zoomControl: true,
+        maxZoom: 24,
+        updateWhenZooming: false,
+        updateWhenIdle: true
     }).setView([1.3521, 103.8198], 15);
 
-    // Online Map သီးသန့် အသုံးပြုခြင်း
+    // Online Tiles
     let satLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 24, maxNativeZoom: 21, crossOrigin: 'anonymous' });
     let streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 24, maxNativeZoom: 19 });
 
@@ -161,15 +47,18 @@ window.initMap = function() {
     zoomLevelBox.addTo(window.leafletMap);
 
     window.leafletMap.on('zoomend', function() {
-        let currentZoom = window.leafletMap.getZoom(); zoomLevelBox.update(currentZoom);
+        let currentZoom = window.leafletMap.getZoom();
+        zoomLevelBox.update(currentZoom);
+
         let mapCont = document.getElementById('map_container');
-        if (mapCont) { if (currentZoom < 17) mapCont.classList.add('zoom-out-texts'); else mapCont.classList.remove('zoom-out-texts'); }
+        if (mapCont) {
+            if (currentZoom < 17) mapCont.classList.add('zoom-out-texts');
+            else mapCont.classList.remove('zoom-out-texts');
+        }
     });
 
     window.leafletMap.on('dragstart', function() { window.isAutoCenter = false; document.getElementById('autoCenterBtn').classList.remove('active'); });
     if(window.setOutPoints.length > 0 && typeof window.plotPointsOnMap === 'function') window.plotPointsOnMap();
-
-// အောက်က window.leafletMap.on('click') ... တွေကတော့ မူလအတိုင်း ဆက်ရှိနေရပါမယ် (မဖျက်ပါနဲ့)။
 
     window.leafletMap.on('click', function(e) {
         let tapLat = e.latlng.lat;
@@ -209,17 +98,16 @@ window.initMap = function() {
             return;
         }
 
-        // 🔴 Map Click Logic: Auto Zone Detect & Out of Bounds check
         let datumLabel = "WGS_LL"; let localN = 0, localE = 0;
         let showLocal = false;
         let autoDetectedZone = Math.floor((finalLon + 180) / 6) + 1;
 
-        if (window.activeApp === 1) { // SVY21 Topo Mode
+        if (window.activeApp === 1) {
             if (finalLat >= 1.0 && finalLat <= 2.0 && finalLon >= 103.0 && finalLon <= 104.5) {
                 let pW = calc_v2_fwd(finalLat, finalLon); localN = pW.N; localE = pW.E; datumLabel = "SVY21"; showLocal = true;
             }
         }
-        else if (window.activeApp === 2) { // MM2000 Topo Mode
+        else if (window.activeApp === 2) {
             if (finalLat >= 9.0 && finalLat <= 29.0 && finalLon >= 92.0 && finalLon <= 102.0) {
                 let x = m_llh2xyz(finalLat, finalLon, 0, m_WGS);
                 let mL = m_xyz2llh(x.x+m_DX, x.y+m_DY, x.z+m_DZ, m_EVE);
@@ -227,13 +115,13 @@ window.initMap = function() {
                 localN = pM.n; localE = pM.e; datumLabel = `MM2000 Z${autoDetectedZone}`; showLocal = true;
             }
         }
-        else if (window.activeApp === 5) { // Global UTM Topo Mode
+        else if (window.activeApp === 5) {
             let hemi = finalLat >= 0 ? 'N' : 'S';
             let pW = m_project(finalLat, finalLon, autoDetectedZone, m_WGS);
             localN = pW.n; localE = pW.e; if(hemi === 'S') localN += 10000000;
             datumLabel = `UTM Z${autoDetectedZone}${hemi}`; showLocal = true;
         }
-        else { // SO, COGO, DXF Apps
+        else {
             let soDatumVal = document.getElementById('so_datum') ? document.getElementById('so_datum').value : "WGS_LL";
             let cogoDatumVal = document.getElementById('cogo_datum') ? document.getElementById('cogo_datum').value : "WGS_LL";
             let dxfDatumVal = document.getElementById('dxf_datum') ? document.getElementById('dxf_datum').value : "WGS_LL";
@@ -285,7 +173,7 @@ window.initMap = function() {
         L.popup().setLatLng([finalLat, finalLon]).setContent(popupContent).openOn(window.leafletMap);
     });
 };
-// 🔴 ပြင်ဆင်ထားသော toggleAutoCenter (Location Pin နှိပ်လျှင် Zoom အပြည့်ဖြင့် ချက်ချင်းရောက်ရန်)
+
 window.toggleAutoCenter = function() {
     window.isAutoCenter = !window.isAutoCenter;
     let btn = document.getElementById('autoCenterBtn');
@@ -328,31 +216,11 @@ window.handleDXFUpload = function(event) {
             }
 
             document.getElementById('dxf_status').innerText = `⚙️ Processing ${window.rawDxfEntities.length} entities...`;
-            if (window.mapDB) { let tx = window.mapDB.transaction("dxf_data", "readwrite"); tx.objectStore("dxf_data").put({entities: window.rawDxfEntities, layerTable: window.dxfLayerTable}, "saved_dxf"); }
             let exportBtn = document.getElementById('btn_export_kml'); if(exportBtn) exportBtn.style.display = 'block';
             setTimeout(() => { window.renderDXF(); window.toggleDxfPanel(); }, 100);
         } catch(err) { document.getElementById('dxf_status').innerText = `❌ Error parsing DXF!`; alert("Failed to parse DXF. Please ensure it's a valid text-based DXF file."); }
     };
     reader.readAsText(file); event.target.value = '';
-};
-
-window.loadSavedDXF = function() {
-    if (!window.mapDB) return;
-    let tx = window.mapDB.transaction("dxf_data", "readonly"); let req = tx.objectStore("dxf_data").get("saved_dxf");
-    req.onsuccess = function(e) {
-        if (e.target.result) {
-            let data = e.target.result;
-            if (Array.isArray(data)) { window.rawDxfEntities = data; window.dxfLayerTable = {}; }
-            else { window.rawDxfEntities = data.entities || []; window.dxfLayerTable = data.layerTable || {}; }
-            document.getElementById('dxf_status').innerText = `✅ Loaded saved DXF map.`;
-            let exportBtn = document.getElementById('btn_export_kml'); if(exportBtn) exportBtn.style.display = 'block';
-
-            let chkLines = document.getElementById('tgl_dxf_lines'); if (chkLines) { chkLines.checked = true; chkLines.disabled = false; }
-            let chkTexts = document.getElementById('tgl_dxf_texts'); if (chkTexts) { chkTexts.checked = true; chkTexts.disabled = false; }
-
-            if (window.leafletMap && window.rawDxfEntities.length > 0) { setTimeout(() => { window.renderDXF(); window.toggleDxfPanel(); }, 500); }
-        }
-    };
 };
 
 window.clearDXF = function() {
@@ -377,10 +245,6 @@ window.clearDXF = function() {
     if (chkTexts) { chkTexts.checked = false; chkTexts.disabled = true; }
     let chkDark = document.getElementById('tgl_dxf_dark');
     if (chkDark) { chkDark.checked = false; }
-    if (window.mapDB) {
-        let tx = window.mapDB.transaction("dxf_data", "readwrite");
-        tx.objectStore("dxf_data").delete("saved_dxf");
-    }
 };
 
 window.aciToHex = function(colorNumber) {
@@ -584,7 +448,6 @@ window.toggleDxfLayers = function() {
         else { window.leafletMap.removeLayer(window.pointsLayerGroup); }
     }
 
-    // 🔴 SO Text တွေကို ဖွင့်/ပိတ် လုပ်ရန်
     let chkSoTexts = document.getElementById('tgl_so_texts');
     let mapCont = document.getElementById('map_container');
     if (chkSoTexts && mapCont) {
@@ -602,7 +465,6 @@ window.plotPointsOnMap = function() {
 
     let i = 0;
     let chunkSize = 50;
-    // 🔴 Canvas Renderer ကို သုံးရန် (Performance ပိုကောင်းအောင်)
     let sharedCanvasRenderer = L.canvas({ padding: 0.5 });
 
     function processChunk() {
@@ -611,7 +473,6 @@ window.plotPointsOnMap = function() {
             let ptIndex = i;
             let pt = window.setOutPoints[ptIndex];
 
-            // 🔴 renderer ထည့်ပေးခြင်း
             let ptMarker = L.circleMarker([pt.lat, pt.lon], {
                 radius: 5, color: 'rgba(0,0,0,0.01)', weight: 25, fillColor: '#ef4444', fillOpacity: 1,
                 renderer: sharedCanvasRenderer
