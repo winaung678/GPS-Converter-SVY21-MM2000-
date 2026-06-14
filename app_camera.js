@@ -148,7 +148,6 @@ window.processCameraPhoto = function(event) {
             drawRoundRect(ctx, boxX, boxY, boxWidth, boxHeight, 20);
             ctx.fill();
 
-            // မြေပုံ အရွယ်အစား
             let mapSize = fontSize * 10.5;
             let textX = boxX + padding;
             let availableTextWidth = boxWidth - (padding * 2);
@@ -164,27 +163,22 @@ window.processCameraPhoto = function(event) {
                 drawRoundRect(ctx, drawBoxX, drawBoxY, mapSize, mapSize, 12);
                 ctx.clip();
 
-                // 🔴 3. လုံခြုံသော ဧရိယာ (512x512) ကိုသာ ဖြတ်ယူခြင်း (လုံးဝ ဘောင်မလွတ်စေရန်)
                 let srcCenterX = 256 + offsetX;
                 let srcCenterY = 256 + offsetY;
                 let cropSize = 512;
                 let srcX = srcCenterX - (cropSize / 2);
                 let srcY = srcCenterY - (cropSize / 2);
 
-                // ဖြတ်ယူထားသော 512x512 ကို Camera UI မှ mapSize အပြည့်ဖြစ်အောင် အော်တိုဆွဲဆန့် (Scale) မည်
                 ctx.drawImage(mapCnv, srcX, srcY, cropSize, cropSize, drawBoxX, drawBoxY, mapSize, mapSize);
 
-                // Center တိကျသွားသောကြောင့် Pin ကို Box ၏ အလယ်တည့်တည့်တွင် အတိအကျချထားနိုင်ပြီ
                 let pinX = drawBoxX + (mapSize / 2);
                 let pinY = drawBoxY + (mapSize / 2);
 
-                // Pin အရိပ်
                 ctx.beginPath();
                 ctx.arc(pinX, pinY, 20, 0, 2*Math.PI);
                 ctx.fillStyle = "rgba(239, 68, 68, 0.4)";
                 ctx.fill();
 
-                // အလွန်ကြီးမားသော 📍 Pin
                 ctx.beginPath();
                 ctx.moveTo(pinX, pinY);
                 ctx.bezierCurveTo(pinX - 45, pinY - 45, pinX - 45, pinY - 110, pinX, pinY - 110);
@@ -194,7 +188,6 @@ window.processCameraPhoto = function(event) {
 
                 ctx.lineWidth = 4; ctx.strokeStyle = "#ffffff"; ctx.stroke();
 
-                // အလယ်က အဖြူစက်
                 ctx.beginPath();
                 ctx.arc(pinX, pinY - 75, 12, 0, 2*Math.PI);
                 ctx.fillStyle = "#ffffff";
@@ -202,7 +195,6 @@ window.processCameraPhoto = function(event) {
 
                 ctx.restore();
 
-                // မြေပုံ အပြင်ဘောင်
                 drawRoundRect(ctx, drawBoxX, drawBoxY, mapSize, mapSize, 12);
                 ctx.lineWidth = 3; ctx.strokeStyle = "rgba(255,255,255,0.7)"; ctx.stroke();
             } else {
@@ -210,13 +202,11 @@ window.processCameraPhoto = function(event) {
                 availableTextWidth -= (mapSize + padding);
             }
 
-            // 3. Texts
             ctx.shadowColor = "rgba(0,0,0,0.9)";
             ctx.shadowBlur = 4; ctx.shadowOffsetX = 2; ctx.shadowOffsetY = 2;
 
             let currentY = boxY + padding + (fontSize * 1.0);
 
-            // Point Name & Compass
             ctx.font = `bold ${fontSize * 1.2}px sans-serif`;
             ctx.fillStyle = "#4ade80";
             ctx.fillText(`📌 ${pName}`, textX, currentY);
@@ -226,53 +216,48 @@ window.processCameraPhoto = function(event) {
             ctx.fillText(compassText, boxX + boxWidth - padding, currentY);
             ctx.textAlign = "left";
 
-            // Address (Word wrap)
             currentY += fontSize * 1.6;
             ctx.font = `bold ${fontSize * 0.9}px sans-serif`;
             ctx.fillStyle = "#ffffff";
             currentY = wrapTextMaxLines(ctx, addressText, textX, currentY, availableTextWidth, fontSize * 1.3, 2);
 
-            // Coordinates
             currentY += fontSize * 0.5;
             ctx.font = `normal ${fontSize}px sans-serif`;
             if (isOutOfBounds) ctx.fillStyle = "#fca5a5"; else ctx.fillStyle = "#ffffff";
             ctx.fillText(coordStr, textX, currentY);
 
-            // WGS Coordinates
             currentY += fontSize * 1.4;
             ctx.fillStyle = "#e2e8f0";
             ctx.fillText(wgsStr, textX, currentY);
 
-            // Date
             currentY += fontSize * 1.5;
             ctx.font = `normal ${fontSize * 0.85}px sans-serif`;
             ctx.fillStyle = "#fcd34d";
             ctx.fillText(`📅 ${dateStr}`, textX, currentY);
 
-            // Note
             currentY += fontSize * 1.3;
             ctx.fillStyle = "#94a3b8";
             if (currentY > boxY + boxHeight - padding) { currentY = boxY + boxHeight - padding; }
             ctx.fillText(`📝 Note: Captured by SVY21/MM2000 GPS CONVERTER`, textX, currentY);
 
             // --- SAVE IMAGE (WEB FALLBACK) ---
-                        let base64Image = canvas.toDataURL("image/jpeg", 0.9);
-                        document.getElementById('cam_placeholder').style.display = 'none';
-                        let previewImg = document.getElementById('cam_preview_img');
-                        previewImg.src = base64Image;
-                        previewImg.style.display = 'block';
+            let base64Image = canvas.toDataURL("image/jpeg", 0.9);
+            document.getElementById('cam_placeholder').style.display = 'none';
+            let previewImg = document.getElementById('cam_preview_img');
+            previewImg.src = base64Image;
+            previewImg.style.display = 'block';
 
-                        if (window.AndroidNative && window.AndroidNative.saveImageToGallery) {
-                            let fileName = `Survey_${pName}_${new Date().getTime()}.jpg`;
-                            window.AndroidNative.saveImageToGallery(base64Image.split(',')[1], fileName);
-                            statusBox.style.color = "#16a34a"; statusBox.innerText = `✅ Photo saved to Gallery!`;
-                        } else {
-                            statusBox.style.color = "#2563eb";
-                            statusBox.innerHTML = `✅ Photo generated successfully!<br><span style="font-size:11px; color:#475569;">Long-press (Tap & Hold) the image above to save it to your Photos.</span>`;
-                        }
-                    };
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(file);
-                event.target.value = '';
-            };
+            if (window.AndroidNative && window.AndroidNative.saveImageToGallery) {
+                let fileName = `Survey_${pName}_${new Date().getTime()}.jpg`;
+                window.AndroidNative.saveImageToGallery(base64Image.split(',')[1], fileName);
+                statusBox.style.color = "#16a34a"; statusBox.innerText = `✅ Photo saved to Gallery!`;
+            } else {
+                statusBox.style.color = "#2563eb";
+                statusBox.innerHTML = `✅ Photo generated successfully!<br><span style="font-size:11px; color:#475569;">Long-press (Tap & Hold) the image above to save it to your Photos.</span>`;
+            }
+        };
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+    event.target.value = '';
+};

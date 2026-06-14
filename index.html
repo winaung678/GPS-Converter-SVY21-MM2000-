@@ -293,7 +293,7 @@
     <!-- 🧮 COGO (App 4) -->
     <div id="app4_view" class="hidden app-container">
 
-        <!-- 🔴 COGO ပင်မ မျက်နှာပြင် (ခလုတ် ၃ ခုသာ ရှိမည်) -->
+        <!-- 🔴 COGO ပင်မ မျက်နှာပြင် -->
         <div id="cogo_main_menu" class="app-card">
             <div class="card-header" style="background:#8b5cf6;">
                 <h3 class="card-title">COGO & Tools</h3>
@@ -316,14 +316,11 @@
             </div>
         </div>
 
-        <!-- 🔴 Tool တစ်ခုစီ ပွင့်လာမည့် နေရာ (အစတွင် ဖျောက်ထားမည်) -->
+        <!-- 🔴 Tool တစ်ခုစီ ပွင့်လာမည့် နေရာ -->
         <div id="cogo_tool_container" class="hidden">
-
-            <!-- Tool ခေါင်းစဉ် (Back ခလုတ် ဖြုတ်ထားသည်) -->
             <div style="display:flex; align-items:center; justify-content:center; margin-bottom:10px;">
                 <div id="cogo_tool_title" style="font-weight:bold; font-size:16px; color:var(--text); text-align:center;">Tool Name</div>
             </div>
-
             <div class="app-card">
                 <div class="card-body" style="padding: 12px;">
 
@@ -410,11 +407,9 @@
                                 <div style="flex:1;">
                                     <input type="text" inputmode="text" id="inv_dist" class="v2-input" placeholder="Distance (m)">
                                 </div>
-
                                 <div style="flex:1;" id="inv_brg_dec_div">
                                     <input type="text" inputmode="text" id="inv_brg_dec" class="v2-input" placeholder="Bearing (DD.dd)">
                                 </div>
-
                                 <div style="flex:1; display:none;" id="inv_brg_dms_div">
                                     <div class="dms-grid" style="margin-top:0;">
                                         <input type="text" inputmode="text" id="inv_brg_d" placeholder="D">
@@ -423,7 +418,6 @@
                                     </div>
                                 </div>
                             </div>
-
                             <div id="inv_result_dms" style="font-size:13px; font-weight:bold; color:#1e40af; text-align:center; margin-top:8px; padding:5px; background:rgba(59,130,246,0.1); border-radius:6px; border:1px solid rgba(59,130,246,0.3); display:none;"></div>
                         </div>
                     </div>
@@ -435,22 +429,18 @@
                         <div style="display:flex; justify-content:flex-end; margin-bottom:10px;">
                             <button class="top-btn" onclick="clearGradient()" style="padding:5px 10px; font-size:11px; background:#fee2e2; color:#b91c1c; border-color:#fca5a5;">🗑️ Clear</button>
                         </div>
-
                         <div style="display:flex; gap:5px;">
                             <div style="flex:1;"><label class="v2-label" style="margin-top:0;">Distance (m)</label><input type="text" inputmode="text" id="grad_dist" class="v2-input"></div>
                             <div style="flex:1;"><label class="v2-label" style="margin-top:0;">Start Z (Z1)</label><input type="text" inputmode="text" id="grad_z1" class="v2-input"></div>
                         </div>
-
                         <div style="display:flex; gap:5px; margin-top:8px;">
                             <div style="flex:1;"><label class="v2-label" style="margin-top:0; color:#1e40af;">End Z (Z2)</label><input type="text" inputmode="text" id="grad_z2" class="v2-input" style="border-color:#1e40af;"></div>
                             <div style="flex:1;"><label class="v2-label" style="margin-top:0; color:#b91c1c;">Gradient (% or 1:N)</label><input type="text" inputmode="text" id="grad_pct" class="v2-input" placeholder="e.g. 2.5 or 1:-40" style="border-color:#b91c1c;"></div>
                         </div>
-
                         <div style="display:flex; gap:5px; margin-top:15px;">
                             <button class="btn-action" style="flex:1; padding:12px; font-size:12px; background:#b91c1c;" onclick="calcGradientFromZ()">Calc % Gradient</button>
                             <button class="btn-action" style="flex:1; padding:12px; font-size:12px; background:#1e40af;" onclick="calcZ2FromGradient()">Calc End Z (Z2)</button>
                         </div>
-
                         <div id="grad_result" style="font-size:13px; font-weight:bold; color:#059669; text-align:center; margin-top:12px; padding:10px; background:rgba(16,185,129,0.1); border-radius:8px; border:1px solid rgba(16,185,129,0.3); display:none;"></div>
                     </div>
 
@@ -538,7 +528,7 @@
     <div id="shared_map_view" class="hidden">
         <div class="app-card" style="margin-bottom: 0;">
             <div class="card-body" style="padding: 10px;">
-                <!-- Offline Map Buttons ဖြုတ်လိုက်ပါပြီ -->
+                <!-- Offline Map Buttons Removed -->
                 <div style="background:var(--res-bg); padding:8px 10px; border-radius:8px; border:1px solid var(--input-border); margin-bottom:10px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_dxf_lines" checked onchange="toggleDxfLayers()"> 〰️ Lines</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_dxf_texts" checked onchange="toggleDxfLayers()"> 🔠 Text</label>
@@ -624,11 +614,9 @@
 <script src="formulas.js"></script>
 <script src="globals.js"></script>
 <script src="map_engine.js"></script>
-<!-- 🔴 ခွဲထုတ်လိုက်သည့် ဖိုင်အသစ်များ -->
 <script src="app_conversions.js"></script>
 <script src="app_survey_tools.js"></script>
 <script src="app_camera.js"></script>
-
-<script src="app_logic.js"></script> <!-- ပင်မဖိုင် -->
+<script src="app_logic.js"></script>
 </body>
 </html>
