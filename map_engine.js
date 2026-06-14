@@ -115,21 +115,44 @@ function getSnapPoint(lat, lon, zoomLevel) {
     return bestPt ? bestPt : { lat, lon, snapped: false };
 }
 
+// ==========================================
+// --- ONLINE MAP ENGINE ---
+// ==========================================
+
+window.toggleMeasureMode = function() {
+    window.isMeasuring = !window.isMeasuring; let btn = document.getElementById('measureBtn');
+    if (window.isMeasuring) {
+        btn.style.background = "#dc2626"; btn.style.borderColor = "#991b1b"; window.measureLatLngs = [];
+        if(window.measureLineLayer) window.leafletMap.removeLayer(window.measureLineLayer); if(window.measureMarkersLayer) window.leafletMap.removeLayer(window.measureMarkersLayer);
+        window.measureLineLayer = L.polyline([], {color: '#dc2626', weight: 4, dashArray: '5, 5'}).addTo(window.leafletMap); window.measureMarkersLayer = L.layerGroup().addTo(window.leafletMap);
+        alert("📏 Measure Mode ON.\nTap on the map or points to measure distances.");
+    } else {
+        btn.style.background = "#f59e0b"; btn.style.borderColor = "#d97706";
+        if(window.measureLineLayer) window.leafletMap.removeLayer(window.measureLineLayer); if(window.measureMarkersLayer) window.leafletMap.removeLayer(window.measureMarkersLayer);
+        window.measureLineLayer = null; window.measureMarkersLayer = null;
+    }
+};
+
+function getSnapPoint(lat, lon, zoomLevel) {
+    if (!window.rawDxfEntities || window.rawDxfEntities.length === 0) return { lat, lon, snapped: false };
+    let snapRadiusMeters = zoomLevel >= 20 ? 1.5 : (zoomLevel >= 18 ? 3 : 8);
+    let bestPt = null; let minDist = snapRadiusMeters;
+    const checkPt = (pX, pY) => { let p = window.dxfToLatLon(pX, pY); if (isNaN(p.lat)) return; let d = calcDistance(lat, lon, p.lat, p.lon); if (d < minDist) { minDist = d; bestPt = { lat: p.lat, lon: p.lon, snapped: true }; } };
+    window.rawDxfEntities.forEach(ent => { try { if (ent.type === 'LINE') { checkPt(ent.vertices[0].x, ent.vertices[0].y); checkPt(ent.vertices[1].x, ent.vertices[1].y); } else if (ent.type === 'POLYLINE' || ent.type === 'LWPOLYLINE') { ent.vertices.forEach(v => checkPt(v.x, v.y)); } else if (ent.type === 'POINT' || ent.type === 'CIRCLE') { let px = ent.center ? ent.center.x : (ent.position ? ent.position.x : ent.x); let py = ent.center ? ent.center.y : (ent.position ? ent.position.y : ent.y); checkPt(px, py); } } catch(e) {} });
+    return bestPt ? bestPt : { lat, lon, snapped: false };
+}
+
 window.initMap = function() {
-    // 🔴 Zoom Smooth ဖြစ်စေရန် ပြင်ဆင်ချက်
     window.leafletMap = L.map('map_view', {
-        zoomControl: true,
-        maxZoom: 24,
-        updateWhenZooming: false,
-        updateWhenIdle: true
+        zoomControl: true, maxZoom: 24, updateWhenZooming: false, updateWhenIdle: true
     }).setView([1.3521, 103.8198], 15);
 
-    // 🔴 Offline Map Tile ကို Buffer ထားရန် keepBuffer ထည့်ခြင်း
-    let satLayer = new L.TileLayer.Offline(window.mapTileUrl, { maxZoom: 24, maxNativeZoom: 21, crossOrigin: 'anonymous', keepBuffer: 4 });
-    let streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 24, maxNativeZoom: 19, keepBuffer: 4 });
+    // Online Map သီးသန့် အသုံးပြုခြင်း
+    let satLayer = L.tileLayer('https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', { maxZoom: 24, maxNativeZoom: 21, crossOrigin: 'anonymous' });
+    let streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 24, maxNativeZoom: 19 });
 
     satLayer.addTo(window.leafletMap);
-    L.control.layers({"Street Map": streetLayer, "Hybrid (Offline)": satLayer}).addTo(window.leafletMap);
+    L.control.layers({"Street Map": streetLayer, "Satellite": satLayer}).addTo(window.leafletMap);
     window.pointsLayerGroup = L.layerGroup().addTo(window.leafletMap);
 
     let zoomLevelBox = L.control({position: 'topleft'});
@@ -137,20 +160,16 @@ window.initMap = function() {
     zoomLevelBox.update = function(z) { this._div.innerHTML = "<b>Z: " + z + "</b>"; };
     zoomLevelBox.addTo(window.leafletMap);
 
-    // 🔴 Zoom level အရ Text များဖျောက်ရန်
     window.leafletMap.on('zoomend', function() {
-        let currentZoom = window.leafletMap.getZoom();
-        zoomLevelBox.update(currentZoom);
-
+        let currentZoom = window.leafletMap.getZoom(); zoomLevelBox.update(currentZoom);
         let mapCont = document.getElementById('map_container');
-        if (mapCont) {
-            if (currentZoom < 17) mapCont.classList.add('zoom-out-texts');
-            else mapCont.classList.remove('zoom-out-texts');
-        }
+        if (mapCont) { if (currentZoom < 17) mapCont.classList.add('zoom-out-texts'); else mapCont.classList.remove('zoom-out-texts'); }
     });
 
     window.leafletMap.on('dragstart', function() { window.isAutoCenter = false; document.getElementById('autoCenterBtn').classList.remove('active'); });
     if(window.setOutPoints.length > 0 && typeof window.plotPointsOnMap === 'function') window.plotPointsOnMap();
+
+// အောက်က window.leafletMap.on('click') ... တွေကတော့ မူလအတိုင်း ဆက်ရှိနေရပါမယ် (မဖျက်ပါနဲ့)။
 
     window.leafletMap.on('click', function(e) {
         let tapLat = e.latlng.lat;

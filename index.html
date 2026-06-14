@@ -538,24 +538,13 @@
     <div id="shared_map_view" class="hidden">
         <div class="app-card" style="margin-bottom: 0;">
             <div class="card-body" style="padding: 10px;">
-                <div style="display:flex; gap:5px; margin-bottom:10px;">
-                    <button class="btn-action" style="flex:1; background:#3b82f6; padding:12px; font-size:13px;" onclick="promptOfflineDownload()">📥 Download Area Map</button>
-                    <button class="btn-action" style="flex:0.4; background:#ef4444; padding:12px; font-size:13px;" onclick="clearOfflineMap()">🗑️ Clear</button>
-                </div>
+                <!-- Offline Map Buttons ဖြုတ်လိုက်ပါပြီ -->
                 <div style="background:var(--res-bg); padding:8px 10px; border-radius:8px; border:1px solid var(--input-border); margin-bottom:10px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_dxf_lines" checked onchange="toggleDxfLayers()"> 〰️ Lines</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_dxf_texts" checked onchange="toggleDxfLayers()"> 🔠 Text</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_so_pts" checked onchange="toggleDxfLayers()"> 🎯 SO Pts</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_so_texts" checked onchange="toggleDxfLayers()"> 🔠 SO Text</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer; width:100%; border-top:1px dashed #ccc; padding-top:6px;"><input type="checkbox" id="tgl_dxf_dark" onchange="reRenderDXFColors()"> 🌙 Use Dark Colors for DXF</label>
-                </div>
-                <div id="dl_progress_modal" class="dl-progress-box" style="position:relative; top:0; left:0; margin-bottom:10px; display:none;">
-                    <b style="color:#3b82f6;font-size:14px;" id="dl_status_text">Calculating Tiles...</b>
-                    <div class="dl-progress-bar-bg"><div id="dl_progress_fill" class="dl-progress-bar-fill"></div></div>
-                    <div style="margin-top:10px;display:flex;gap:5px;">
-                        <button id="dl_confirm_btn" style="flex:1;background:#10b981;color:white;border:none;padding:10px;border-radius:5px;font-weight:bold;display:none;cursor:pointer;" onclick="startTileDownload()">✅ Start Download</button>
-                        <button id="dl_cancel_btn" style="flex:1;background:#ef4444;color:white;border:none;padding:10px;border-radius:5px;font-weight:bold;cursor:pointer;" onclick="cancelOfflineDownload()">❌ Cancel</button>
-                    </div>
                 </div>
                 <div class="map-wrapper" id="map_container">
                     <div id="map_view"></div>

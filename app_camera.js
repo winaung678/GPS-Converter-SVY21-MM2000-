@@ -255,21 +255,24 @@ window.processCameraPhoto = function(event) {
             if (currentY > boxY + boxHeight - padding) { currentY = boxY + boxHeight - padding; }
             ctx.fillText(`📝 Note: Captured by SVY21/MM2000 GPS CONVERTER`, textX, currentY);
 
-            // --- SAVE IMAGE ---
-            let base64Image = canvas.toDataURL("image/jpeg", 0.9);
-            if (window.AndroidNative && window.AndroidNative.saveImageToGallery) {
-                let fileName = `Survey_${pName}_${new Date().getTime()}.jpg`;
-                window.AndroidNative.saveImageToGallery(base64Image.split(',')[1], fileName);
-                document.getElementById('cam_placeholder').style.display = 'none';
-                let previewImg = document.getElementById('cam_preview_img');
-                previewImg.src = base64Image; previewImg.style.display = 'block';
-                statusBox.style.color = "#16a34a"; statusBox.innerText = `✅ Photo saved to Gallery!`;
-            } else {
-                statusBox.style.color = "#ef4444"; statusBox.innerText = `⚠️ Cannot save on Web Browser. Use Android App.`;
-            }
-        };
-        img.src = e.target.result;
-    };
-    reader.readAsDataURL(file);
-    event.target.value = '';
-};
+            // --- SAVE IMAGE (WEB FALLBACK) ---
+                        let base64Image = canvas.toDataURL("image/jpeg", 0.9);
+                        document.getElementById('cam_placeholder').style.display = 'none';
+                        let previewImg = document.getElementById('cam_preview_img');
+                        previewImg.src = base64Image;
+                        previewImg.style.display = 'block';
+
+                        if (window.AndroidNative && window.AndroidNative.saveImageToGallery) {
+                            let fileName = `Survey_${pName}_${new Date().getTime()}.jpg`;
+                            window.AndroidNative.saveImageToGallery(base64Image.split(',')[1], fileName);
+                            statusBox.style.color = "#16a34a"; statusBox.innerText = `✅ Photo saved to Gallery!`;
+                        } else {
+                            statusBox.style.color = "#2563eb";
+                            statusBox.innerHTML = `✅ Photo generated successfully!<br><span style="font-size:11px; color:#475569;">Long-press (Tap & Hold) the image above to save it to your Photos.</span>`;
+                        }
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+                event.target.value = '';
+            };
