@@ -215,12 +215,42 @@ window.handleDXFUpload = function(event) {
                 }
             }
 
+            // 🔴 DXF Data ကို Browser Database (IndexedDB) ထဲ အသေသိမ်းခြင်း
+            if (window.mapDB) {
+                let tx = window.mapDB.transaction("dxf_data", "readwrite");
+                tx.objectStore("dxf_data").put({entities: window.rawDxfEntities, layerTable: window.dxfLayerTable}, "saved_dxf");
+            }
+
             document.getElementById('dxf_status').innerText = `⚙️ Processing ${window.rawDxfEntities.length} entities...`;
             let exportBtn = document.getElementById('btn_export_kml'); if(exportBtn) exportBtn.style.display = 'block';
             setTimeout(() => { window.renderDXF(); window.toggleDxfPanel(); }, 100);
         } catch(err) { document.getElementById('dxf_status').innerText = `❌ Error parsing DXF!`; alert("Failed to parse DXF. Please ensure it's a valid text-based DXF file."); }
     };
     reader.readAsText(file); event.target.value = '';
+};
+
+// 🔴 App ဖွင့်တာနဲ့ သိမ်းထားတဲ့ DXF ကို အလိုအလျောက် ပြန်ခေါ်မည့် Function အသစ်
+window.loadSavedDXF = function() {
+    if (!window.mapDB) return;
+    let tx = window.mapDB.transaction("dxf_data", "readonly");
+    let req = tx.objectStore("dxf_data").get("saved_dxf");
+    req.onsuccess = function(e) {
+        if (e.target.result) {
+            let data = e.target.result;
+            window.rawDxfEntities = data.entities || [];
+            window.dxfLayerTable = data.layerTable || {};
+            document.getElementById('dxf_status').innerText = `✅ Loaded saved DXF map.`;
+            let exportBtn = document.getElementById('btn_export_kml'); if(exportBtn) exportBtn.style.display = 'block';
+
+            let chkLines = document.getElementById('tgl_dxf_lines'); if (chkLines) { chkLines.checked = true; chkLines.disabled = false; }
+            let chkTexts = document.getElementById('tgl_dxf_texts'); if (chkTexts) { chkTexts.checked = true; chkTexts.disabled = false; }
+
+            // မြေပုံဆွဲရန် အချိန်နည်းနည်းစောင့်ပြီး Auto ခေါ်ပေးခြင်း
+            if (window.leafletMap && window.rawDxfEntities.length > 0) {
+                setTimeout(() => { window.renderDXF(); }, 500);
+            }
+        }
+    };
 };
 
 window.clearDXF = function() {
@@ -245,6 +275,12 @@ window.clearDXF = function() {
     if (chkTexts) { chkTexts.checked = false; chkTexts.disabled = true; }
     let chkDark = document.getElementById('tgl_dxf_dark');
     if (chkDark) { chkDark.checked = false; }
+
+    // 🔴 Clear လုပ်တဲ့အခါ Database ထဲကပါ အပြီးဖျက်ခြင်း
+    if (window.mapDB) {
+        let tx = window.mapDB.transaction("dxf_data", "readwrite");
+        tx.objectStore("dxf_data").delete("saved_dxf");
+    }
 };
 
 window.aciToHex = function(colorNumber) {
