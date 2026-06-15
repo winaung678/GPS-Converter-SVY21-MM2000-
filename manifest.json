@@ -1,6 +1,6 @@
 {
-  "name": "Survey Pro (SVY21/MM2000)",
-  "short_name": "Survey Pro",
+  "name": "GPS Converter (SVY21/MM2000)",
+  "short_name": "GPS Converter",
   "description": "Professional Land Surveying & GPS Converter Tool",
   "start_url": "./index.html",
   "display": "standalone",
