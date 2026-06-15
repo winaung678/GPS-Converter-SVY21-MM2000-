@@ -59,7 +59,10 @@ window.onload = function() {
     let sDxfDatum = localStorage.getItem('pref_dxf_datum');
     if(sDxfDatum) { document.getElementById('dxf_datum').value = sDxfDatum; window.toggleDxfDatum(); }
 
-    window.switchApp(0);
+    // 🔴 Refresh လုပ်ရင် ရောက်နေတဲ့နေရာမှာပဲ ဆက်ရှိနေအောင် မှတ်ဉာဏ်ပြန်ခေါ်ခြင်း
+    let lastApp = localStorage.getItem('surveyProLastApp');
+    let startApp = lastApp ? parseInt(lastApp) : 0;
+    window.switchApp(startApp);
 
     // Web Compass Listener
     if (window.DeviceOrientationEvent) {
@@ -119,6 +122,10 @@ window.switchApp = function(n) {
     if (window.activeApp === 4 && n !== 4) { window.clearAreaResultOnly(); }
 
     window.activeApp = n;
+
+    // 🔴 ရောက်သွားတဲ့ စာမျက်နှာကို မှတ်ထားမည် (Refresh လုပ်ရင် ပြန်ခေါ်နိုင်ရန်)
+    localStorage.setItem('surveyProLastApp', n);
+
     document.getElementById('dashboard_view').classList.toggle('hidden', n !== 0);
     document.getElementById('app1_view').classList.toggle('hidden', n !== 1);
     document.getElementById('app2_view').classList.toggle('hidden', n !== 2);
@@ -148,11 +155,24 @@ window.switchApp = function(n) {
 
     if(n !== 0 && n !== 7) {
         if(!window.leafletMap) window.initMap();
+
+        // 🔴 DXF စာမျက်နှာ (App 6) ကို ရောက်ရင် Memory ထဲမှာ DXF မရှိရင် DB ထဲကနေ အတင်းပြန်ခေါ်မည်
+        if (n === 6) {
+            if ((!window.rawDxfEntities || window.rawDxfEntities.length === 0) && typeof window.loadSavedDXF === 'function') {
+                window.loadSavedDXF();
+            }
+        }
+
         setTimeout(() => {
             window.leafletMap.invalidateSize();
             if (n === 3 || n === 4 || n === 6) { if (window.recordedLayerGroup && window.leafletMap.hasLayer(window.recordedLayerGroup)) { window.leafletMap.removeLayer(window.recordedLayerGroup); } if (window.pointsLayerGroup && !window.leafletMap.hasLayer(window.pointsLayerGroup)) { window.leafletMap.addLayer(window.pointsLayerGroup); } window.plotPointsOnMap(); }
             if (n === 1 || n === 2 || n === 5) { if (window.recordedLayerGroup && !window.leafletMap.hasLayer(window.recordedLayerGroup)) { window.leafletMap.addLayer(window.recordedLayerGroup); } window.plotRecordedPointsOnMap(); window.updateTopoUI(); }
-            if (window.rawDxfEntities && window.rawDxfEntities.length > 0 && window.dxfLineLayer === null) { window.renderDXF(); } else { window.toggleDxfLayers(); }
+
+            // 🔴 DXF ဆွဲမည့် အပိုင်းကို သေချာစစ်ဆေးမည်
+            if (window.rawDxfEntities && window.rawDxfEntities.length > 0) {
+                if (window.dxfLineLayer === null) { window.renderDXF(); } else { window.toggleDxfLayers(); }
+            } else { window.toggleDxfLayers(); }
+
             if (n === 1 || n === 2 || n === 5) { if (window.pointsLayerGroup && window.leafletMap.hasLayer(window.pointsLayerGroup)) { window.leafletMap.removeLayer(window.pointsLayerGroup); } }
         }, 350);
     }
