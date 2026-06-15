@@ -8,6 +8,16 @@
     <script src="leaflet.js"></script>
     <script src="https://unpkg.com/dxf-parser/dist/dxf-parser.js"></script>
     <link rel="stylesheet" href="style.css">
+    <link rel="manifest" href="manifest.json">
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js')
+                .then(reg => console.log('Service Worker Registered'))
+                .catch(err => console.log('Service Worker Error', err));
+            });
+        }
+    </script>
 </head>
 <body id="master-ui">
 <div class="container-box">
