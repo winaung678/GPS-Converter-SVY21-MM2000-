@@ -84,5 +84,11 @@ requestDB.onupgradeneeded = function(e) {
 };
 requestDB.onsuccess = function(e) {
     window.mapDB = e.target.result;
-    if (typeof window.loadSavedDXF === "function") window.loadSavedDXF();
+    // 🔴 ဤနေရာတွင် DXF ကို အလိုအလျောက် ပြန်ခေါ်ရန် ထည့်ထားပါသည်
+    if (typeof window.loadSavedDXF === "function") {
+        window.loadSavedDXF();
+    }
+};
+requestDB.onerror = function(e) {
+    console.error("IndexedDB Error:", e);
 };
