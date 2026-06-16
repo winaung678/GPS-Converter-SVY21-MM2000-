@@ -99,7 +99,9 @@
             <div class="card-body">
                 <div id="v2_gps_box" class="gps-box hidden">
                     <div class="gps-row"><span style="font-size:11px;font-weight:bold;color:#10b981;">Tracking Mode ON</span></div>
-                    <div class="gps-row"><span id="v2_gps_stat" class="gps-status">H: -- | V: --</span><span id="v2_sat_info" class="gps-status" style="flex:0.3;background:#475569;">SAT: 0</span></div>
+                    <div class="gps-row">
+                        <span id="v2_gps_stat" class="gps-status">H.Acc: --</span>
+                    </div>
                     <div class="gps-row"><span id="v2_dop_info" class="gps-status" style="background:#3b82f6;">PDOP: -- | VDOP: --</span></div>
                     <div class="z-badge" id="v2_z_val">MSL: --.--- m</div>
                     <div class="geoid-text" id="v2_raw_alt" style="color:#d97706; font-weight:bold;">Raw GPS Alt: --.--- m</div>
@@ -144,7 +146,9 @@
             <div class="card-body">
                 <div id="m_gps_box" class="gps-box hidden">
                     <div class="gps-row"><span style="font-size:11px;font-weight:bold;color:#10b981;">Tracking Mode ON</span></div>
-                    <div class="gps-row"><span id="m_gps_stat" class="gps-status">H: -- | V: --</span><span id="m_sat_info" class="gps-status" style="flex:0.3;background:#475569;">SAT: 0</span></div>
+                    <div class="gps-row">
+                        <span id="m_gps_stat" class="gps-status">H.Acc: --</span>
+                    </div>
                     <div class="gps-row"><span id="m_dop_info" class="gps-status" style="background:#3b82f6;">PDOP: -- | VDOP: --</span></div>
                     <div class="z-badge" id="m_z_val">MSL: --.--- m</div>
                     <div class="geoid-text" id="m_raw_alt" style="color:#d97706; font-weight:bold;">Raw GPS Alt: --.--- m</div>
@@ -193,7 +197,9 @@
             <div class="card-body">
                 <div id="g_gps_box" class="gps-box hidden">
                     <div class="gps-row"><span style="font-size:11px;font-weight:bold;color:#10b981;">Tracking Mode ON</span></div>
-                    <div class="gps-row"><span id="g_gps_stat" class="gps-status">H: -- | V: --</span><span id="g_sat_info" class="gps-status" style="flex:0.3;background:#475569;">SAT: 0</span></div>
+                    <div class="gps-row">
+                        <span id="g_gps_stat" class="gps-status">H.Acc: --</span>
+                    </div>
                     <div class="gps-row"><span id="g_dop_info" class="gps-status" style="background:#3b82f6;">PDOP: -- | VDOP: --</span></div>
                     <div class="z-badge" id="g_z_val" style="color:#0f766e; border-color:rgba(15,118,110,0.3); background:rgba(15,118,110,0.1);">MSL: --.--- m</div>
                     <div class="geoid-text" id="g_raw_alt" style="color:#d97706; font-weight:bold;">Raw GPS Alt: --.--- m</div>
@@ -249,9 +255,8 @@
                 <div class="card-subtitle">GPS Navigation</div>
             </div>
             <div class="card-body" style="padding: 10px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+                <div style="margin-bottom:10px;">
                     <label class="v2-label" style="margin:0;">Select Data Format:</label>
-                    <button id="soundBtn" class="top-btn" onclick="toggleSound()" style="background:#10b981;color:white;border:none;">🔊 Sound: ON</button>
                 </div>
                 <select id="so_datum" class="v2-input" style="margin-top:0;" onchange="toggleSoDatum()">
                     <option value="SVY21">🇸🇬 SVY21 (Local N, E)</option>

@@ -142,7 +142,37 @@ window.addPointToArea = function(idx) {
     if (typeof window.plotPointsOnMap === "function") window.plotPointsOnMap();
 };
 
-window.updateSetOut = function() { if(!window.targetPoint || window.currentLat === 0) return; let dist = calcDistance(window.currentLat, window.currentLon, window.targetPoint.lat, window.targetPoint.lon); let bearing = calcBearing(window.currentLat, window.currentLon, window.targetPoint.lat, window.targetPoint.lon); let arrowRotation = bearing - window.compassAzimuth; let soArrow = document.getElementById('so_arrow'); if (soArrow) soArrow.style.transform = `rotate(${arrowRotation}deg)`; let distBox = document.getElementById('so_dist'); if (distBox) distBox.innerText = dist.toFixed(3) + " m"; let dLat = (window.targetPoint.lat - window.currentLat) * 111320; let dLon = (window.targetPoint.lon - window.currentLon) * (111320 * Math.cos(toRad(window.currentLat))); let dirN = dLat >= 0 ? "North" : "South"; let dirE = dLon >= 0 ? "East" : "West"; let soGuide = document.getElementById('so_guidance_text'); if (soGuide) soGuide.innerHTML = `Go ${dirN}: <b>${Math.abs(dLat).toFixed(2)}m</b> | Go ${dirE}: <b>${Math.abs(dLon).toFixed(2)}m</b>`; let latlngs = [ [window.currentLat, window.currentLon], [window.targetPoint.lat, window.targetPoint.lon] ]; if(!window.distanceLine) { window.distanceLine = L.polyline(latlngs, {color: '#ef4444', dashArray: '5, 5', weight: 3}).addTo(window.leafletMap); } else { window.distanceLine.setLatLngs(latlngs); } if(dist <= 2.0) { if (distBox) distBox.classList.add('success'); if(window.distanceLine) window.distanceLine.setStyle({opacity: 0}); if(window.markerTarget) window.markerTarget.setStyle({fillOpacity: 0.2, color: 'rgba(0,0,0,0.2)'}); let now = Date.now(); if(window.isSoundOn && now - window.lastBeepTime > 500) { if(window.AndroidNative) { window.AndroidNative.vibratePhone(); window.AndroidNative.playBeep(); } window.lastBeepTime = now; } } else { if (distBox) distBox.classList.remove('success'); if(window.distanceLine) window.distanceLine.setStyle({opacity: 1}); if(window.markerTarget) window.markerTarget.setStyle({fillOpacity: 1, color: '#1e3a8a'}); } };
+window.updateSetOut = function() {
+    if(!window.targetPoint || window.currentLat === 0) return;
+    let dist = calcDistance(window.currentLat, window.currentLon, window.targetPoint.lat, window.targetPoint.lon);
+    let bearing = calcBearing(window.currentLat, window.currentLon, window.targetPoint.lat, window.targetPoint.lon);
+    let arrowRotation = bearing - window.compassAzimuth;
+    let soArrow = document.getElementById('so_arrow');
+    if (soArrow) soArrow.style.transform = `rotate(${arrowRotation}deg)`;
+    let distBox = document.getElementById('so_dist');
+    if (distBox) distBox.innerText = dist.toFixed(3) + " m";
+    let dLat = (window.targetPoint.lat - window.currentLat) * 111320;
+    let dLon = (window.targetPoint.lon - window.currentLon) * (111320 * Math.cos(toRad(window.currentLat)));
+    let dirN = dLat >= 0 ? "North" : "South";
+    let dirE = dLon >= 0 ? "East" : "West";
+    let soGuide = document.getElementById('so_guidance_text');
+    if (soGuide) soGuide.innerHTML = `Go ${dirN}: <b>${Math.abs(dLat).toFixed(2)}m</b> | Go ${dirE}: <b>${Math.abs(dLon).toFixed(2)}m</b>`;
+
+    let latlngs = [ [window.currentLat, window.currentLon], [window.targetPoint.lat, window.targetPoint.lon] ];
+    if(!window.distanceLine) { window.distanceLine = L.polyline(latlngs, {color: '#ef4444', dashArray: '5, 5', weight: 3}).addTo(window.leafletMap); }
+    else { window.distanceLine.setLatLngs(latlngs); }
+
+    // ၂ မီတာအတွင်းရောက်လျှင် အရောင်သာပြောင်းမည် (အသံ/တုန်ခါမှု မပါတော့ပါ)
+    if(dist <= 2.0) {
+        if (distBox) distBox.classList.add('success');
+        if(window.distanceLine) window.distanceLine.setStyle({opacity: 0});
+        if(window.markerTarget) window.markerTarget.setStyle({fillOpacity: 0.2, color: 'rgba(0,0,0,0.2)'});
+    } else {
+        if (distBox) distBox.classList.remove('success');
+        if(window.distanceLine) window.distanceLine.setStyle({opacity: 1});
+        if(window.markerTarget) window.markerTarget.setStyle({fillOpacity: 1, color: '#1e3a8a'});
+    }
+};
 
 window.toggleCheckboxArea = function(idx, isChecked) { let indexPos = window.orderedAreaPoints.indexOf(idx); if (isChecked && indexPos === -1) window.orderedAreaPoints.push(idx); else if (!isChecked && indexPos !== -1) window.orderedAreaPoints.splice(indexPos, 1); window.updateAreaOrderUI(); window.plotPointsOnMap(); };
 window.updateAreaOrderUI = function() { let orderTextSpan = document.getElementById('area_order_text'); if (!orderTextSpan) return; if (window.orderedAreaPoints.length === 0) { orderTextSpan.innerHTML = "None"; orderTextSpan.style.color = "#ef4444"; } else { let textArray = window.orderedAreaPoints.map((idx, step) => `<b>${step+1}.</b> ${window.setOutPoints[idx].p}`); orderTextSpan.innerHTML = textArray.join(" ➔ "); orderTextSpan.style.color = "#059669"; } };

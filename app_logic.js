@@ -247,11 +247,11 @@ window.onNativeGPSUpdate = function(d) {
     if(d.geoid_n !== undefined && d.geoid_n !== null) { window.currentGeoidN = d.geoid_n; window.currentGeoidModel = d.geoid_model || "Unknown"; }
     else { fetchGeoidDataFromNative(lat, lon); }
 
-    let sats = d.satCount || 0, hA = d.hAcc || d.acc || 0, vA = d.vAcc || 0;
+    // H Accuracy သာ ပြသမည်
+    let hA = d.hAcc || d.acc || 0;
 
     if(window.activeApp === 1 || window.activeApp === 2 || window.activeApp === 5) {
-        document.getElementById(t+'_gps_stat').innerText = `H: ${hA.toFixed(1)}m | V: ${vA.toFixed(1)}m`;
-        document.getElementById(t+'_sat_info').innerText = "SAT: " + sats;
+        document.getElementById(t+'_gps_stat').innerText = `H.Acc: ${hA.toFixed(1)}m`;
         let pdop = d.pdop ? d.pdop.toFixed(1) : "--", vdop = d.vdop ? d.vdop.toFixed(1) : "--";
         document.getElementById(t+'_dop_info').innerText = `PDOP: ${pdop} | VDOP: ${vdop}`;
         let rawAltUI = document.getElementById(t+'_raw_alt'); let geoidUI = document.getElementById(t+'_geoid_val');
