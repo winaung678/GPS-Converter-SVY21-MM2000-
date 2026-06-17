@@ -619,6 +619,17 @@
     </div>
 </div>
 
+<!-- 📄 FOOTER FOR ADSENSE APPROVAL -->
+<div style="text-align:center; padding: 20px; font-size: 12px; color: var(--label-text); background: var(--card-bg); margin-top: 20px; border-top: 1px solid var(--input-border);">
+    <p style="margin-bottom: 5px;"><b>GPS Converter (SVY21/MM2000)</b> is a professional surveying web application designed to help surveyors calculate coordinates, find geoid values, and render DXF site plans accurately.</p>
+    <p style="margin-bottom: 10px;">By using this application, you agree to our policies.</p>
+    <a href="javascript:void(0)" onclick="document.getElementById('privacyModal').style.display='flex';" style="color: #3b82f6; text-decoration: none; margin: 0 10px;">Privacy Policy</a> |
+    <a href="javascript:void(0)" onclick="document.getElementById('termsModal').style.display='flex';" style="color: #3b82f6; text-decoration: none; margin: 0 10px;">Terms of Service</a> |
+    <a href="javascript:void(0)" onclick="openAbout()" style="color: #3b82f6; text-decoration: none; margin: 0 10px;">About Us</a>
+    <p style="margin-top: 10px;">&copy; 2026 Win Aung. All Rights Reserved.</p>
+</div>
+</div> <!-- End of container-box -->
+
 <!-- ABOUT MODAL -->
 <div id="aboutModal" class="modal">
     <div class="modal-content about-card">
@@ -643,39 +654,21 @@
     </div>
 </div>
 
-<script src="formulas.js"></script>
-<script src="globals.js"></script>
-<script src="map_engine.js"></script>
-<script src="app_conversions.js"></script>
-<script src="app_survey_tools.js"></script>
-<script src="app_camera.js"></script>
-<script src="app_logic.js"></script>
-<!-- 📄 FOOTER FOR ADSENSE APPROVAL -->
-<div style="text-align:center; padding: 20px; font-size: 12px; color: var(--label-text); background: var(--card-bg); margin-top: 20px; border-top: 1px solid var(--input-border);">
-    <p style="margin-bottom: 5px;"><b>GPS Converter (SVY21/MM2000)</b> is a professional surveying web application designed to help surveyors calculate coordinates, find geoid values, and render DXF site plans accurately.</p>
-    <p style="margin-bottom: 10px;">By using this application, you agree to our policies.</p>
-    <a href="#" onclick="showPrivacyPolicy()" style="color: #3b82f6; text-decoration: none; margin: 0 10px;">Privacy Policy</a> |
-    <a href="#" onclick="showTerms()" style="color: #3b82f6; text-decoration: none; margin: 0 10px;">Terms of Service</a> |
-    <a href="#" onclick="openAbout()" style="color: #3b82f6; text-decoration: none; margin: 0 10px;">About Us</a>
-    <p style="margin-top: 10px;">&copy; 2026 Win Aung. All Rights Reserved.</p>
-</div>
-
 <!-- PRIVACY POLICY MODAL -->
 <div id="privacyModal" class="modal">
     <div class="modal-content about-card">
         <span class="close-btn" onclick="document.getElementById('privacyModal').style.display='none'">&times;</span>
-        <h2 class="about-title">Privacy Policy</h2>
-        <div class="about-desc" style="max-height: 60vh; overflow-y: auto;">
+        <div class="about-header">
+            <h2 class="about-title">Privacy Policy</h2>
+        </div>
+        <div class="about-body" style="max-height: 50vh; overflow-y: auto; text-align: left; font-size: 13px; line-height: 1.6;">
             <p>This Privacy Policy describes how your personal information is collected, used, and shared when you visit or use the GPS Converter (SVY21/MM2000) web application.</p>
-            <b>1. Personal Information We Collect</b>
+            <b style="color: #1e40af;">1. Personal Information We Collect</b>
             <p>We do not collect any personal data (such as names, emails, or phone numbers) directly. However, we use your device's <b>Geolocation data</b> strictly to perform coordinate conversions and surveying tasks within the app. This location data is processed locally on your device and is not sent to or stored on our servers.</p>
-            <b>2. Cookies and Advertising (Google AdSense)</b>
-            <p>We use third-party advertising companies, specifically Google AdSense, to serve ads when you visit our website. Google uses cookies (including the DoubleClick DART cookie) to serve ads based on your prior visits to our website or other websites on the Internet.</p>
-            <p>You may opt out of personalized advertising by visiting Google's <a href="https://www.google.com/settings/ads" target="_blank">Ads Settings</a>.</p>
-            <b>3. Offline Storage</b>
+            <b style="color: #1e40af;">2. Cookies and Advertising (Google AdSense)</b>
+            <p>We use third-party advertising companies, specifically Google AdSense, to serve ads when you visit our website. Google uses cookies to serve ads based on your prior visits. You may opt out of personalized advertising by visiting Google's Ads Settings.</p>
+            <b style="color: #1e40af;">3. Offline Storage</b>
             <p>To provide offline functionality (PWA), this app stores structural files (HTML, JS, CSS) and DXF map data locally in your browser's Cache and IndexedDB. You can clear this data at any time by clearing your browser history.</p>
-            <b>Contact Us</b>
-            <p>If you have questions about this Privacy Policy, please contact the developer.</p>
         </div>
     </div>
 </div>
@@ -684,22 +677,27 @@
 <div id="termsModal" class="modal">
     <div class="modal-content about-card">
         <span class="close-btn" onclick="document.getElementById('termsModal').style.display='none'">&times;</span>
-        <h2 class="about-title">Terms of Service</h2>
-        <div class="about-desc" style="max-height: 60vh; overflow-y: auto;">
+        <div class="about-header">
+            <h2 class="about-title">Terms of Service</h2>
+        </div>
+        <div class="about-body" style="max-height: 50vh; overflow-y: auto; text-align: left; font-size: 13px; line-height: 1.6;">
             <p>By accessing or using the GPS Converter web application, you agree to be bound by these Terms of Service.</p>
-            <b>1. Use of the Application</b>
+            <b style="color: #1e40af;">1. Use of the Application</b>
             <p>This tool is provided for surveying and educational purposes. While we strive for accuracy (incorporating EGM2008 and EGM96 Geoid models), we do not guarantee 100% precision. The developer is not responsible for any financial, structural, or legal damages arising from the use of this data in real-world construction or surveying projects.</p>
-            <b>2. Intellectual Property</b>
+            <b style="color: #1e40af;">2. Intellectual Property</b>
             <p>All formulas, code structure, and design belong to the original developer. You may not copy, reproduce, or resell this software without permission.</p>
-            <b>3. Modifications</b>
+            <b style="color: #1e40af;">3. Modifications</b>
             <p>We reserve the right to modify or replace these Terms at any time. Continued use of the app after changes constitutes your acceptance of the new Terms.</p>
         </div>
     </div>
 </div>
 
-<script>
-    function showPrivacyPolicy() { document.getElementById('privacyModal').style.display='flex'; }
-    function showTerms() { document.getElementById('termsModal').style.display='flex'; }
-</script>
+<script src="formulas.js"></script>
+<script src="globals.js"></script>
+<script src="map_engine.js"></script>
+<script src="app_conversions.js"></script>
+<script src="app_survey_tools.js"></script>
+<script src="app_camera.js"></script>
+<script src="app_logic.js"></script>
 </body>
 </html>
