@@ -1,4 +1,4 @@
-const CACHE_NAME = 'survey-pro-cache-v4';
+const CACHE_NAME = 'survey-pro-cache-v4.1';
 const urlsToCache = [
   './',
   './index.html',
@@ -29,14 +29,16 @@ self.addEventListener('install', event => {
 });
 
 self.addEventListener('fetch', event => {
+  // 🔴 ads.txt သို့မဟုတ် Google AdSense နဲ့ ပတ်သက်တာတွေကို Cache ထဲက မပေးဘဲ တိုက်ရိုက်ယူခိုင်းမည် (အရေးကြီး)
+  if (event.request.url.includes('ads.txt') || event.request.url.includes('pagead2.googlesyndication.com')) {
+    event.respondWith(fetch(event.request));
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then(response => {
-        // Cache ထဲမှာရှိရင် အဲ့ဒါကို ပေးမယ် (Offline အလုပ်လုပ်မယ်)
-        if (response) {
-          return response;
-        }
-        // မရှိရင် အင်တာနက်ကနေ ဆွဲမယ်
+        if (response) { return response; }
         return fetch(event.request);
       })
   );
