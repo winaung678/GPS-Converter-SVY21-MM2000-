@@ -59,10 +59,8 @@ window.onload = function() {
     let sDxfDatum = localStorage.getItem('pref_dxf_datum');
     if(sDxfDatum) { document.getElementById('dxf_datum').value = sDxfDatum; window.toggleDxfDatum(); }
 
-    // 🔴 Refresh လုပ်ရင် ရောက်နေတဲ့နေရာမှာပဲ ဆက်ရှိနေအောင် မှတ်ဉာဏ်ပြန်ခေါ်ခြင်း
-    let lastApp = localStorage.getItem('surveyProLastApp');
-    let startApp = lastApp ? parseInt(lastApp) : 0;
-    window.switchApp(startApp);
+    // 🔴 ဝင်ဝင်ချင်း အမြဲတမ်း Dashboard (Main Face) ကိုသာ ပြသမည်
+    window.switchApp(0);
 
     // Web Compass Listener
     if (window.DeviceOrientationEvent) {
@@ -84,9 +82,19 @@ function attachPasteFilterToInputs() {
     });
 }
 
-window.openAbout = function() { document.getElementById('aboutModal').style.display='flex'; };
+// Modals ဖွင့်ခြင်း/ပိတ်ခြင်းများ
+window.openAbout = function() { document.getElementById('aboutModal').style.display='flex'; history.pushState({modal: true}, "Modal", ""); };
 window.closeAbout = function() { document.getElementById('aboutModal').style.display='none'; };
-window.openPlayStore = function() { if(window.AndroidNative) window.AndroidNative.openPlayStore(); };
+
+// 🔴 Play Store သို့ Web မှတစ်ဆင့် သွားနိုင်ရန် ပြင်ဆင်ချက်
+window.openPlayStore = function() {
+    if(window.AndroidNative && window.AndroidNative.openPlayStore) {
+        window.AndroidNative.openPlayStore();
+    } else {
+        // Web Browser မှ နှိပ်လျှင် Play Store Link ကို တိုက်ရိုက်ဖွင့်မည်
+        window.open("https://play.google.com/store/apps/details?id=com.winaung.svy21converter", "_blank");
+    }
+};
 window.toggleSound = function() { window.isSoundOn = !window.isSoundOn; let btn = document.getElementById('soundBtn'); btn.innerText = window.isSoundOn ? "🔊 Sound: ON" : "🔇 Sound: OFF"; btn.style.background = window.isSoundOn ? "#10b981" : "#ef4444"; };
 window.toggleInputLock = function(lock) { document.querySelectorAll('.v2-input, .dms-grid input').forEach(i => { if(i.id !== 'pt_id' && i.id !== 'pt_desc' && i.id !== 'csv_mode' && !i.id.startsWith('so_') && !i.id.startsWith('dxf_') && !i.id.startsWith('cam_') && !i.id.endsWith('_man_pt') && !i.id.endsWith('_man_desc')) { if(lock) { i.classList.add('input-locked'); i.readOnly = true; } else { i.classList.remove('input-locked'); i.readOnly = false; } } }); };
 
@@ -296,3 +304,41 @@ function updateZDisplay(t) { if (!window.currentRawAlt) return; let finalZ = win
 window.applyPole = function(val) { window.appliedPoleH = parseFloat(val) || 0; document.getElementById('v2_pole_val').value = document.getElementById('m_pole_val').value = document.getElementById('g_pole_val').value = val; updateZDisplay('v2'); updateZDisplay('m'); updateZDisplay('g'); };
 window.setBM = function(t) { let p_val = document.getElementById(t+'_pole_val').value; let b_val = document.getElementById(t+'_bm_val').value; if (b_val === '') return alert("Please enter a Benchmark (BM) value to SET!"); if (!window.isNativeGPSActive) return alert("Start GPS first!"); if (!window.currentRawAlt) return alert("Waiting for GPS Altitude..."); document.getElementById('v2_pole_val').value = document.getElementById('m_pole_val').value = document.getElementById('g_pole_val').value = p_val; document.getElementById('v2_bm_val').value = document.getElementById('m_bm_val').value = document.getElementById('g_bm_val').value = b_val; window.appliedPoleH = parseFloat(p_val) || 0; let bmValue = parseFloat(b_val); if (isNaN(bmValue)) return alert("Invalid BM value!"); window.zOffset = bmValue - (window.currentRawAlt - window.currentGeoidN - window.appliedPoleH); window.isBMMode = true; updateZDisplay(t); alert("Benchmark Calibration Successful!"); };
 window.resetBM = function(t) { window.appliedPoleH = 0; window.zOffset = 0; window.isBMMode = false; document.getElementById('v2_pole_val').value = ''; document.getElementById('m_pole_val').value = ''; document.getElementById('g_pole_val').value = ''; document.getElementById('v2_bm_val').value = ''; document.getElementById('m_bm_val').value = ''; document.getElementById('g_bm_val').value = ''; updateZDisplay(t); };
+
+// ==========================================
+// --- SYSTEM BACK BUTTON & MODALS LOGIC ---
+// ==========================================
+
+window.openAbout = function() { document.getElementById('aboutModal').style.display='flex'; history.pushState({modal: true}, "Modal", ""); };
+window.closeAbout = function() { document.getElementById('aboutModal').style.display='none'; };
+
+window.openPlayStore = function() {
+    if(window.AndroidNative && window.AndroidNative.openPlayStore) {
+        window.AndroidNative.openPlayStore();
+    } else {
+        window.open("https://play.google.com/store/apps/details?id=com.winaung.svy21converter", "_blank");
+    }
+};
+
+window.addEventListener("popstate", function(e) {
+    let modals = document.querySelectorAll('.modal');
+    let modalClosed = false;
+    modals.forEach(m => {
+        if (m.style.display === 'flex') {
+            m.style.display = 'none';
+            modalClosed = true;
+        }
+    });
+    if (modalClosed) return;
+
+    if (window.activeApp === 4) {
+        if (!document.getElementById('cogo_tool_container').classList.contains('hidden')) {
+            window.closeCogoTool();
+        } else {
+            window.switchApp(0);
+        }
+    }
+    else if (window.activeApp !== 0) {
+        window.switchApp(0);
+    }
+});
