@@ -124,15 +124,21 @@ window.updateTopoUI = function() {
 };
 
 window.switchApp = function(n) {
-    if (window.activeApp === 0 && n !== 0) { history.pushState({page: n}, "App " + n, ""); }
+    // 🔴 History Stack များ မပုံနေစေရန် (Dashboard ကလွဲပြီး တခြားကို pushState မလုပ်တော့ပါ)
+    if (n === 0 && window.activeApp !== 0) {
+        // Dashboard ကို ပြန်သွားမှသာ URL ကို ရှင်းလင်းမည် (Back နှိပ်ရ သက်သာစေရန်)
+    }
+
     if (window.isNativeGPSActive && window.activeApp !== n) { window.toggleGlobalGPS(); }
     if (window.activeApp === 3 && n !== 3) { window.stopNavigation(); }
     if (window.activeApp === 4 && n !== 4) { window.clearAreaResultOnly(); }
 
     window.activeApp = n;
 
-    // 🔴 ရောက်သွားတဲ့ စာမျက်နှာကို မှတ်ထားမည် (Refresh လုပ်ရင် ပြန်ခေါ်နိုင်ရန်)
+    // ရောက်သွားတဲ့ စာမျက်နှာကို မှတ်ထားမည် (Refresh လုပ်ရင် ပြန်ခေါ်နိုင်ရန်)
     localStorage.setItem('surveyProLastApp', n);
+
+    // ... (အောက်ပိုင်း Code များ အကုန် အရင်တိုင်း ဆက်ထားပါ) ...
 
     document.getElementById('dashboard_view').classList.toggle('hidden', n !== 0);
     document.getElementById('app1_view').classList.toggle('hidden', n !== 1);
@@ -320,7 +326,9 @@ window.openPlayStore = function() {
     }
 };
 
+// 🔴 System Back ခလုတ် (ဖုန်း Back) ကို ဖမ်းယူခြင်း
 window.addEventListener("popstate", function(e) {
+    // ၁။ Modal ပုံးလေးတွေ ပွင့်နေရင် Back နှိပ်တဲ့အခါ ပုံးကိုပဲ အရင်ပိတ်မည်
     let modals = document.querySelectorAll('.modal');
     let modalClosed = false;
     modals.forEach(m => {
@@ -329,15 +337,22 @@ window.addEventListener("popstate", function(e) {
             modalClosed = true;
         }
     });
-    if (modalClosed) return;
+    if (modalClosed) return; // ပုံးပိတ်သွားရင် အနောက်ကို ထပ်မထွက်တော့ပါ
 
+    // ၂။ COGO ထဲရောက်နေရင်
     if (window.activeApp === 4) {
-        if (!document.getElementById('cogo_tool_container').classList.contains('hidden')) {
-            window.closeCogoTool();
+        let cogoContainer = document.getElementById('cogo_tool_container');
+        // COGO Tool တစ်ခုခု ပွင့်နေတယ်ဆိုရင်
+        if (!cogoContainer.classList.contains('hidden')) {
+            window.closeCogoTool(); // COGO Main Menu သို့ ပြန်သွားမည်
+            // History တွင် နောက်တစ်ဆင့် မဆုတ်သွားစေရန် ကာကွယ်မည်
+            history.pushState({page: 4}, "App 4", "");
         } else {
+            // COGO Main Menu မှာ ရောက်နေရင်တော့ Dashboard ကို ထွက်မည်
             window.switchApp(0);
         }
     }
+    // ၃။ တခြား App တွေရောက်နေရင် Dashboard (Main Face) ကို ပြန်သွားမည်
     else if (window.activeApp !== 0) {
         window.switchApp(0);
     }
