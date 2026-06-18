@@ -311,21 +311,6 @@ window.closeCogoTool = function() {
     document.getElementById('globalGpsBtn').classList.add('hidden');
 };
 
-// 🔴 System Back ခလုတ် (ဖုန်း Back) ကို ဖမ်းယူခြင်း
-window.addEventListener("popstate", function(e) {
-    if (window.activeApp === 4) {
-        // COGO အထဲ ရောက်နေပြီး Tool တစ်ခုခု ပွင့်နေလျှင် Menu သို့ ပြန်ထွက်မည်
-        if (!document.getElementById('cogo_tool_container').classList.contains('hidden')) {
-            window.closeCogoTool();
-        } else {
-            // Main Menu တွင် ရောက်နေပါက Dashboard သို့ ထွက်မည်
-            window.switchApp(0);
-        }
-    } else if (window.activeApp !== 0) {
-        window.switchApp(0);
-    }
-});
-
 // ==========================================
 // --- BEARING & DISTANCE UI LOGIC ---
 // ==========================================

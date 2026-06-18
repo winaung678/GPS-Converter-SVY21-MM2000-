@@ -310,7 +310,11 @@ window.resetBM = function(t) { window.appliedPoleH = 0; window.zOffset = 0; wind
 // ==========================================
 
 window.openAbout = function() { document.getElementById('aboutModal').style.display='flex'; history.pushState({modal: true}, "Modal", ""); };
-window.closeAbout = function() { document.getElementById('aboutModal').style.display='none'; };
+window.closeAbout = function() {
+    if(document.getElementById('aboutModal').style.display === 'flex') {
+        history.back(); // 🔴 ဒီလိုရေးမှ ဖုန်း Back နှိပ်သလို သဘောသက်ရောက်ပြီး History အပိုတွေ မကျန်တော့မှာပါ
+    }
+};
 
 window.openPlayStore = function() {
     if(window.AndroidNative && window.AndroidNative.openPlayStore) {
