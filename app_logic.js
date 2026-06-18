@@ -40,6 +40,7 @@ class WebGeoidReader {
     }
 }
 
+// Load Geoids for Web
 window.webEgm2008 = new WebGeoidReader("egm2008_1min.bin", 1.0, 29.0, 92.0, 104.0, 1.0/60.0, false);
 window.webEgm96 = new WebGeoidReader("egm96_global.bin", 90.0, -90.0, 0.0, 360.0, 0.25, true);
 
@@ -58,16 +59,16 @@ window.onload = function() {
     let sDxfDatum = localStorage.getItem('pref_dxf_datum');
     if(sDxfDatum) { document.getElementById('dxf_datum').value = sDxfDatum; window.toggleDxfDatum(); }
 
-    // 🔴 ဝင်ဝင်ချင်း Dashboard မှာပဲ အမြဲစတင်မည် (History အသန့်ဖြစ်စေရန်)
-    history.replaceState({app: 0}, "Dashboard", "");
-    window.switchApp(0, true);
+    // 🔴 ဝင်ဝင်ချင်း အမြဲတမ်း Dashboard (Main Face) ကိုသာ ပြသမည်
+    window.switchApp(0);
 
+    // Web Compass Listener
     if (window.DeviceOrientationEvent) {
         window.addEventListener("deviceorientationabsolute", (event) => {
             if (event.alpha !== null) window.onCompassUpdate(360 - event.alpha);
         }, true);
         window.addEventListener("deviceorientation", (event) => {
-            if (event.webkitCompassHeading) window.onCompassUpdate(event.webkitCompassHeading);
+            if (event.webkitCompassHeading) window.onCompassUpdate(event.webkitCompassHeading); // iOS
         }, true);
     }
 };
@@ -81,15 +82,27 @@ function attachPasteFilterToInputs() {
     });
 }
 
+// Modals ဖွင့်ခြင်း/ပိတ်ခြင်းများ
+window.openAbout = function() { document.getElementById('aboutModal').style.display='flex'; history.pushState({modal: true}, "Modal", ""); };
+window.closeAbout = function() { document.getElementById('aboutModal').style.display='none'; };
+
+// 🔴 Play Store သို့ Web မှတစ်ဆင့် သွားနိုင်ရန် ပြင်ဆင်ချက်
+window.openPlayStore = function() {
+    if(window.AndroidNative && window.AndroidNative.openPlayStore) {
+        window.AndroidNative.openPlayStore();
+    } else {
+        // Web Browser မှ နှိပ်လျှင် Play Store Link ကို တိုက်ရိုက်ဖွင့်မည်
+        window.open("https://play.google.com/store/apps/details?id=com.winaung.svy21converter", "_blank");
+    }
+};
+window.toggleSound = function() { window.isSoundOn = !window.isSoundOn; let btn = document.getElementById('soundBtn'); btn.innerText = window.isSoundOn ? "🔊 Sound: ON" : "🔇 Sound: OFF"; btn.style.background = window.isSoundOn ? "#10b981" : "#ef4444"; };
 window.toggleInputLock = function(lock) { document.querySelectorAll('.v2-input, .dms-grid input').forEach(i => { if(i.id !== 'pt_id' && i.id !== 'pt_desc' && i.id !== 'csv_mode' && !i.id.startsWith('so_') && !i.id.startsWith('dxf_') && !i.id.startsWith('cam_') && !i.id.endsWith('_man_pt') && !i.id.endsWith('_man_desc')) { if(lock) { i.classList.add('input-locked'); i.readOnly = true; } else { i.classList.remove('input-locked'); i.readOnly = false; } } }); };
 
 window.toggleSoDatum = function() { let v = document.getElementById('so_datum').value; let customDiv = document.getElementById('so_custom_utm'); if(customDiv) customDiv.style.display = (v === "GLOBAL_UTM") ? "flex" : "none"; localStorage.setItem('pref_so_datum', v); };
 window.toggleDxfDatum = function() { let v = document.getElementById('dxf_datum').value; let customDiv = document.getElementById('dxf_custom_utm'); if(customDiv) customDiv.style.display = (v === "GLOBAL_UTM") ? "flex" : "none"; localStorage.setItem('pref_dxf_datum', v); };
 window.toggleCogoDatum = function() { let v = document.getElementById('cogo_datum').value; let customDiv = document.getElementById('cogo_custom_utm'); if(customDiv) customDiv.style.display = (v === "GLOBAL_UTM") ? "flex" : "none"; };
 
-window.handleTopMenuClick = function() {
-    if (window.activeApp === 4) { window.switchApp(0); } else { window.isTopoMode = !window.isTopoMode; window.updateTopoUI(); }
-};
+window.handleTopMenuClick = function() { window.isTopoMode = !window.isTopoMode; window.updateTopoUI(); };
 
 window.updateTopoUI = function() {
     let btn = document.getElementById('topMenuBtn'); let n = window.activeApp;
@@ -98,26 +111,28 @@ window.updateTopoUI = function() {
         if (window.isTopoMode) {
             btn.innerHTML = "🧮 Data View"; btn.classList.add('topo-active'); document.getElementById('shared_map_view').classList.remove('hidden');
             document.getElementById('v2_calc_ui').classList.add('hidden'); document.getElementById('m_calc_ui').classList.add('hidden'); document.getElementById('g_calc_ui').classList.add('hidden');
-            if (!window.leafletMap) window.initMap(); setTimeout(() => { window.leafletMap.invalidateSize(); window.plotRecordedPointsOnMap(); }, 350);
+            if (!window.leafletMap) window.initMap();
+            setTimeout(() => { window.leafletMap.invalidateSize(); window.plotRecordedPointsOnMap(); }, 350);
         } else {
             btn.innerHTML = "🗺️ Map View"; btn.classList.remove('topo-active'); document.getElementById('shared_map_view').classList.add('hidden');
             if (n === 1) document.getElementById('v2_calc_ui').classList.remove('hidden'); if (n === 2) document.getElementById('m_calc_ui').classList.remove('hidden'); if (n === 5) document.getElementById('g_calc_ui').classList.remove('hidden');
         }
     } else {
-        if (n === 4) { btn.classList.remove('hidden'); btn.innerHTML = "🔙 Back to Home"; btn.classList.remove('topo-active'); btn.style.background = "#ef4444"; } else { btn.classList.add('hidden'); if (!window.isNativeGPSActive && (n === 1 || n === 2 || n === 5)) { document.getElementById('shared_map_view').classList.add('hidden'); if (n === 1) document.getElementById('v2_calc_ui').classList.remove('hidden'); if (n === 2) document.getElementById('m_calc_ui').classList.remove('hidden'); if (n === 5) document.getElementById('g_calc_ui').classList.remove('hidden'); } }
+        btn.classList.add('hidden');
+        if (!window.isNativeGPSActive && (n === 1 || n === 2 || n === 5)) { document.getElementById('shared_map_view').classList.add('hidden'); if (n === 1) document.getElementById('v2_calc_ui').classList.remove('hidden'); if (n === 2) document.getElementById('m_calc_ui').classList.remove('hidden'); if (n === 5) document.getElementById('g_calc_ui').classList.remove('hidden'); }
     }
 };
 
-window.switchApp = function(n, isBackAction = false) {
+window.switchApp = function(n) {
+    if (window.activeApp === 0 && n !== 0) { history.pushState({page: n}, "App " + n, ""); }
     if (window.isNativeGPSActive && window.activeApp !== n) { window.toggleGlobalGPS(); }
     if (window.activeApp === 3 && n !== 3) { window.stopNavigation(); }
-
-    // 🔴 Dashboard မှ App တစ်ခုခုသို့ ဝင်ပါက History မှတ်မည်
-    if (!isBackAction && window.activeApp === 0 && n !== 0) {
-        history.pushState({app: n}, "App " + n, "");
-    }
+    if (window.activeApp === 4 && n !== 4) { window.clearAreaResultOnly(); }
 
     window.activeApp = n;
+
+    // 🔴 ရောက်သွားတဲ့ စာမျက်နှာကို မှတ်ထားမည် (Refresh လုပ်ရင် ပြန်ခေါ်နိုင်ရန်)
+    localStorage.setItem('surveyProLastApp', n);
 
     document.getElementById('dashboard_view').classList.toggle('hidden', n !== 0);
     document.getElementById('app1_view').classList.toggle('hidden', n !== 1);
@@ -135,22 +150,37 @@ window.switchApp = function(n, isBackAction = false) {
     else { document.getElementById('shared_tools_view').classList.remove('hidden'); document.getElementById('record_panel').style.display = showRecordPanel ? 'block' : 'none'; document.getElementById('csv_panel').style.display = showSharedTools ? 'block' : 'none'; }
 
     let gpsBtn = document.getElementById('globalGpsBtn'); let menuBtn = document.getElementById('topMenuBtn');
+    if (n === 0 || n === 4) { gpsBtn.classList.add('hidden'); menuBtn.classList.add('hidden'); document.getElementById('shared_map_view').classList.add('hidden'); } else { gpsBtn.classList.remove('hidden'); }
 
-    if (n === 0) { gpsBtn.classList.add('hidden'); menuBtn.classList.add('hidden'); document.getElementById('shared_map_view').classList.add('hidden'); } else { gpsBtn.classList.remove('hidden'); }
+    if (n === 3 || n === 6) { window.isTopoMode = false; menuBtn.classList.add('hidden'); document.getElementById('shared_map_view').classList.remove('hidden'); let mapDiv = document.getElementById('map_view'); if (n === 6) { mapDiv.classList.add('map-full-height'); } else { mapDiv.classList.remove('map-full-height'); } }
+    else if (n === 4) { window.isTopoMode = false; menuBtn.classList.add('hidden'); document.getElementById('shared_map_view').classList.add('hidden'); document.getElementById('map_view').classList.remove('map-full-height'); if (typeof window.closeCogoTool === "function") window.closeCogoTool(); }
+    else if (n === 7) { document.getElementById('shared_map_view').classList.add('hidden'); window.isTopoMode = false; menuBtn.classList.add('hidden'); }
 
-    if (n === 3 || n === 6) { window.isTopoMode = false; menuBtn.classList.remove('hidden'); menuBtn.innerHTML = "🔙 Home"; menuBtn.style.background = "#ef4444"; menuBtn.onclick = function(){ window.history.back(); }; document.getElementById('shared_map_view').classList.remove('hidden'); let mapDiv = document.getElementById('map_view'); if (n === 6) { mapDiv.classList.add('map-full-height'); } else { mapDiv.classList.remove('map-full-height'); } }
-    else if (n === 4) { window.isTopoMode = false; menuBtn.classList.remove('hidden'); menuBtn.innerHTML = "🔙 Home"; menuBtn.style.background = "#ef4444"; menuBtn.onclick = function(){ window.history.back(); }; document.getElementById('shared_map_view').classList.add('hidden'); document.getElementById('map_view').classList.remove('map-full-height'); if (typeof window.closeCogoTool === "function") window.closeCogoTool(true); }
-    else if (n === 7) { document.getElementById('shared_map_view').classList.add('hidden'); window.isTopoMode = false; menuBtn.classList.remove('hidden'); menuBtn.innerHTML = "🔙 Home"; menuBtn.style.background = "#ef4444"; menuBtn.onclick = function(){ window.history.back(); }; }
-    else { menuBtn.onclick = window.handleTopMenuClick; menuBtn.style.background = "#3b82f6"; window.updateTopoUI(); }
+    let csvSelect = document.getElementById('csv_mode');
+    if(csvSelect) { if (n === 5) { csvSelect.options[0].text = `UTM (PNEZD) → WGS84 (Lat, Lon)`; csvSelect.options[1].text = `WGS84 (Lat, Lon) → UTM (PNEZD)`; csvSelect.options[2].style.display = 'none'; if (csvSelect.value === "3") csvSelect.value = "1"; } else { let dName = (n === 1) ? "SVY21" : "MM2000"; csvSelect.options[0].text = `${dName} (Local NE) → WGS84 LL & NE`; csvSelect.options[1].text = `WGS84 LL (Lat, Lon) → ${dName} NE`; csvSelect.options[2].text = `WGS84 NE → ${dName} Local NE`; csvSelect.options[2].style.display = 'block'; } }
+
+    if((n === 3 || n === 7) && !window.isNativeGPSActive) window.toggleGlobalGPS();
 
     if(n !== 0 && n !== 7) {
         if(!window.leafletMap) window.initMap();
-        if (n === 6 && (!window.rawDxfEntities || window.rawDxfEntities.length === 0) && typeof window.loadSavedDXF === 'function') { window.loadSavedDXF(); }
+
+        // 🔴 DXF စာမျက်နှာ (App 6) ကို ရောက်ရင် Memory ထဲမှာ DXF မရှိရင် DB ထဲကနေ အတင်းပြန်ခေါ်မည်
+        if (n === 6) {
+            if ((!window.rawDxfEntities || window.rawDxfEntities.length === 0) && typeof window.loadSavedDXF === 'function') {
+                window.loadSavedDXF();
+            }
+        }
+
         setTimeout(() => {
             window.leafletMap.invalidateSize();
             if (n === 3 || n === 4 || n === 6) { if (window.recordedLayerGroup && window.leafletMap.hasLayer(window.recordedLayerGroup)) { window.leafletMap.removeLayer(window.recordedLayerGroup); } if (window.pointsLayerGroup && !window.leafletMap.hasLayer(window.pointsLayerGroup)) { window.leafletMap.addLayer(window.pointsLayerGroup); } window.plotPointsOnMap(); }
-            if (n === 1 || n === 2 || n === 5) { if (window.recordedLayerGroup && !window.leafletMap.hasLayer(window.recordedLayerGroup)) { window.leafletMap.addLayer(window.recordedLayerGroup); } window.plotRecordedPointsOnMap(); }
-            if (window.rawDxfEntities && window.rawDxfEntities.length > 0) { if (window.dxfLineLayer === null) { window.renderDXF(); } else { window.toggleDxfLayers(); } } else { window.toggleDxfLayers(); }
+            if (n === 1 || n === 2 || n === 5) { if (window.recordedLayerGroup && !window.leafletMap.hasLayer(window.recordedLayerGroup)) { window.leafletMap.addLayer(window.recordedLayerGroup); } window.plotRecordedPointsOnMap(); window.updateTopoUI(); }
+
+            // 🔴 DXF ဆွဲမည့် အပိုင်းကို သေချာစစ်ဆေးမည်
+            if (window.rawDxfEntities && window.rawDxfEntities.length > 0) {
+                if (window.dxfLineLayer === null) { window.renderDXF(); } else { window.toggleDxfLayers(); }
+            } else { window.toggleDxfLayers(); }
+
             if (n === 1 || n === 2 || n === 5) { if (window.pointsLayerGroup && window.leafletMap.hasLayer(window.pointsLayerGroup)) { window.leafletMap.removeLayer(window.pointsLayerGroup); } }
         }, 350);
     }
@@ -170,6 +200,7 @@ window.toggleGlobalGPS = function() {
         window.v2_toggleUI(); window.m_toggleUI(); window.g_toggleUI(); window.toggleInputLock(true);
         if (window.activeApp === 1 || window.activeApp === 2 || window.activeApp === 5) { document.getElementById('record_panel').style.display = 'block'; document.getElementById('csv_panel').style.display = 'none'; window.updateTopoUI(); }
 
+        // WEB GPS TRACKING (Fallback)
         if (typeof window.AndroidNative === 'undefined' && navigator.geolocation) {
             window.webGPSWatchId = navigator.geolocation.watchPosition((pos) => {
                 window.onNativeGPSUpdate({
@@ -177,7 +208,7 @@ window.toggleGlobalGPS = function() {
                     alt: pos.coords.altitude||0, acc: pos.coords.accuracy||0, hAcc: pos.coords.accuracy||0,
                     vAcc: pos.coords.altitudeAccuracy||0, satCount: 5
                 });
-            }, (err) => {}, { enableHighAccuracy: true, maximumAge: 0 });
+            }, (err) => { alert("GPS Error: " + err.message); }, { enableHighAccuracy: true, maximumAge: 0 });
         }
     } else {
         window.isTopoMode = false; btn.innerHTML = "🛰️ GPS: OFF"; btn.classList.remove('active');
@@ -186,7 +217,7 @@ window.toggleGlobalGPS = function() {
         document.getElementById('v2_mode').disabled = false; document.getElementById('m_mode').disabled = false; document.getElementById('m_zone').disabled = false; document.getElementById('g_mode').disabled = false;
         window.toggleInputLock(false); window.resetBM('v2'); window.resetBM('m'); window.resetBM('g');
         window.currentRawAlt = 0; window.appliedPoleH = 0; window.latest_local_N = 0; window.latest_local_E = 0; window.latest_wgs_N = 0; window.latest_wgs_E = 0; window.latest_Z = 0; window.latest_lat = 0; window.latest_lon = 0; window.currentGeoidN = 0; window.currentGeoidModel = "Unknown";
-        document.getElementById('v2_gps_stat').innerText = "H.Acc: --"; document.getElementById('m_gps_stat').innerText = "H.Acc: --"; document.getElementById('g_gps_stat').innerText = "H.Acc: --";
+        document.getElementById('v2_gps_stat').innerText = "H: -- | V: --"; document.getElementById('m_gps_stat').innerText = "H: -- | V: --"; document.getElementById('g_gps_stat').innerText = "H: -- | V: --";
         document.getElementById('v2_dop_info').innerText = "PDOP: -- | VDOP: --"; document.getElementById('m_dop_info').innerText = "PDOP: -- | VDOP: --"; document.getElementById('g_dop_info').innerText = "PDOP: -- | VDOP: --";
         document.getElementById('v2_geoid_val').innerText = "Geoid (N): --.--- m"; document.getElementById('m_geoid_val').innerText = "Geoid (N): --.--- m"; document.getElementById('g_geoid_val').innerText = "Geoid (N): --.--- m";
         document.getElementById('v2_raw_alt').innerText = "Raw GPS Alt: --.--- m"; document.getElementById('m_raw_alt').innerText = "Raw GPS Alt: --.--- m"; document.getElementById('g_raw_alt').innerText = "Raw GPS Alt: --.--- m";
@@ -200,6 +231,7 @@ function fetchGeoidDataFromNative(lat, lon) {
         let jsonStr = window.AndroidNative.getGeoidData(lat, lon);
         try { let data = JSON.parse(jsonStr); if (data.geoid_n !== null) { window.currentGeoidN = data.geoid_n; window.currentGeoidModel = data.geoid_model; } else { window.currentGeoidN = 0; window.currentGeoidModel = "Unknown"; } } catch(e) { window.currentGeoidN = 0; window.currentGeoidModel = "Unknown"; }
     } else {
+        // WEB GEOID LOOKUP (JS)
         let n = window.webEgm2008 ? window.webEgm2008.getUndulation(lat, lon) : null;
         if (n !== null) { window.currentGeoidN = n; window.currentGeoidModel = "EGM2008"; }
         else {
@@ -216,11 +248,14 @@ window.onNativeGPSUpdate = function(d) {
     let t = (window.activeApp === 1) ? 'v2' : (window.activeApp === 2) ? 'm' : 'g';
     let lat = d.lat, lon = d.lon; window.currentLat = lat; window.currentLon = lon; window.latest_lat = lat; window.latest_lon = lon;
 
+    // Altitude smoothing
     let rawIncomingAlt = d.alt || 0; window.altBuffer.push(rawIncomingAlt); if(window.altBuffer.length > window.BUFFER_SIZE) window.altBuffer.shift(); window.currentRawAlt = window.altBuffer.reduce((a,b) => a + b, 0) / window.altBuffer.length;
 
+    // Check Geoid
     if(d.geoid_n !== undefined && d.geoid_n !== null) { window.currentGeoidN = d.geoid_n; window.currentGeoidModel = d.geoid_model || "Unknown"; }
     else { fetchGeoidDataFromNative(lat, lon); }
 
+    // H Accuracy သာ ပြသမည်
     let hA = d.hAcc || d.acc || 0;
 
     if(window.activeApp === 1 || window.activeApp === 2 || window.activeApp === 5) {
@@ -262,6 +297,9 @@ window.onCompassUpdate = function(azimuth) {
     if (headingElement) { headingElement.style.transform = `rotate(${azimuth}deg)`; }
 };
 
+// ==========================================
+// --- Z (MSL) & POLE/BM LOGIC ---
+// ==========================================
 function updateZDisplay(t) { if (!window.currentRawAlt) return; let finalZ = window.currentRawAlt - window.currentGeoidN - window.appliedPoleH; if (window.isBMMode) { finalZ += window.zOffset; } window.latest_Z = finalZ; if (window.activeApp === 1 || window.activeApp === 2 || window.activeApp === 5) { let zb = document.getElementById(t+'_z_val'); let modeText = window.isBMMode ? "Z (BM Mode)" : window.appliedPoleH > 0 ? `MSL (Pole -${window.appliedPoleH}m)` : `MSL (${window.currentGeoidModel})`; window.globalZText = `${modeText}: ${finalZ.toFixed(3)} m`; if (zb) { zb.innerText = window.globalZText; zb.style.color = window.isBMMode ? "#dc2626" : (window.activeApp === 5 ? "#0f766e" : "#059669"); } } }
 window.applyPole = function(val) { window.appliedPoleH = parseFloat(val) || 0; document.getElementById('v2_pole_val').value = document.getElementById('m_pole_val').value = document.getElementById('g_pole_val').value = val; updateZDisplay('v2'); updateZDisplay('m'); updateZDisplay('g'); };
 window.setBM = function(t) { let p_val = document.getElementById(t+'_pole_val').value; let b_val = document.getElementById(t+'_bm_val').value; if (b_val === '') return alert("Please enter a Benchmark (BM) value to SET!"); if (!window.isNativeGPSActive) return alert("Start GPS first!"); if (!window.currentRawAlt) return alert("Waiting for GPS Altitude..."); document.getElementById('v2_pole_val').value = document.getElementById('m_pole_val').value = document.getElementById('g_pole_val').value = p_val; document.getElementById('v2_bm_val').value = document.getElementById('m_bm_val').value = document.getElementById('g_bm_val').value = b_val; window.appliedPoleH = parseFloat(p_val) || 0; let bmValue = parseFloat(b_val); if (isNaN(bmValue)) return alert("Invalid BM value!"); window.zOffset = bmValue - (window.currentRawAlt - window.currentGeoidN - window.appliedPoleH); window.isBMMode = true; updateZDisplay(t); alert("Benchmark Calibration Successful!"); };
@@ -282,24 +320,25 @@ window.openPlayStore = function() {
     }
 };
 
-// 🔴 System Back ဖမ်းယူသည့် အပိုင်း (History Spam လုံးဝ မရှိစေရန်)
 window.addEventListener("popstate", function(e) {
     let modals = document.querySelectorAll('.modal');
     let modalClosed = false;
     modals.forEach(m => {
-        if (m.style.display === 'flex') { m.style.display = 'none'; modalClosed = true; }
+        if (m.style.display === 'flex') {
+            m.style.display = 'none';
+            modalClosed = true;
+        }
     });
     if (modalClosed) return;
 
-    if (e.state && e.state.app !== undefined) {
-        // App (1-7) မှ Back နှိပ်လျှင် Dashboard သို့သာ သွားမည်
-        if (e.state.app === 0) {
-            window.switchApp(0, true);
+    if (window.activeApp === 4) {
+        if (!document.getElementById('cogo_tool_container').classList.contains('hidden')) {
+            window.closeCogoTool();
+        } else {
+            window.switchApp(0);
         }
-    } else if (e.state && e.state.subTool !== undefined) {
-        // COGO Tool တစ်ခုခု ပွင့်နေလျှင် (Back နှိပ်ပါက COGO Main Menu ကိုသာ ပြန်ခေါ်မည်)
-        window.closeCogoTool(true);
-    } else {
-        window.switchApp(0, true);
+    }
+    else if (window.activeApp !== 0) {
+        window.switchApp(0);
     }
 });

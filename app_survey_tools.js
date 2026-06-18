@@ -273,38 +273,58 @@ window.openCogoTool = function(toolName) {
     let mapContainer = document.getElementById('shared_map_view');
     let gpsBtn = document.getElementById('globalGpsBtn');
 
-    if (window.isNativeGPSActive && toolName !== 'area') { window.toggleGlobalGPS(); }
+    // 🔴 Area မှလွဲ၍ အခြား Tool သို့ ဝင်ချိန်တွင် GPS ပွင့်နေပါက အလိုအလျောက် ပိတ် (Off) ပေးမည်
+    if (window.isNativeGPSActive && toolName !== 'area') {
+        window.toggleGlobalGPS();
+    }
 
     if (toolName === 'area') {
         document.getElementById('cogo_area_tool').classList.remove('hidden');
-        titleEl.innerText = '📐 Area Calculator'; titleEl.style.color = '#10b981';
-        mapContainer.classList.remove('hidden'); gpsBtn.classList.remove('hidden');
+        titleEl.innerText = '📐 Area Calculator';
+        titleEl.style.color = '#10b981';
+        mapContainer.classList.remove('hidden');
+        gpsBtn.classList.remove('hidden');
         if(window.leafletMap) setTimeout(() => { window.leafletMap.invalidateSize(); }, 300);
     } else if (toolName === 'inv') {
         document.getElementById('cogo_inv_tool').classList.remove('hidden');
-        titleEl.innerText = '🧭 Bearing & Distance'; titleEl.style.color = '#8b5cf6';
-        mapContainer.classList.add('hidden'); gpsBtn.classList.add('hidden');
+        titleEl.innerText = '🧭 Bearing & Distance';
+        titleEl.style.color = '#8b5cf6';
+        mapContainer.classList.add('hidden');
+        gpsBtn.classList.add('hidden');
     } else if (toolName === 'grad') {
         document.getElementById('cogo_grad_tool').classList.remove('hidden');
-        titleEl.innerText = '📈 Gradient / Elevation'; titleEl.style.color = '#b91c1c';
-        mapContainer.classList.add('hidden'); gpsBtn.classList.add('hidden');
+        titleEl.innerText = '📈 Gradient / Elevation';
+        titleEl.style.color = '#b91c1c';
+        mapContainer.classList.add('hidden');
+        gpsBtn.classList.add('hidden');
     }
 
-    // 🔴 Tool ပွင့်လာလျှင် Back နှိပ်ရန်အတွက် မှတ်ဉာဏ်တစ်ခု ထည့်ထားမည်
-    history.pushState({subTool: toolName}, "Cogo Tool", "");
+    history.pushState({page: 4, subTool: toolName}, "Cogo Tool", "");
 };
 
-window.closeCogoTool = function(isFromBack = false) {
+window.closeCogoTool = function() {
     document.getElementById('cogo_tool_container').classList.add('hidden');
     document.getElementById('cogo_main_menu').classList.remove('hidden');
     document.getElementById('shared_map_view').classList.add('hidden');
-    document.getElementById('globalGpsBtn').classList.add('hidden');
 
-    // User က UI ပေါ်က "Home" ကို နှိပ်ပြီး ထွက်တာဆိုရင်
-    if (!isFromBack) {
-        window.history.back(); // History ရှင်းလင်းရန် back() ခေါ်ပေးသည်
-    }
+    // Main Menu သို့ ပြန်ရောက်ချိန်တွင် GPS ခလုတ်ကို ဖျောက်မည်
+    document.getElementById('globalGpsBtn').classList.add('hidden');
 };
+
+// 🔴 System Back ခလုတ် (ဖုန်း Back) ကို ဖမ်းယူခြင်း
+window.addEventListener("popstate", function(e) {
+    if (window.activeApp === 4) {
+        // COGO အထဲ ရောက်နေပြီး Tool တစ်ခုခု ပွင့်နေလျှင် Menu သို့ ပြန်ထွက်မည်
+        if (!document.getElementById('cogo_tool_container').classList.contains('hidden')) {
+            window.closeCogoTool();
+        } else {
+            // Main Menu တွင် ရောက်နေပါက Dashboard သို့ ထွက်မည်
+            window.switchApp(0);
+        }
+    } else if (window.activeApp !== 0) {
+        window.switchApp(0);
+    }
+});
 
 // ==========================================
 // --- BEARING & DISTANCE UI LOGIC ---
