@@ -124,21 +124,23 @@ window.updateTopoUI = function() {
 };
 
 window.switchApp = function(n) {
-    // 🔴 History Stack များ မပုံနေစေရန် (Dashboard ကလွဲပြီး တခြားကို pushState မလုပ်တော့ပါ)
-    if (n === 0 && window.activeApp !== 0) {
-        // Dashboard ကို ပြန်သွားမှသာ URL ကို ရှင်းလင်းမည် (Back နှိပ်ရ သက်သာစေရန်)
-    }
+    // 🔴 History (URL) ပြောင်းခြင်းကို လုံးဝ ဖယ်ရှားလိုက်ပါသည်
+    // (if (window.activeApp === 0 && n !== 0) { history.pushState... } ဆိုတာကို ဖြုတ်လိုက်ပါ)
 
     if (window.isNativeGPSActive && window.activeApp !== n) { window.toggleGlobalGPS(); }
     if (window.activeApp === 3 && n !== 3) { window.stopNavigation(); }
     if (window.activeApp === 4 && n !== 4) { window.clearAreaResultOnly(); }
 
     window.activeApp = n;
-
-    // ရောက်သွားတဲ့ စာမျက်နှာကို မှတ်ထားမည် (Refresh လုပ်ရင် ပြန်ခေါ်နိုင်ရန်)
     localStorage.setItem('surveyProLastApp', n);
 
-    // ... (အောက်ပိုင်း Code များ အကုန် အရင်တိုင်း ဆက်ထားပါ) ...
+    // 🔴 Dashboard အပြင် တခြား App တွေ ရောက်သွားတိုင်း Browser History သို့ (Dummy) အတုတစ်ခု ထည့်ထားမည်
+    // သို့မှသာ User က ဖုန်း Back ကို နှိပ်လျှင် App အပြင် တန်းမထွက်သွားမည်ဖြစ်သည်
+    if (n !== 0) {
+        history.pushState({appState: n}, "App " + n, "");
+    }
+
+    // ... (အောက်ပိုင်း DOM Element များ Show/Hide လုပ်သည့် Code များ အရင်အတိုင်း ဆက်ထားပါ) ...
 
     document.getElementById('dashboard_view').classList.toggle('hidden', n !== 0);
     document.getElementById('app1_view').classList.toggle('hidden', n !== 1);
@@ -315,8 +317,13 @@ window.resetBM = function(t) { window.appliedPoleH = 0; window.zOffset = 0; wind
 // --- SYSTEM BACK BUTTON & MODALS LOGIC ---
 // ==========================================
 
-window.openAbout = function() { document.getElementById('aboutModal').style.display='flex'; history.pushState({modal: true}, "Modal", ""); };
-window.closeAbout = function() { document.getElementById('aboutModal').style.display='none'; };
+window.openAbout = function() {
+    document.getElementById('aboutModal').style.display='flex';
+    history.pushState({modal: true}, "Modal", ""); // Modal အတွက်သာ သီးသန့် State မှတ်မည်
+};
+window.closeAbout = function() {
+    document.getElementById('aboutModal').style.display='none';
+};
 
 window.openPlayStore = function() {
     if(window.AndroidNative && window.AndroidNative.openPlayStore) {
@@ -328,7 +335,7 @@ window.openPlayStore = function() {
 
 // 🔴 System Back ခလုတ် (ဖုန်း Back) ကို ဖမ်းယူခြင်း
 window.addEventListener("popstate", function(e) {
-    // ၁။ Modal ပုံးလေးတွေ ပွင့်နေရင် Back နှိပ်တဲ့အခါ ပုံးကိုပဲ အရင်ပိတ်မည်
+    // ၁။ Modal (About Us, Privacy) ပုံးလေးတွေ ပွင့်နေရင် အဲ့ဒါကိုပဲ အရင်ပိတ်မည်
     let modals = document.querySelectorAll('.modal');
     let modalClosed = false;
     modals.forEach(m => {
@@ -337,23 +344,22 @@ window.addEventListener("popstate", function(e) {
             modalClosed = true;
         }
     });
-    if (modalClosed) return; // ပုံးပိတ်သွားရင် အနောက်ကို ထပ်မထွက်တော့ပါ
+    if (modalClosed) return; // ပုံးပိတ်သွားရင် အနောက်ကို ထပ်မဆုတ်တော့ပါ
 
-    // ၂။ COGO ထဲရောက်နေရင်
+    // ၂။ COGO ထဲရောက်နေရင် (App 4)
     if (window.activeApp === 4) {
         let cogoContainer = document.getElementById('cogo_tool_container');
-        // COGO Tool တစ်ခုခု ပွင့်နေတယ်ဆိုရင်
+        // COGO ရဲ့ (Area/Inverse/Grad) Tool တစ်ခုခု ပွင့်နေတယ်ဆိုရင်
         if (!cogoContainer.classList.contains('hidden')) {
-            window.closeCogoTool(); // COGO Main Menu သို့ ပြန်သွားမည်
-            // History တွင် နောက်တစ်ဆင့် မဆုတ်သွားစေရန် ကာကွယ်မည်
-            history.pushState({page: 4}, "App 4", "");
-        } else {
-            // COGO Main Menu မှာ ရောက်နေရင်တော့ Dashboard ကို ထွက်မည်
-            window.switchApp(0);
+            window.closeCogoTool(); // COGO Main Menu ကိုသာ ပြန်သွားမည်
+            // History မှာ ဆက်နေနိုင်အောင် အတုတစ်ခု ပြန်ထည့်ပေးမည်
+            history.pushState({appState: 4}, "App 4", "");
+            return;
         }
     }
-    // ၃။ တခြား App တွေရောက်နေရင် Dashboard (Main Face) ကို ပြန်သွားမည်
-    else if (window.activeApp !== 0) {
-        window.switchApp(0);
+
+    // ၃။ တခြား App တွေ (SVY21, COGO Main Menu စသည်) ရောက်နေရင် Dashboard ကို ပြန်သွားမည်
+    if (window.activeApp !== 0) {
+        window.switchApp(0); // 0 (Dashboard) ကို ခေါ်လိုက်ပါမည်
     }
 });
