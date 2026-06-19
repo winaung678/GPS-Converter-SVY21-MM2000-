@@ -20,6 +20,12 @@
             });
         }
     </script>
+    <script>
+  // လက်ရှိဝင်ထားတဲ့ URL က gpsconverter.site မဟုတ်ဘဲ github.io ဖြစ်နေရင် Custom Domain ဘက်ကို လွှဲပစ်မယ်
+  if (window.location.hostname.includes("github.io")) {
+    window.location.replace("https://gpsconverter.site" + window.location.pathname + window.location.search);
+  }
+</script>
 </head>
 <body id="master-ui">
 <div class="container-box">
