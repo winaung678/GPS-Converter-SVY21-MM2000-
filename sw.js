@@ -1,5 +1,5 @@
 // 🔴 Version ကို v4.9 သို့မဟုတ် v5.0 သို့ ပြောင်းလိုက်ပါ
-const CACHE_NAME = 'survey-pro-cache-v5.5'; 
+const CACHE_NAME = 'survey-pro-cache-v5.6'; 
 
 const urlsToCache = [
   './',
