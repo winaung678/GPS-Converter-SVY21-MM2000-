@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Surveying Articles & Guides</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="container-box">
+    <div class="top-controls">
+        <button class="top-menu-btn" onclick="window.location.href='index.html'">🔙 Back to App</button>
+    </div>
+    <div class="app-card">
+        <div class="card-header" style="background: #10b981;">
+            <h3 class="card-title">Surveying Blog & Guides</h3>
+        </div>
+        <div class="card-body" style="line-height: 1.6; font-size: 14px;">
+            
+            <article style="border-bottom: 1px solid var(--input-border); margin-bottom: 20px; padding-bottom: 10px;">
+                <h2 style="color: var(--primary); font-size: 18px;">Understanding Geoid Models: EGM2008 vs EGM96</h2>
+                <p>In modern land surveying, obtaining accurate elevations using GPS is a significant challenge. GPS receivers inherently measure height relative to a mathematical ellipsoid (WGS84). However, topographic maps and engineering projects require orthometric height, also known as Mean Sea Level (MSL).</p>
+                <p>To convert ellipsoidal height to MSL, surveyors use Geoid Models. The <b>Earth Gravitational Model 1996 (EGM96)</b> was a standard for many years. However, the introduction of <b>EGM2008</b> revolutionized surveying by providing a much higher resolution grid (up to 1-minute resolution in some areas), significantly reducing vertical errors in field measurements.</p>
+            </article>
+
+            <article style="border-bottom: 1px solid var(--input-border); margin-bottom: 20px; padding-bottom: 10px;">
+                <h2 style="color: var(--primary); font-size: 18px;">Why Local Coordinate Systems Like SVY21 Matter</h2>
+                <p>While Global Positioning Systems (GPS) operate on the universal WGS84 coordinate system, projecting this 3D sphere onto a 2D engineering plan causes distortion. This is why localized coordinate systems are essential.</p>
+                <p>In Singapore, the <b>SVY21</b> coordinate system is the standard. It is a Transverse Mercator projection specifically centered over Singapore to minimize scale distortion. For engineers and surveyors, converting WGS84 Latitude and Longitude to SVY21 Northing and Easting is a daily necessity to ensure buildings, roads, and boundaries align perfectly with local cadastral maps.</p>
+            </article>
+
+            <article style="border-bottom: 1px solid var(--input-border); margin-bottom: 20px; padding-bottom: 10px;">
+                <h2 style="color: var(--primary); font-size: 18px;">The Importance of COGO in Topographical Surveys</h2>
+                <p>Coordinate Geometry (COGO) is the backbone of land surveying software. While capturing GPS points is the first step, calculating the relationship between these points is where the actual surveying happens.</p>
+                <p>Using an Inverse function, a surveyor can instantly determine the bearing and distance between two captured coordinates. The Area computation tool, which utilizes the Shoelace formula, allows for the instant calculation of land plots in Square Meters, Acres, or Hectares directly in the field, saving hours of office work.</p>
+            </article>
+
+        </div>
+    </div>
+</div>
+</body>
+</html>
