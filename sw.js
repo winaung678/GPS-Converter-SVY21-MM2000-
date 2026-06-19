@@ -1,7 +1,13 @@
-const CACHE_NAME = 'survey-pro-cache-v5.3';
+// 🔴 Version ကို v4.9 သို့မဟုတ် v5.0 သို့ ပြောင်းလိုက်ပါ
+const CACHE_NAME = 'survey-pro-cache-v5.5'; 
+
 const urlsToCache = [
   './',
   './index.html',
+  './blog.html',      // 🔴 အသစ်ထည့်ထားသည်
+  './privacy.html',   // 🔴 အသစ်ထည့်ထားသည်
+  './terms.html',     // 🔴 အသစ်ထည့်ထားသည်
+  './about.html',     // 🔴 အသစ်ထည့်ထားသည်
   './style.css',
   './leaflet.css',
   './leaflet.js',
@@ -26,10 +32,12 @@ self.addEventListener('install', event => {
         return cache.addAll(urlsToCache);
       })
   );
+  // 🔴 ချက်ချင်း Update ဖြစ်စေရန် ထည့်ထားသည်
+  self.skipWaiting(); 
 });
 
 self.addEventListener('fetch', event => {
-  // 🔴 ads.txt သို့မဟုတ် Google AdSense နဲ့ ပတ်သက်တာတွေကို Cache ထဲက မပေးဘဲ တိုက်ရိုက်ယူခိုင်းမည် (အရေးကြီး)
+  // ads.txt သို့မဟုတ် Google AdSense နဲ့ ပတ်သက်တာတွေကို Cache ထဲက မပေးဘဲ တိုက်ရိုက်ယူခိုင်းမည် (အရေးကြီး)
   if (event.request.url.includes('ads.txt') || event.request.url.includes('pagead2.googlesyndication.com')) {
     event.respondWith(fetch(event.request));
     return;
@@ -57,4 +65,6 @@ self.addEventListener('activate', event => {
       );
     })
   );
+  // 🔴 ပွင့်နေတဲ့ Page တွေကို Service Worker အသစ်က ချက်ချင်းလွှမ်းမိုးစေရန် ထည့်ထားသည်
+  self.clients.claim(); 
 });
