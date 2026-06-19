@@ -93,6 +93,18 @@ window.v2_reset = function() { if(!window.isNativeGPSActive) { document.querySel
 window.m_reset = function() { if(!window.isNativeGPSActive) { document.querySelectorAll('#app2_view input').forEach(i => i.value=''); window.latest_local_N=0; window.latest_local_E=0; window.latest_wgs_N=0; window.latest_wgs_E=0; window.latest_Z=0; } document.getElementById('m_out').innerHTML='<p style="text-align:center;opacity:0.5;margin-top:30px;">Results will appear here</p>'; window.m_map_lat = window.m_map_lon = null; };
 window.g_reset = function() { if(!window.isNativeGPSActive) { document.querySelectorAll('#app5_view input').forEach(i => i.value=''); window.latest_local_N=0; window.latest_local_E=0; window.latest_wgs_N=0; window.latest_wgs_E=0; window.latest_Z=0; } document.getElementById('g_out').innerHTML='<p style="text-align:center;opacity:0.5;margin-top:30px;">Results will appear here</p>'; window.g_map_lat = window.g_map_lon = null; };
 
-window.v2_map = function() { if(window.v2_map_lat) window.location.href=`geo:${window.v2_map_lat},${window.v2_map_lon}?q=${window.v2_map_lat},${window.v2_map_lon}(Point)`; else alert("Calculate first!"); };
-window.m_map = function() { if(window.m_map_lat) window.location.href=`geo:${window.m_map_lat},${window.m_map_lon}?q=${window.m_map_lat},${window.m_map_lon}(Point)`; else alert("Calculate first!"); };
-window.g_map = function() { if(window.g_map_lat) window.location.href=`geo:${window.g_map_lat},${window.g_map_lon}?q=${window.g_map_lat},${window.g_map_lon}(Point)`; else alert("Calculate first!"); };
+window.v2_map = function() { 
+    if(window.v2_map_lat) {
+        window.open(`https://www.google.com/maps/search/?api=1&query=${window.v2_map_lat},${window.v2_map_lon}`, '_blank');
+    } else { alert("Calculate first!"); } 
+};
+window.m_map = function() { 
+    if(window.m_map_lat) {
+        window.open(`https://www.google.com/maps/search/?api=1&query=${window.m_map_lat},${window.m_map_lon}`, '_blank');
+    } else { alert("Calculate first!"); } 
+};
+window.g_map = function() { 
+    if(window.g_map_lat) {
+        window.open(`https://www.google.com/maps/search/?api=1&query=${window.g_map_lat},${window.g_map_lon}`, '_blank');
+    } else { alert("Calculate first!"); } 
+};
