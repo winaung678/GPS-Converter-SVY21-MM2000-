@@ -20,10 +20,11 @@
             });
         }
     </script>
-    <script>
-  // လက်ရှိဝင်ထားတဲ့ URL က gpsconverter.site မဟုတ်ဘဲ github.io ဖြစ်နေရင် Custom Domain ဘက်ကို လွှဲပစ်မယ်
-  if (window.location.hostname.includes("github.io")) {
-    window.location.replace("https://gpsconverter.site" + window.location.pathname + window.location.search);
+   <script>
+  // 🔴 ပိုမိုသေချာသော လမ်းကြောင်းလွှဲ Logic (Sub-folder ကော Cache ပါ ကျော်ဖြတ်နိုင်ရန်)
+  if (window.location.hostname !== "gpsconverter.site" && window.location.hostname !== "localhost") {
+    // လက်ရှိ ဝင်ထားတဲ့ Domain က gpsconverter.site မဟုတ်ရင် (github.io ဖြစ်နေရင်) Custom Domain ဆီ အတင်းလွှဲမည်
+    window.location.replace("https://gpsconverter.site/");
   }
 </script>
 </head>
