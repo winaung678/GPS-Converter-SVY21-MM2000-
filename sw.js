@@ -1,9 +1,10 @@
 // 🔴 Version ကို v4.9 သို့မဟုတ် v5.0 သို့ ပြောင်းလိုက်ပါ
-const CACHE_NAME = 'survey-pro-cache-v5.6'; 
+const CACHE_NAME = 'survey-pro-cache-v5.7'; 
 
 const urlsToCache = [
   './',
   './index.html',
+  './app.html',
   './blog.html',      // 🔴 အသစ်ထည့်ထားသည်
   './privacy.html',   // 🔴 အသစ်ထည့်ထားသည်
   './terms.html',     // 🔴 အသစ်ထည့်ထားသည်
