@@ -1,7 +1,12 @@
-const CACHE_NAME = 'survey-pro-cache-v5.8'; 
+const CACHE_NAME = 'survey-pro-cache-v5.9'; 
 
 const urlsToCache = [
   './',
+  './post1.html',
+  './post2.html',
+  './post3.html',
+  './post4.html',
+  './post5.html',
   './index.html',
   './app.html',
   './blog.html',      // 🔴 အသစ်ထည့်ထားသည်
