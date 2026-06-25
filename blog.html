@@ -3,39 +3,70 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WGS84, SVY21, and MM2000 Explained</title>
+    <title>Surveying Articles & Guides - GPS CONVERTER</title>
     <link rel="stylesheet" href="style.css">
     <style>
         .top-navbar { display: flex; justify-content: space-between; align-items: center; background: var(--card-bg); padding: 15px 20px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 1000; }
         .nav-brand { font-size: 20px; font-weight: 900; color: var(--primary); text-decoration: none; }
-        .post-content { padding: 30px 20px; background: var(--card-bg); border-radius: 12px; line-height: 1.8; font-size: 16px; color: var(--text); }
-        h1 { color: var(--primary); font-size: 24px; }
-        h2 { color: #d97706; font-size: 20px; margin-top: 25px; }
+        .nav-links { display: flex; align-items: center; gap: 15px; }
+        .nav-links a { text-decoration: none; color: var(--text); font-weight: bold; font-size: 14px; }
+        .blog-list { padding: 20px; }
+        .blog-card { background: var(--card-bg); border-radius: 12px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.05); border-left: 5px solid var(--primary); }
+        .blog-card h2 { margin-top: 0; color: var(--primary); font-size: 20px; }
+        .blog-card p { color: var(--label-text); font-size: 14px; line-height: 1.6; }
+        .read-more { display: inline-block; margin-top: 10px; color: #10b981; font-weight: bold; text-decoration: none; }
     </style>
 </head>
 <body>
+
     <nav class="top-navbar">
         <a href="index.html" class="nav-brand">GPS CONVERTER</a>
-        <a href="blog.html" style="text-decoration: none; font-weight: bold; color: var(--text);">🔙 Back to Blog</a>
+        <div class="nav-links">
+            <a href="index.html">Home</a>
+            <a href="about.html">About</a>
+        </div>
     </nav>
 
     <div class="container-box">
-        <div class="post-content">
-            <h1>Demystifying Local Coordinate Systems: WGS84, SVY21, and MM2000</h1>
-            
-            <p>In the realm of topographical surveying and civil engineering, understanding coordinate systems is the most fundamental requirement. While modern technology has given us powerful Global Positioning Systems (GPS), relying solely on raw GPS data is insufficient for precise construction and boundary mapping.</p>
+        <div class="blog-list">
+            <h1 style="text-align: center; color: var(--primary);">Surveying Knowledge Base</h1>
+            <p style="text-align: center; color: var(--label-text); margin-bottom: 30px;">Explore our comprehensive guides on modern land surveying, coordinate systems, and geospatial technologies.</p>
 
-            <h2>The Limitation of WGS84</h2>
-            <p>The World Geodetic System 1984 (WGS84) is the reference frame used by the Global Positioning System. It provides coordinates in Latitude and Longitude based on a 3D ellipsoidal model of the Earth. While perfect for navigating oceans or flying airplanes, plotting a 3D sphere onto a 2D piece of engineering paper introduces significant scale distortions. Imagine trying to flatten an orange peel; it tears and stretches. This is why local projected coordinate systems are essential.</p>
+            <div class="blog-card">
+                <h2>Demystifying Local Coordinate Systems: WGS84, SVY21, and MM2000</h2>
+                <p>Why do surveyors use local datums instead of standard GPS coordinates? Learn the mathematics and necessity behind SVY21 and MM2000 projections.</p>
+                <a href="post1.html" class="read-more">Read Full Article &rarr;</a>
+            </div>
 
-            <h2>SVY21: Singapore’s Precision Grid</h2>
-            <p>For a highly urbanized island like Singapore, minimizing grid distortion is critical. The SVY21 coordinate system was developed specifically for this purpose. It is based on a Transverse Mercator projection. By centering the projection locally, SVY21 ensures that distances measured on a cadastral map closely match the actual physical distances on the ground. Surveyors convert WGS84 geographic coordinates to SVY21 Northing and Easting to lay out building foundations, road alignments, and property boundaries with millimeter accuracy.</p>
+            <div class="blog-card">
+                <h2>Achieving Vertical Accuracy: The Role of EGM96 and EGM2008</h2>
+                <p>GPS receivers are notoriously inaccurate for elevation. Discover how geoid models convert ellipsoidal height into true Mean Sea Level (MSL).</p>
+                <a href="post2.html" class="read-more">Read Full Article &rarr;</a>
+            </div>
 
-            <h2>MM2000: Adapting to Myanmar’s Geography</h2>
-            <p>Similarly, Myanmar utilizes the MM2000 datum for national mapping and surveying. Given the vast geographic spread of the country, MM2000 often relies on specific UTM (Universal Transverse Mercator) zones, such as Zone 46 and Zone 47. Converting WGS84 data to MM2000 requires specialized datum shift parameters (DX, DY, DZ) to transform the geocentric coordinates into the local Everest 1830 ellipsoid before projecting them into a flat grid.</p>
+            <div class="blog-card">
+                <h2>Coordinate Geometry (COGO) in Modern Land Surveying</h2>
+                <p>From the Shoelace formula for area calculation to grid inverse and traverse. Explore the core mathematics that power topographical surveys.</p>
+                <a href="post3.html" class="read-more">Read Full Article &rarr;</a>
+            </div>
 
-            <h2>Conclusion</h2>
-            <p>Whether you are operating in Singapore using SVY21 or in Myanmar using MM2000, specialized GPS converter software is mandatory. By translating global satellite data into localized, flat-grid Cartesian coordinates, surveyors ensure that the digital designs of engineers perfectly match the physical reality of our world.</p>
+            <div class="blog-card">
+                <h2>The Evolution of Site Plans: Viewing DXF on Mobile Devices</h2>
+                <p>Taking CAD to the field used to require heavy equipment. Learn how modern web technologies allow seamless interaction with DXF files on smartphones.</p>
+                <a href="post4.html" class="read-more">Read Full Article &rarr;</a>
+            </div>
+
+            <div class="blog-card">
+                <h2>Best Practices for Using Smartphone GPS in Field Reconnaissance</h2>
+                <p>While RTK provides millimeter accuracy, smartphone GPS is invaluable for reconnaissance. Learn how to maximize smartphone accuracy using averaging and geoids.</p>
+                <a href="post5.html" class="read-more">Read Full Article &rarr;</a>
+            </div>
+        </div>
+
+        <div style="text-align:center; padding: 20px; font-size: 13px; color: var(--label-text);">
+            <a href="privacy.html" style="color: #3b82f6; text-decoration: none; margin: 0 10px;">Privacy Policy</a> |
+            <a href="terms.html" style="color: #3b82f6; text-decoration: none; margin: 0 10px;">Terms of Service</a>
+            <p>&copy; 2026 Win Aung. All Rights Reserved.</p>
         </div>
     </div>
 </body>
