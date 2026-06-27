@@ -363,6 +363,11 @@
                     <button class="btn-action" style="background:#b91c1c; color:#fff; border:none; padding:18px; font-size:16px; font-weight:bold; border-radius:12px; display:flex; align-items:center; gap:10px; box-shadow:0 4px 6px rgba(0,0,0,0.1);" onclick="openCogoTool('grad')">
                         <span style="font-size:24px;">📈</span> <span>Gradient / Elevation</span>
                     </button>
+
+                    <!-- 🔴 Traverse Adjustment ခလုတ်အသစ် 🔴 -->
+                    <button class="btn-action" style="background:#0ea5e9; color:#fff; border:none; padding:18px; font-size:16px; font-weight:bold; border-radius:12px; display:flex; align-items:center; gap:10px; box-shadow:0 4px 6px rgba(0,0,0,0.1);" onclick="openCogoTool('trv')">
+                        <span style="font-size:24px;">🔗</span> <span>Traverse Adjustment</span>
+                    </button>
                 </div>
             </div>
         </div>
@@ -494,7 +499,57 @@
                         </div>
                         <div id="grad_result" style="font-size:13px; font-weight:bold; color:#059669; text-align:center; margin-top:12px; padding:10px; background:rgba(16,185,129,0.1); border-radius:8px; border:1px solid rgba(16,185,129,0.3); display:none;"></div>
                     </div>
+                 </div>
 
+                    <!-- ========================================== -->
+                    <!-- 4. TRAVERSE ADJUSTMENT TOOL -->
+                    <!-- ========================================== -->
+                    <div id="cogo_trv_tool" class="hidden">
+                        
+                        <label class="v2-label" style="margin-top:0; color:#1e40af;">1. Traverse Type</label>
+                        <select id="trv_type" class="v2-input" onchange="if(typeof toggleTrvType === 'function') toggleTrvType()">
+                            <option value="C">Closed Traverse (Same Start/End Control)</option>
+                            <option value="O">Open Traverse (Different Start/End Control)</option>
+                        </select>
+
+                        <div style="margin-top:10px; padding:10px; background:#f1f5f9; border-radius:8px; border:1px solid #cbd5e1;">
+                            <label class="v2-label" style="margin-top:0; color:#059669;">Control Point (Start)</label>
+                            <div style="display:flex; gap:5px; margin-bottom:5px;">
+                                <input type="text" id="trv_n0" class="v2-input" placeholder="N (Start)">
+                                <input type="text" id="trv_e0" class="v2-input" placeholder="E (Start)">
+                                <input type="text" id="trv_z0" class="v2-input" placeholder="Z (Start)">
+                            </div>
+                            
+                            <div id="trv_end_ctrl" style="display:none;">
+                                <label class="v2-label" style="color:#b91c1c;">Control Point (End)</label>
+                                <div style="display:flex; gap:5px;">
+                                    <input type="text" id="trv_n_last" class="v2-input" placeholder="N (End)">
+                                    <input type="text" id="trv_e_last" class="v2-input" placeholder="E (End)">
+                                    <input type="text" id="trv_z_last" class="v2-input" placeholder="Z (End)">
+                                </div>
+                            </div>
+                        </div>
+
+                        <label class="v2-label" style="margin-top:15px; color:#1e40af;">2. Observed Points (Data)</label>
+                        <div class="btn-group" style="margin-top:5px; margin-bottom:10px;">
+                            <button class="btn-action" style="background:#3b82f6; flex:1;" onclick="document.getElementById('trv_csv').click()">📂 Load CSV (P, N, E, Z)</button>
+                            <button class="btn-action" style="background:#ef4444; flex:0.5;" onclick="if(typeof clearTrvData === 'function') clearTrvData()">🗑️ Clear</button>
+                        </div>
+                        <input type="file" id="trv_csv" accept=".csv" style="display:none;" onchange="if(typeof loadTrvCSV === 'function') loadTrvCSV(event)">
+                        
+                        <div id="trv_data_status" style="font-size:12px; font-weight:bold; color:#d97706; text-align:center; margin-bottom:10px;">0 points loaded</div>
+
+                        <button class="btn-action" style="width:100%; background:#10b981; padding:15px; font-size:16px;" onclick="if(typeof calculateTraverse === 'function') calculateTraverse()">⚙️ Calculate Adjustment</button>
+
+                        <!-- Results Area -->
+                        <div id="trv_result_box" class="hidden" style="margin-top:15px; padding-top:15px; border-top:2px dashed #cbd5e1;">
+                            <div id="trv_summary" style="background:rgba(59,130,246,0.1); border:1px solid #3b82f6; border-radius:8px; padding:10px; font-size:13px; line-height: 1.6; margin-bottom:10px; color: var(--text);">
+                                <!-- တွက်ပြီးသား Summary တွေ ဒီနေရာမှာ ပေါ်လာပါမယ် -->
+                            </div>
+                            <button class="btn-action" style="width:100%; background:#8b5cf6; padding:15px; font-size:14px;" onclick="if(typeof exportTrvCSV === 'function') exportTrvCSV()">💾 Download Adjusted Data (CSV)</button>
+                        </div>
+
+                    </div>
                 </div>
             </div>
         </div>
