@@ -346,3 +346,155 @@ window.addEventListener("popstate", function(e) {
         window.switchApp(0);
     }
 });
+
+// ==========================================
+// --- TRAVERSE ADJUSTMENT EVENT HANDLERS ---
+// ==========================================
+
+window.trvObsPoints = []; // observed points တွေကို ယာယီသိမ်းမည့် နေရာ
+window.trvLastResult = null; // တွက်ပြီးသား ရလဒ်ကို သိမ်းမည့် နေရာ
+
+// Closed သို့မဟုတ် Open ရွေးရင် Box တွေ ဖျောက်/ဖော်လုပ်ရန်
+window.toggleTrvType = function() {
+    let type = document.getElementById('trv_type').value;
+    document.getElementById('trv_end_ctrl').style.display = (type === 'O') ? 'block' : 'none';
+};
+
+// CSV ဖိုင်ဖတ်ရန် (Format: Point_No, N, E, Z, Description)
+window.loadTrvCSV = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        let lines = e.target.result.split('\n');
+        window.trvObsPoints = [];
+        let successCount = 0;
+        
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            if (!line) continue;
+            let cols = line.split(',');
+            let p = cols[0].trim();
+            let n = parseFloat(cols[1]);
+            let e_val = parseFloat(cols[2]);
+            if (isNaN(n) || isNaN(e_val)) continue; // Header သို့မဟုတ် စာသားဖြစ်ပါက ကျော်မည်
+            let z = parseFloat(cols[3]) || 0.0;
+            let d = cols[4] ? cols[4].trim() : "";
+            window.trvObsPoints.push({ p: p, n: n, e: e_val, z: z, d: d });
+            successCount++;
+        }
+        document.getElementById('trv_data_status').innerText = `✅ Loaded ${successCount} observed points!`;
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+};
+
+// ဒေတာများ ရှင်းထုတ်ရန်
+window.clearTrvData = function() {
+    window.trvObsPoints = [];
+    window.trvLastResult = null;
+    document.getElementById('trv_data_status').innerText = "0 points loaded";
+    document.getElementById('trv_result_box').classList.add('hidden');
+    document.getElementById('trv_csv').value = "";
+};
+
+// Bowditch Travese Adjustment အဓိက တွက်ချက်မှု
+window.calculateTraverse = function() {
+    let type = document.getElementById('trv_type').value;
+    let n0 = parseFloat(document.getElementById('trv_n0').value);
+    let e0 = parseFloat(document.getElementById('trv_e0').value);
+    let z0 = parseFloat(document.getElementById('trv_z0').value);
+
+    if (isNaN(n0) || isNaN(e0) || isNaN(z0)) {
+        return alert("⚠️ Please enter valid coordinates for Start Control Point (N, E, Z)!");
+    }
+
+    if (window.trvObsPoints.length === 0) {
+        return alert("⚠️ Please load observed points from a CSV file first!");
+    }
+
+    let startCtrl = { n: n0, e: e0, z: z0 };
+    let endCtrl = { n: n0, e: e0, z: z0 }; // Closed ဆိုလျှင် စမှတ်နှင့် ဆုံးမှတ်တူတူပဲထားမည်
+
+    if (type === 'O') {
+        let n_last = parseFloat(document.getElementById('trv_n_last').value);
+        let e_last = parseFloat(document.getElementById('trv_e_last').value);
+        let z_last = parseFloat(document.getElementById('trv_z_last').value);
+        if (isNaN(n_last) || isNaN(e_last) || isNaN(z_last)) {
+            return alert("⚠️ Please enter valid coordinates for End Control Point (N, E, Z)!");
+        }
+        endCtrl = { n: n_last, e: e_last, z: z_last };
+    }
+
+    // formulas.js ထဲက တွက်ချက်မှုဖော်မြူလာကို လှမ်းခေါ်တွက်ခြင်း
+    let res = adjust3dTraverse(type, startCtrl, endCtrl, window.trvObsPoints);
+    window.trvLastResult = res; // ရလဒ်ကို သိမ်းထားမည် (Export လုပ်ရန်အတွက်)
+
+    // သတင်းအချက်အလက်များကို ဇယားပုံစံဖြင့် ပြသရန် ပြင်ဆင်ခြင်း
+    let summaryHTML = `
+        <div style="font-weight:bold; font-size:14px; text-align:center; color:#1e40af; border-bottom:1px solid #cbd5e1; padding-bottom:5px; margin-bottom:8px;">📊 Traverse Adjustment Summary</div>
+        <b>Traverse Type:</b> ${type === 'C' ? 'Closed Loop' : 'Open Link'}<br>
+        <b>Total Measured Length (L):</b> ${res.D_sum.toFixed(3)} m<br>
+        <b>Horiz. Misclosure (LCE):</b> <span style="color:#ef4444; font-weight:bold;">${res.LCE.toFixed(4)} m</span><br>
+        <b>Relative Precision (1:R):</b> <span style="color:#059669; font-weight:bold;">1:${Math.round(res.R_val).toLocaleString()}</span><br>
+        <b>Horizontal Class:</b> ${res.class_text}<br>
+        <b>Horizontal Status:</b> <span style="color:${res.status_text.includes('Required') ? '#ef4444' : '#059669'}; font-weight:bold;">${res.status_text}</span><br>
+        <div style="margin-top:5px; border-top:1px dashed #cbd5e1; padding-top:5px;">
+            <b>Vert. Misclosure (ZF):</b> <span style="color:#ef4444; font-weight:bold;">${res.ZF.toFixed(4)} m</span><br>
+            <b>Vertical Class:</b> ${res.vert_class}<br>
+            <b>Vertical Status:</b> <span style="color:${res.vert_status.includes('Required') ? '#ef4444' : '#059669'}; font-weight:bold;">${res.vert_status}</span>
+        </div>
+    `;
+
+    document.getElementById('trv_summary').innerHTML = summaryHTML;
+    document.getElementById('trv_result_box').classList.remove('hidden');
+};
+
+// 💾 CSV Report ဖိုင် ထုတ်ယူရန် (LISP ထဲက ဇယားပုံစံအတိုင်း ကွက်တိထွက်လာပါလိမ့်မည်)
+window.exportTrvCSV = function() {
+    let res = window.trvLastResult;
+    if (!res) return alert("Calculate first!");
+
+    let csvContent = "Point_No,N_Observed,E_Observed,Z_Observed,N_Adjusted,E_Adjusted,Z_Adjusted,Total_Corr_N,Total_Corr_E,Total_Corr_Z,Total_Correction\n";
+    res.adjusted_points.forEach((pt, idx) => {
+        let total_corr = Math.sqrt(pt.dn_corr**2 + pt.de_corr**2 + pt.dz_corr**2);
+        csvContent += `${pt.p},${pt.n_obs.toFixed(4)},${pt.e_obs.toFixed(4)},${pt.z_obs.toFixed(4)},${pt.n_adj.toFixed(4)},${pt.e_adj.toFixed(4)},${pt.z_adj.toFixed(4)},${pt.dn_corr.toFixed(4)},${pt.de_corr.toFixed(4)},${pt.dz_corr.toFixed(4)},${total_corr.toFixed(4)}\n`;
+    });
+
+    csvContent += "\n";
+    csvContent += "--- Summary and Accuracy ---\n";
+    csvContent += `Traverse Type,${document.getElementById('trv_type').value === 'C' ? 'Closed' : 'Open'}\n`;
+    csvContent += `Total Measured Length (L),${res.D_sum.toFixed(4)},m\n`;
+    csvContent += `Horizontal Linear Misclosure (LCE),${res.LCE.toFixed(4)},m\n`;
+    csvContent += `Relative Precision (1:R),1:${Math.round(res.R_val)}\n`;
+    csvContent += `Horizontal Classification,${res.class_text}\n`;
+    csvContent += `Horizontal Status,${res.status_text}\n`;
+    csvContent += "\n";
+    csvContent += "--- Vertical Accuracy Classification ---\n";
+    csvContent += `Vertical Misclosure (ZF),${res.ZF.toFixed(4)},m\n`;
+    csvContent += `Vertical Classification,${res.vert_class}\n`;
+    csvContent += `Vertical Status,${res_status = res.vert_status}\n`;
+    
+    let fileName = `Traverse_Adjustment_Report_${new Date().getTime()}.csv`;
+    
+    if (window.AndroidNative && window.AndroidNative.saveImageToGallery) {
+        // Android WebView ဖြစ်ပါက Base64 သို့မဟုတ် Text အနေနဲ့ သိမ်းရန် (မလိုအပ်ပါက Browser download သုံးမည်)
+        let blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        let reader = new FileReader();
+        reader.onload = function(e) {
+            let base64 = e.target.result.split(',')[1];
+            window.AndroidNative.saveImageToGallery(base64, fileName);
+        };
+        reader.readAsDataURL(blob);
+    } else {
+        // Web Browser ဖြစ်ပါက တိုက်ရိုက်ဒေါင်းမည်
+        let blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        let url = URL.createObjectURL(blob);
+        let link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    }
+};
