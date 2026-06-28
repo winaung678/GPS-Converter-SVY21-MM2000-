@@ -104,3 +104,130 @@ function calcGradientPercentage(dist, z1, z2) {
 function calcZ2FromPercentage(dist, z1, pct) {
     return z1 + (dist * (pct / 100));
 }
+
+// ==========================================
+// --- 3D BOWDITCH TRAVERSE ADJUSTMENT ---
+// ==========================================
+
+function adjust3dTraverse(type, startCtrl, endCtrl, rawPoints) {
+    let n0 = startCtrl.n, e0 = startCtrl.e, z0 = startCtrl.z;
+    let n_last = endCtrl.n, e_last = endCtrl.e, z_last = endCtrl.z;
+
+    let D_sum = 0.0;
+    let NF = 0.0, EF = 0.0, ZF = 0.0;
+    let n_prev = n0, e_prev = e0, z_prev = z0;
+
+    let adjust_data = [];
+
+    // 1. horizontal distance & misclosure တွက်ချက်ခြင်း
+    for (let i = 0; i < rawPoints.length; i++) {
+        let pt = rawPoints[i];
+        let dist = Math.sqrt((pt.e - e_prev)**2 + (pt.n - n_prev)**2); // 2D Horizontal distance
+        let d_n = pt.n - n_prev;
+        let d_e = pt.e - e_prev;
+        let d_z = pt.z - z_prev;
+
+        D_sum += dist;
+        NF += d_n;
+        EF += d_e;
+        ZF += d_z;
+
+        adjust_data.push({
+            p: pt.p,
+            n_obs: pt.n,
+            e_obs: pt.e,
+            z_obs: pt.z,
+            dist: dist,
+            d: pt.d
+        });
+
+        n_prev = pt.n; e_prev = pt.e; z_prev = pt.z;
+    }
+
+    // 2. Misclosures တွက်ထုတ်ခြင်း (LISP အတိုင်း တွက်နည်းတူတူပါပဲ)
+    NF = NF - (n_last - n0);
+    EF = EF - (e_last - e0);
+    ZF = ZF - (z_last - z0);
+
+    let LCE = Math.sqrt(NF*NF + EF*EF);
+    let RP = D_sum > 0 ? LCE / D_sum : 0;
+
+    // 3. Compass/Bowditch Rule အရ အမှားကို အချိုးကျ ခွဲဝေပြင်ဆင်ခြင်း
+    let adjusted_points = [];
+    let D_accum = 0.0;
+
+    for (let i = 0; i < adjust_data.length; i++) {
+        let data = adjust_data[i];
+        D_accum += data.dist;
+
+        let N_accum_corr = -NF * (D_accum / D_sum);
+        let E_accum_corr = -EF * (D_accum / D_sum);
+        let Z_accum_corr = -ZF * (D_accum / D_sum);
+
+        let n_new = data.n_obs + N_accum_corr;
+        let e_new = data.e_obs + E_accum_corr;
+        let z_new = data.z_obs + Z_accum_corr;
+
+        let NF_corr = N_accum_corr;
+        let EF_corr = E_accum_corr;
+        let ZF_corr = Z_accum_corr;
+
+        // နောက်ဆုံးမှတ်ကို Control End Point နဲ့ အတိအကျ ကိုက်ညှိပေးခြင်း
+        if (i === adjust_data.length - 1) {
+            n_new = n_last;
+            e_new = e_last;
+            z_new = z_last;
+        }
+
+        adjusted_points.push({
+            p: data.p,
+            n_obs: data.n_obs,
+            e_obs: data.e_obs,
+            z_obs: data.z_obs,
+            n_adj: n_new,
+            e_adj: e_new,
+            z_adj: z_new,
+            dn_corr: NF_corr,
+            de_corr: EF_corr,
+            dz_corr: ZF_corr,
+            d: data.d
+        });
+    }
+
+    // 4. Horizontal Accuracy Classifications (1:R)
+    let R_val = RP > 0 ? 1.0 / RP : 0;
+    let class_text = "";
+    let status_text = "";
+
+    if (R_val >= 50000) { class_text = "First-Order (1:50,000+)"; status_text = "Pass (High Accuracy)"; }
+    else if (R_val >= 20000) { class_text = "Second-Order (1:20,000 to 1:50,000)"; status_text = "Pass"; }
+    else if (R_val >= 10000) { class_text = "Third-Order (1:10,000 to 1:20,000)"; status_text = "Acceptable"; }
+    else { class_text = "Below 1:10,000"; status_text = "Review/Re-survey Required"; }
+
+    // 5. Vertical Accuracy Classifications (mm*sqrt(K))
+    let K_val = D_sum / 1000.0; // K in km
+    let ZF_abs = Math.abs(ZF);
+    let vert_class = "Below Construction Grade";
+    let vert_status = "Review/Re-survey Required";
+
+    if (K_val > 0) {
+        let sqrtK = Math.sqrt(K_val);
+        if (ZF_abs <= 0.003 * sqrtK) { vert_class = "First-Order (3mm/sqrt(K))"; vert_status = "Pass (High Precision)"; }
+        else if (ZF_abs <= 0.007 * sqrtK) { vert_class = "Second-Order (7mm/sqrt(K))"; vert_status = "Pass"; }
+        else if (ZF_abs <= 0.012 * sqrtK) { vert_class = "Third-Order (12mm/sqrt(K))"; vert_status = "Acceptable"; }
+        else if (ZF_abs <= 0.020 * sqrtK) { vert_class = "Construction Grade (20mm/sqrt(K))"; vert_status = "Acceptable"; }
+    }
+
+    return {
+        adjusted_points: adjusted_points,
+        D_sum: D_sum,
+        LCE: LCE,
+        RP: RP,
+        R_val: R_val,
+        class_text: class_text,
+        status_text: status_text,
+        ZF: ZF,
+        vert_class: vert_class,
+        vert_status: vert_status
+    };
+}
