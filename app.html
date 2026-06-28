@@ -22,10 +22,10 @@
     </script>
    <script>
   // 🔴 ပိုမိုသေချာသော လမ်းကြောင်းလွှဲ Logic (Sub-folder ကော Cache ပါ ကျော်ဖြတ်နိုင်ရန်)
-  if (window.location.hostname !== "gpsconverter.site" && window.location.hostname !== "localhost") {
+  //if (window.location.hostname !== "gpsconverter.site" && window.location.hostname !== "localhost") {
     // လက်ရှိ ဝင်ထားတဲ့ Domain က gpsconverter.site မဟုတ်ရင် (github.io ဖြစ်နေရင်) Custom Domain ဆီ အတင်းလွှဲမည်
-    window.location.replace("https://gpsconverter.site/");
-  }
+  //  window.location.replace("https://gpsconverter.site/");
+  //}
 </script>
 </head>
 <body id="master-ui">
@@ -501,53 +501,83 @@
                     </div>
                  </div>
 
-                    <!-- ========================================== -->
-                    <!-- 4. TRAVERSE ADJUSTMENT TOOL -->
-                    <!-- ========================================== -->
-                    <div id="cogo_trv_tool" class="hidden">
-                        
-                        <label class="v2-label" style="margin-top:0; color:#1e40af;">1. Traverse Type</label>
-                        <select id="trv_type" class="v2-input" onchange="if(typeof toggleTrvType === 'function') toggleTrvType()">
-                            <option value="C">Closed Traverse (Same Start/End Control)</option>
-                            <option value="O">Open Traverse (Different Start/End Control)</option>
-                        </select>
+                   <!-- ========================================== -->
+<!-- 4. TRAVERSE ADJUSTMENT TOOL -->
+<!-- ========================================== -->
+<div id="cogo_trv_tool" class="hidden">
+    
+    <label class="v2-label" style="margin-top:0; color:#1e40af;">1. Traverse Type</label>
+    <div style="display:flex; gap:10px; align-items:flex-start;">
+        <select id="trv_type" class="v2-input" style="flex:1;" onchange="if(typeof toggleTrvType === 'function') toggleTrvType()">
+            <option value="C">Closed Traverse (Same Start/End Control)</option>
+            <option value="O">Open Traverse (Different Start/End Control)</option>
+        </select>
+        <div id="trv_diagram" style="width: 50px; height: 50px; background:#f1f5f9; border:1px solid #cbd5e1; border-radius:8px; display:flex; align-items:center; justify-content:center;"></div>
+    </div>
 
-                        <div style="margin-top:10px; padding:10px; background:#f1f5f9; border-radius:8px; border:1px solid #cbd5e1;">
-                            <label class="v2-label" style="margin-top:0; color:#059669;">Control Point (Start)</label>
-                            <div style="display:flex; gap:5px; margin-bottom:5px;">
-                                <input type="text" id="trv_n0" class="v2-input" placeholder="N (Start)">
-                                <input type="text" id="trv_e0" class="v2-input" placeholder="E (Start)">
-                                <input type="text" id="trv_z0" class="v2-input" placeholder="Z (Start)">
-                            </div>
-                            
-                            <div id="trv_end_ctrl" style="display:none;">
-                                <label class="v2-label" style="color:#b91c1c;">Control Point (End)</label>
-                                <div style="display:flex; gap:5px;">
-                                    <input type="text" id="trv_n_last" class="v2-input" placeholder="N (End)">
-                                    <input type="text" id="trv_e_last" class="v2-input" placeholder="E (End)">
-                                    <input type="text" id="trv_z_last" class="v2-input" placeholder="Z (End)">
-                                </div>
-                            </div>
-                        </div>
+    <div style="margin-top:10px; padding:10px; background:#f1f5f9; border-radius:8px; border:1px solid #cbd5e1;">
+        <label class="v2-label" style="margin-top:0; color:#059669;">Control Point (Start)</label>
+        <div style="display:flex; gap:5px; margin-bottom:5px;">
+            <input type="text" id="trv_p0" class="v2-input" placeholder="Name" style="flex:1.2; font-weight:bold; color:#b91c1c;">
+            <input type="text" id="trv_n0" class="v2-input" placeholder="N" style="flex:2;">
+            <input type="text" id="trv_e0" class="v2-input" placeholder="E" style="flex:2;">
+            <input type="text" id="trv_z0" class="v2-input" placeholder="Z" style="flex:1;">
+        </div>
+        
+        <div id="trv_end_ctrl" style="display:none;">
+            <label class="v2-label" style="color:#b91c1c;">Control Point (End)</label>
+            <div style="display:flex; gap:5px;">
+                <input type="text" id="trv_p_last" class="v2-input" placeholder="Name" style="flex:1.2; font-weight:bold; color:#10b981;">
+                <input type="text" id="trv_n_last" class="v2-input" placeholder="N" style="flex:2;">
+                <input type="text" id="trv_e_last" class="v2-input" placeholder="E" style="flex:2;">
+                <input type="text" id="trv_z_last" class="v2-input" placeholder="Z" style="flex:1;">
+            </div>
+        </div>
+    </div>
 
-                        <label class="v2-label" style="margin-top:15px; color:#1e40af;">2. Observed Points (Data)</label>
-                        <div class="btn-group" style="margin-top:5px; margin-bottom:10px;">
-                            <button class="btn-action" style="background:#3b82f6; flex:1;" onclick="document.getElementById('trv_csv').click()">📂 Load CSV (P, N, E, Z)</button>
-                            <button class="btn-action" style="background:#ef4444; flex:0.5;" onclick="if(typeof clearTrvData === 'function') clearTrvData()">🗑️ Clear</button>
-                        </div>
-                        <input type="file" id="trv_csv" accept=".csv" style="display:none;" onchange="if(typeof loadTrvCSV === 'function') loadTrvCSV(event)">
-                        
-                        <div id="trv_data_status" style="font-size:12px; font-weight:bold; color:#d97706; text-align:center; margin-bottom:10px;">0 points loaded</div>
+    <label class="v2-label" style="margin-top:15px; color:#1e40af;">2. Observed Points (Data)</label>
+    
+    <div style="background:var(--res-bg); padding:10px; border-radius:8px; border:1px solid var(--input-border); margin-bottom:10px;">
+        <div style="display:flex; gap:5px; margin-bottom:5px;">
+            <input type="text" id="trv_m_p" class="v2-input" placeholder="Pt (P)" style="flex:1;">
+            <input type="text" id="trv_m_n" class="v2-input" placeholder="N" style="flex:1.5;">
+            <input type="text" id="trv_m_e" class="v2-input" placeholder="E" style="flex:1.5;">
+        </div>
+        <div style="display:flex; gap:5px;">
+            <input type="text" id="trv_m_z" class="v2-input" placeholder="Z" style="flex:1;">
+            <button class="btn-action" style="flex:1; padding:8px; font-size:12px; background:#10b981; margin-top:0;" onclick="if(typeof addManualTrvPoint === 'function') addManualTrvPoint()">➕ ADD POINT</button>
+        </div>
+    </div>
 
-                        <button class="btn-action" style="width:100%; background:#10b981; padding:15px; font-size:16px;" onclick="if(typeof calculateTraverse === 'function') calculateTraverse()">⚙️ Calculate Adjustment</button>
+    <div class="btn-group" style="margin-top:5px; margin-bottom:10px;">
+        <button class="btn-action" style="background:#3b82f6; flex:1;" onclick="document.getElementById('trv_csv').click()">📂 Load CSV</button>
+        <button class="btn-action" style="background:#ef4444; flex:0.5;" onclick="if(typeof clearTrvData === 'function') clearTrvData()">🗑️ Clear</button>
+    </div>
+    <input type="file" id="trv_csv" accept=".csv" style="display:none;" onchange="if(typeof loadTrvCSV === 'function') loadTrvCSV(event)">
+    
+    <div id="trv_point_list" style="max-height: 120px; overflow-y: auto; font-size:11px; background:#fff; border:1px solid #ccc; padding:5px; border-radius:5px; margin-bottom:10px;">
+        <div style="text-align:center; color:#94a3b8; margin-top:10px;">No points added yet.</div>
+    </div>
+    <div id="trv_data_status" style="font-size:12px; font-weight:bold; color:#d97706; text-align:center; margin-bottom:10px;">Total: 0 points</div>
 
-                        <!-- Results Area -->
-                        <div id="trv_result_box" class="hidden" style="margin-top:15px; padding-top:15px; border-top:2px dashed #cbd5e1;">
-                            <div id="trv_summary" style="background:rgba(59,130,246,0.1); border:1px solid #3b82f6; border-radius:8px; padding:10px; font-size:13px; line-height: 1.6; margin-bottom:10px; color: var(--text);">
-                                <!-- တွက်ပြီးသား Summary တွေ ဒီနေရာမှာ ပေါ်လာပါမယ် -->
-                            </div>
-                            <button class="btn-action" style="width:100%; background:#8b5cf6; padding:15px; font-size:14px;" onclick="if(typeof exportTrvCSV === 'function') exportTrvCSV()">💾 Download Adjusted Data (CSV)</button>
-                        </div>
+    <button class="btn-action" style="width:100%; background:#10b981; padding:15px; font-size:16px;" onclick="if(typeof calculateTraverse === 'function') calculateTraverse()">⚙️ Calculate Adjustment</button>
+
+    <div id="trv_result_box" class="hidden" style="margin-top:15px; padding-top:15px; border-top:2px dashed #cbd5e1;">
+        
+        <div style="background:#fff; border:1px solid #cbd5e1; border-radius:8px; padding:5px; margin-bottom:10px; overflow:hidden;">
+            <div style="font-size:11px; font-weight:bold; text-align:center; color:#64748b; margin-bottom:5px;">Traverse Plot</div>
+            <canvas id="trv_canvas" width="300" height="300" style="width:100%; max-width:400px; height:auto; display:block; margin:0 auto; background:#f8fafc; border-radius:5px;"></canvas>
+        </div>
+
+        <div id="trv_summary" style="background:rgba(59,130,246,0.1); border:1px solid #3b82f6; border-radius:8px; padding:10px; font-size:12px; line-height: 1.6; margin-bottom:10px; color: var(--text);">
+        </div>
+        
+        <div style="display:flex; gap:5px;">
+            <button class="btn-action" style="flex:1; background:#0ea5e9; padding:12px; font-size:12px;" onclick="if(typeof exportTrvCSV === 'function') exportTrvCSV('PNEZD')">💾 Export Adjusted (PNEZD)</button>
+            <button class="btn-action" style="flex:1; background:#8b5cf6; padding:12px; font-size:12px;" onclick="if(typeof exportTrvCSV === 'function') exportTrvCSV('REPORT')">📄 Export Full Report</button>
+        </div>
+    </div>
+</div>
 
                     </div>
                 </div>
