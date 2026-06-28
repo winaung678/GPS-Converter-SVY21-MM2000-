@@ -308,6 +308,22 @@ window.openCogoTool = function(toolName) {
 
     history.pushState({page: 4, subTool: toolName}, "Cogo Tool", "");
 };
+window.closeCogoTool = function() {
+    // ၁။ Tool တွေပေါ်နေတဲ့ နေရာကို ဖျောက်ပါမည်
+    document.getElementById('cogo_tool_container').classList.add('hidden');
+    
+    // ၂။ COGO Main Menu ကို ပြန်ဖော်ပါမည်
+    document.getElementById('cogo_main_menu').classList.remove('hidden');
+    
+    // ၃။ Map မျက်နှာပြင်နဲ့ GPS ခလုတ်ကို ဖျောက်ပါမည် (COGO Main Menu မှာ မလိုအပ်လို့ပါ)
+    document.getElementById('shared_map_view').classList.add('hidden');
+    document.getElementById('globalGpsBtn').classList.add('hidden');
+
+    // ၄။ Area Tool ကနေ ထွက်လာတဲ့အချိန် GPS ပွင့်နေခဲ့ရင် အလိုအလျောက် ပြန်ပိတ်ပေးပါမည်
+    if (window.isNativeGPSActive) {
+        window.toggleGlobalGPS();
+    }
+};
 
 // ==========================================
 // --- BEARING & DISTANCE UI LOGIC ---
