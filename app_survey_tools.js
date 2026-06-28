@@ -268,12 +268,13 @@ window.openCogoTool = function(toolName) {
     document.getElementById('cogo_area_tool').classList.add('hidden');
     document.getElementById('cogo_inv_tool').classList.add('hidden');
     document.getElementById('cogo_grad_tool').classList.add('hidden');
+    document.getElementById('cogo_trv_tool').classList.add('hidden'); // 🔴 Added
 
     let titleEl = document.getElementById('cogo_tool_title');
     let mapContainer = document.getElementById('shared_map_view');
     let gpsBtn = document.getElementById('globalGpsBtn');
 
-    // 🔴 Area မှလွဲ၍ အခြား Tool သို့ ဝင်ချိန်တွင် GPS ပွင့်နေပါက အလိုအလျောက် ပိတ် (Off) ပေးမည်
+    // Area မှလွဲ၍ အခြား Tool သို့ ဝင်ချိန်တွင် GPS ပွင့်နေပါက အလိုအလျောက် ပိတ် (Off) ပေးမည်
     if (window.isNativeGPSActive && toolName !== 'area') {
         window.toggleGlobalGPS();
     }
@@ -297,18 +298,15 @@ window.openCogoTool = function(toolName) {
         titleEl.style.color = '#b91c1c';
         mapContainer.classList.add('hidden');
         gpsBtn.classList.add('hidden');
+    } else if (toolName === 'trv') { // 🔴 Added
+        document.getElementById('cogo_trv_tool').classList.remove('hidden');
+        titleEl.innerText = '🔗 Traverse Adjustment';
+        titleEl.style.color = '#0ea5e9';
+        mapContainer.classList.add('hidden');
+        gpsBtn.classList.add('hidden');
     }
 
     history.pushState({page: 4, subTool: toolName}, "Cogo Tool", "");
-};
-
-window.closeCogoTool = function() {
-    document.getElementById('cogo_tool_container').classList.add('hidden');
-    document.getElementById('cogo_main_menu').classList.remove('hidden');
-    document.getElementById('shared_map_view').classList.add('hidden');
-
-    // Main Menu သို့ ပြန်ရောက်ချိန်တွင် GPS ခလုတ်ကို ဖျောက်မည်
-    document.getElementById('globalGpsBtn').classList.add('hidden');
 };
 
 // ==========================================
