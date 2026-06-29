@@ -637,96 +637,29 @@ window.calculateTraverse = function() {
     window.trvLastResult.startCtrl = startCtrl;
     window.trvLastResult.endCtrl = endCtrl;
 
+    // 🔴 Summary အသစ် (ပိုမိုပြည့်စုံသော အချက်အလက်များနှင့် အရောင်ခွဲခြားမှုများ ပါဝင်သည်)
     let summaryHTML = `
         <div style="font-weight:bold; font-size:14px; text-align:center; color:#1e40af; border-bottom:1px solid #cbd5e1; padding-bottom:5px; margin-bottom:8px;">📊 Traverse Adjustment Summary</div>
         <table style="width:100%; border-collapse: collapse;">
+            <tr><td style="padding:2px 0;"><b>Method:</b></td><td style="padding:2px 0;">Bowditch (Coordinate Base)</td></tr>
             <tr><td style="padding:2px 0;"><b>Type:</b></td><td style="padding:2px 0;">${type === 'C' ? 'Closed Loop' : 'Open Link'}</td></tr>
+            <tr><td style="padding:2px 0;"><b>Stations (n):</b></td><td style="padding:2px 0;">${res.num_stations} points</td></tr>
             <tr><td style="padding:2px 0;"><b>Total Length (L):</b></td><td style="padding:2px 0;">${res.D_sum.toFixed(4)} m</td></tr>
-            <tr><td style="padding:2px 0;"><b>Horiz. Misclosure:</b></td><td style="padding:2px 0; color:#ef4444; font-weight:bold;">${res.LCE.toFixed(4)} m</td></tr>
+            <tr><td style="padding:2px 0;"><b>Misclosure (ΔN):</b></td><td style="padding:2px 0; color:#ef4444;">${res.NF.toFixed(4)} m</td></tr>
+            <tr><td style="padding:2px 0;"><b>Misclosure (ΔE):</b></td><td style="padding:2px 0; color:#ef4444;">${res.EF.toFixed(4)} m</td></tr>
+            <tr><td style="padding:2px 0;"><b>Linear Misclosure:</b></td><td style="padding:2px 0; color:#ef4444; font-weight:bold;">${res.LCE.toFixed(4)} m</td></tr>
             <tr><td style="padding:2px 0;"><b>Precision (1:R):</b></td><td style="padding:2px 0; color:#059669; font-weight:bold;">1:${Math.round(res.R_val).toLocaleString()}</td></tr>
             <tr><td style="padding:2px 0;"><b>Horiz. Class:</b></td><td style="padding:2px 0;">${res.class_text}</td></tr>
-            <tr><td style="border-bottom:1px dashed #ccc; padding-bottom:5px;"><b>Status:</b></td><td style="border-bottom:1px dashed #ccc; padding-bottom:5px; color:${res.status_text.includes('Required') ? '#ef4444' : '#059669'}; font-weight:bold;">${res.status_text}</td></tr>
+            <tr><td style="border-bottom:1px dashed #ccc; padding-bottom:5px;"><b>Horiz. Status:</b></td><td style="border-bottom:1px dashed #ccc; padding-bottom:5px; color:${res.status_text.includes('Required') ? '#ef4444' : '#059669'}; font-weight:bold;">${res.status_text}</td></tr>
             <tr><td style="padding-top:5px;"><b>Vert. Misclosure:</b></td><td style="padding-top:5px; color:#ef4444; font-weight:bold;">${res.ZF.toFixed(4)} m</td></tr>
             <tr><td style="padding:2px 0;"><b>Vert. Class:</b></td><td style="padding:2px 0;">${res.vert_class}</td></tr>
+            <tr><td style="padding:2px 0;"><b>Vert. Status:</b></td><td style="padding:2px 0; color:${res.vert_status.includes('Required') ? '#ef4444' : '#059669'}; font-weight:bold;">${res.vert_status}</td></tr>
         </table>
     `;
     document.getElementById('trv_summary').innerHTML = summaryHTML;
     document.getElementById('trv_result_box').classList.remove('hidden');
 
     window.drawTraverseCanvas(startCtrl, endCtrl, res.adjusted_points, type);
-};
-
-window.drawTraverseCanvas = function(startPt, endPt, adjPoints, type) {
-    let canvas = document.getElementById('trv_canvas');
-    if (!canvas) return;
-    let ctx = canvas.getContext('2d');
-    let w = canvas.width; let h = canvas.height;
-    ctx.clearRect(0, 0, w, h);
-
-    let allPts = [startPt, ...adjPoints];
-    if (type === 'O') allPts.push(endPt);
-
-    let minN = Math.min(...allPts.map(p => p.n || p.n_adj));
-    let maxN = Math.max(...allPts.map(p => p.n || p.n_adj));
-    let minE = Math.min(...allPts.map(p => p.e || p.e_adj));
-    let maxE = Math.max(...allPts.map(p => p.e || p.e_adj));
-
-    let padding = 50; 
-    let rangeN = maxN - minN || 1; 
-    let rangeE = maxE - minE || 1;
-    let scaleX = (w - padding * 2) / rangeE;
-    let scaleY = (h - padding * 2) / rangeN;
-    let scale = Math.min(scaleX, scaleY);
-    let offsetX = (w - (rangeE * scale)) / 2;
-    let offsetY = (h - (rangeN * scale)) / 2;
-
-    let toScreen = (n, e) => { return { x: offsetX + (e - minE) * scale, y: h - (offsetY + (n - minN) * scale) }; };
-
-    ctx.beginPath();
-    let sPos = toScreen(startPt.n, startPt.e);
-    ctx.moveTo(sPos.x, sPos.y);
-    adjPoints.forEach(pt => { let pos = toScreen(pt.n_adj, pt.e_adj); ctx.lineTo(pos.x, pos.y); });
-    if (type === 'O') { let ePos = toScreen(endPt.n, endPt.e); ctx.lineTo(ePos.x, ePos.y); } 
-    else { ctx.lineTo(sPos.x, sPos.y); }
-    ctx.strokeStyle = "#334155"; ctx.lineWidth = 1.5; ctx.stroke();
-
-    let screenPts = [];
-    let addOrMerge = (n, e, name, pType) => {
-        let pos = toScreen(n, e);
-        let merged = false;
-        for(let sp of screenPts) {
-            let dist = Math.sqrt((sp.x - pos.x)**2 + (sp.y - pos.y)**2);
-            if(dist < 8) { 
-                if(!sp.names.includes(name)) sp.names.push(name);
-                if(pType === 'start') sp.type = 'start';
-                if(pType === 'end' && sp.type !== 'start') sp.type = 'end';
-                merged = true; break;
-            }
-        }
-        if(!merged) screenPts.push({ x: pos.x, y: pos.y, names: [name], type: pType });
-    };
-
-    addOrMerge(startPt.n, startPt.e, startPt.p, 'start');
-    adjPoints.forEach(pt => addOrMerge(pt.n_adj, pt.e_adj, pt.p, 'adj'));
-    if(type === 'O') addOrMerge(endPt.n, endPt.e, endPt.p, 'end');
-
-    screenPts.forEach(sp => {
-        if(sp.type === 'start' || sp.type === 'end') {
-            ctx.beginPath();
-            ctx.moveTo(sp.x, sp.y - 8); ctx.lineTo(sp.x + 8, sp.y + 6); ctx.lineTo(sp.x - 8, sp.y + 6);
-            ctx.closePath();
-            ctx.fillStyle = sp.type === 'start' ? "#dc2626" : "#16a34a";
-            ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke();
-        } else {
-            ctx.beginPath(); ctx.arc(sp.x, sp.y, 4, 0, 2 * Math.PI);
-            ctx.fillStyle = "#2563eb"; ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke();
-        }
-        
-        ctx.fillStyle = (sp.type === 'start') ? "#dc2626" : (sp.type === 'end') ? "#16a34a" : "#1e40af";
-        ctx.font = (sp.type === 'start' || sp.type === 'end') ? "bold 11px Arial" : "10px Arial";
-        let text = sp.names.join(' / ');
-        ctx.fillText(text, sp.x + 10, sp.y + 3);
-    });
 };
 
 window.exportTrvCSV = function(exportType) {
@@ -749,19 +682,27 @@ window.exportTrvCSV = function(exportType) {
         res.adjusted_points.forEach(pt => {
             csvContent += `${pt.p},${pt.n_obs.toFixed(4)},${pt.e_obs.toFixed(4)},${pt.z_obs.toFixed(4)},${pt.n_adj.toFixed(4)},${pt.e_adj.toFixed(4)},${pt.z_adj.toFixed(4)},${pt.dn_corr.toFixed(4)},${pt.de_corr.toFixed(4)},${pt.dz_corr.toFixed(4)}\n`;
         });
+        
+        // 🔴 CSV Report သစ် (အသေးစိတ် အချက်အလက်များ)
         csvContent += "\n--- Traverse Information ---\n";
-        csvContent += `Traverse Type,${document.getElementById('trv_type').value === 'C' ? 'Closed' : 'Open'}\n`;
+        csvContent += `Adjustment Method,Bowditch (Coordinate Base)\n`;
+        csvContent += `Traverse Type,${document.getElementById('trv_type').value === 'C' ? 'Closed Loop' : 'Open Link'}\n`;
+        csvContent += `Number of Stations (n),${res.num_stations}\n`;
         csvContent += `Start Control,${res.startCtrl.p} (N:${res.startCtrl.n.toFixed(3)} E:${res.startCtrl.e.toFixed(3)})\n`;
         if (document.getElementById('trv_type').value === 'O') {
             csvContent += `End Control,${res.endCtrl.p} (N:${res.endCtrl.n.toFixed(3)} E:${res.endCtrl.e.toFixed(3)})\n`;
         }
         csvContent += `Total Length (L),${res.D_sum.toFixed(4)},m\n`;
-        csvContent += `Horiz Misclosure,${res.LCE.toFixed(4)},m\n`;
+        csvContent += `Misclosure dN,${res.NF.toFixed(4)},m\n`;
+        csvContent += `Misclosure dE,${res.EF.toFixed(4)},m\n`;
+        csvContent += `Linear Misclosure,${res.LCE.toFixed(4)},m\n`;
         csvContent += `Relative Precision,1:${Math.round(res.R_val)}\n`;
         csvContent += `Horizontal Class,${res.class_text}\n`;
+        csvContent += `Horizontal Status,${res.status_text}\n`;
         csvContent += `Vert Misclosure,${res.ZF.toFixed(4)},m\n`;
         csvContent += `Vertical Class,${res.vert_class}\n`;
-        csvContent += `Status,${res.status_text}\n`;
+        csvContent += `Vertical Status,${res.vert_status}\n`;
+        
         fileName = `Traverse_FullReport_${new Date().getTime()}.csv`;
     }
     
