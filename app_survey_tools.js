@@ -529,25 +529,60 @@ window.plotRecordedPointsOnMap = function() {
 // --- TRAVERSE ADJUSTMENT EVENT HANDLERS ---
 // ==========================================
 
-window.trvObsPoints = []; // observed points တွေကို ယာယီသိမ်းမည့် နေရာ
-window.trvLastResult = null; // တွက်ပြီးသား ရလဒ်ကို သိမ်းမည့် နေရာ
+window.trvObsPoints = []; 
+window.trvLastResult = null; 
 
-// Closed သို့မဟုတ် Open ရွေးရင် Box တွေ ဖျောက်/ဖော်လုပ်ရန်
+const svgClosed = `<svg width="30" height="30" viewBox="0 0 100 100"><polygon points="50,20 80,80 20,80" fill="none" stroke="#ef4444" stroke-width="4"/><circle cx="50" cy="20" r="6" fill="#2563eb"/></svg>`;
+const svgOpen = `<svg width="30" height="30" viewBox="0 0 100 100"><polyline points="20,80 50,20 80,80" fill="none" stroke="#ef4444" stroke-width="4"/><circle cx="20" cy="80" r="6" fill="#2563eb"/><circle cx="80" cy="80" r="6" fill="#10b981"/></svg>`;
+
 window.toggleTrvType = function() {
     let type = document.getElementById('trv_type').value;
     document.getElementById('trv_end_ctrl').style.display = (type === 'O') ? 'block' : 'none';
+    document.getElementById('trv_diagram').innerHTML = (type === 'C') ? svgClosed : svgOpen;
 };
 
-// CSV ဖိုင်ဖတ်ရန် (Format: Point_No, N, E, Z, Description)
+setTimeout(() => { if(document.getElementById('trv_diagram')) window.toggleTrvType(); }, 500);
+
+window.addManualTrvPoint = function() {
+    let p = document.getElementById('trv_m_p').value || `P${window.trvObsPoints.length + 1}`;
+    let n = parseFloat(document.getElementById('trv_m_n').value);
+    let e = parseFloat(document.getElementById('trv_m_e').value);
+    let z = parseFloat(document.getElementById('trv_m_z').value) || 0.0;
+
+    if (isNaN(n) || isNaN(e)) return alert("Please enter valid N and E.");
+    
+    window.trvObsPoints.push({ p: p, n: n, e: e, z: z, d: "" });
+    window.updateTrvPointListUI();
+    
+    document.getElementById('trv_m_p').value = `P${window.trvObsPoints.length + 1}`;
+    document.getElementById('trv_m_n').value = "";
+    document.getElementById('trv_m_e').value = "";
+    document.getElementById('trv_m_z').value = "";
+};
+
+window.updateTrvPointListUI = function() {
+    let listDiv = document.getElementById('trv_point_list');
+    let statusDiv = document.getElementById('trv_data_status');
+    if(window.trvObsPoints.length === 0) {
+        listDiv.innerHTML = '<div style="text-align:center; color:#94a3b8; margin-top:10px;">No points added yet.</div>';
+        statusDiv.innerText = "Total: 0 points";
+        return;
+    }
+    let html = '<table style="width:100%; text-align:left; border-collapse:collapse;"><tr><th>Pt</th><th>N</th><th>E</th><th>Z</th></tr>';
+    window.trvObsPoints.forEach(pt => { html += `<tr style="border-bottom:1px solid #f1f5f9;"><td>${pt.p}</td><td>${pt.n.toFixed(3)}</td><td>${pt.e.toFixed(3)}</td><td>${pt.z.toFixed(3)}</td></tr>`; });
+    html += '</table>';
+    listDiv.innerHTML = html;
+    statusDiv.innerText = `✅ Total: ${window.trvObsPoints.length} observed points`;
+    listDiv.scrollTop = listDiv.scrollHeight;
+};
+
 window.loadTrvCSV = function(event) {
     const file = event.target.files[0];
     if (!file) return;
     const reader = new FileReader();
     reader.onload = function(e) {
         let lines = e.target.result.split('\n');
-        window.trvObsPoints = [];
         let successCount = 0;
-        
         for (let i = 0; i < lines.length; i++) {
             let line = lines[i].trim();
             if (!line) continue;
@@ -555,124 +590,245 @@ window.loadTrvCSV = function(event) {
             let p = cols[0].trim();
             let n = parseFloat(cols[1]);
             let e_val = parseFloat(cols[2]);
-            if (isNaN(n) || isNaN(e_val)) continue; // Header သို့မဟုတ် စာသားဖြစ်ပါက ကျော်မည်
+            if (isNaN(n) || isNaN(e_val)) continue;
             let z = parseFloat(cols[3]) || 0.0;
             let d = cols[4] ? cols[4].trim() : "";
             window.trvObsPoints.push({ p: p, n: n, e: e_val, z: z, d: d });
             successCount++;
         }
-        document.getElementById('trv_data_status').innerText = `✅ Loaded ${successCount} observed points!`;
+        window.updateTrvPointListUI();
+        if(successCount > 0) alert(`Added ${successCount} points from CSV!`);
     };
     reader.readAsText(file);
     event.target.value = '';
 };
 
-// ဒေတာများ ရှင်းထုတ်ရန်
 window.clearTrvData = function() {
-    window.trvObsPoints = [];
-    window.trvLastResult = null;
-    document.getElementById('trv_data_status').innerText = "0 points loaded";
+    window.trvObsPoints = []; window.trvLastResult = null;
+    window.updateTrvPointListUI();
     document.getElementById('trv_result_box').classList.add('hidden');
-    document.getElementById('trv_csv').value = "";
+    document.getElementById('trv_csv').value = ""; document.getElementById('trv_m_p').value = "P1";
 };
 
-// Bowditch Travese Adjustment အဓိက တွက်ချက်မှု
 window.calculateTraverse = function() {
     let type = document.getElementById('trv_type').value;
+    let p0 = document.getElementById('trv_p0').value || (type === 'C' ? "St/End" : "Start");
     let n0 = parseFloat(document.getElementById('trv_n0').value);
     let e0 = parseFloat(document.getElementById('trv_e0').value);
-    let z0 = parseFloat(document.getElementById('trv_z0').value);
+    let z0 = parseFloat(document.getElementById('trv_z0').value) || 0;
 
-    if (isNaN(n0) || isNaN(e0) || isNaN(z0)) {
-        return alert("⚠️ Please enter valid coordinates for Start Control Point (N, E, Z)!");
-    }
+    if (isNaN(n0) || isNaN(e0)) return alert("⚠️ Enter valid Start Control Point (N, E)!");
+    if (window.trvObsPoints.length === 0) return alert("⚠️ No observed points data!");
 
-    if (window.trvObsPoints.length === 0) {
-        return alert("⚠️ Please load observed points from a CSV file first!");
-    }
-
-    let startCtrl = { n: n0, e: e0, z: z0 };
-    let endCtrl = { n: n0, e: e0, z: z0 }; // Closed ဆိုလျှင် စမှတ်နှင့် ဆုံးမှတ်တူတူပဲထားမည်
+    let startCtrl = { p: p0, n: n0, e: e0, z: z0 };
+    let endCtrl = { p: p0, n: n0, e: e0, z: z0 };
 
     if (type === 'O') {
+        let p_last = document.getElementById('trv_p_last').value || "End";
         let n_last = parseFloat(document.getElementById('trv_n_last').value);
         let e_last = parseFloat(document.getElementById('trv_e_last').value);
-        let z_last = parseFloat(document.getElementById('trv_z_last').value);
-        if (isNaN(n_last) || isNaN(e_last) || isNaN(z_last)) {
-            return alert("⚠️ Please enter valid coordinates for End Control Point (N, E, Z)!");
-        }
-        endCtrl = { n: n_last, e: e_last, z: z_last };
+        let z_last = parseFloat(document.getElementById('trv_z_last').value) || 0;
+        if (isNaN(n_last) || isNaN(e_last)) return alert("⚠️ Enter valid End Control Point (N, E)!");
+        endCtrl = { p: p_last, n: n_last, e: e_last, z: z_last };
     }
 
-    // formulas.js ထဲက တွက်ချက်မှုဖော်မြူလာကို လှမ်းခေါ်တွက်ခြင်း
     let res = adjust3dTraverse(type, startCtrl, endCtrl, window.trvObsPoints);
-    window.trvLastResult = res; // ရလဒ်ကို သိမ်းထားမည် (Export လုပ်ရန်အတွက်)
+    window.trvLastResult = res; 
+    window.trvLastResult.startCtrl = startCtrl;
+    window.trvLastResult.endCtrl = endCtrl;
 
-    // သတင်းအချက်အလက်များကို ဇယားပုံစံဖြင့် ပြသရန် ပြင်ဆင်ခြင်း
+    // 🔴 Summary အသစ် (ပိုမိုပြည့်စုံသော အချက်အလက်များနှင့် အရောင်ခွဲခြားမှုများ ပါဝင်သည်)
     let summaryHTML = `
         <div style="font-weight:bold; font-size:14px; text-align:center; color:#1e40af; border-bottom:1px solid #cbd5e1; padding-bottom:5px; margin-bottom:8px;">📊 Traverse Adjustment Summary</div>
-        <b>Traverse Type:</b> ${type === 'C' ? 'Closed Loop' : 'Open Link'}<br>
-        <b>Total Measured Length (L):</b> ${res.D_sum.toFixed(3)} m<br>
-        <b>Horiz. Misclosure (LCE):</b> <span style="color:#ef4444; font-weight:bold;">${res.LCE.toFixed(4)} m</span><br>
-        <b>Relative Precision (1:R):</b> <span style="color:#059669; font-weight:bold;">1:${Math.round(res.R_val).toLocaleString()}</span><br>
-        <b>Horizontal Class:</b> ${res.class_text}<br>
-        <b>Horizontal Status:</b> <span style="color:${res.status_text.includes('Required') ? '#ef4444' : '#059669'}; font-weight:bold;">${res.status_text}</span><br>
-        <div style="margin-top:5px; border-top:1px dashed #cbd5e1; padding-top:5px;">
-            <b>Vert. Misclosure (ZF):</b> <span style="color:#ef4444; font-weight:bold;">${res.ZF.toFixed(4)} m</span><br>
-            <b>Vertical Class:</b> ${res.vert_class}<br>
-            <b>Vertical Status:</b> <span style="color:${res.vert_status.includes('Required') ? '#ef4444' : '#059669'}; font-weight:bold;">${res.vert_status}</span>
-        </div>
+        <table style="width:100%; border-collapse: collapse;">
+            <tr><td style="padding:2px 0;"><b>Method:</b></td><td style="padding:2px 0;">Bowditch (Coordinate Base)</td></tr>
+            <tr><td style="padding:2px 0;"><b>Type:</b></td><td style="padding:2px 0;">${type === 'C' ? 'Closed Loop' : 'Open Link'}</td></tr>
+            <tr><td style="padding:2px 0;"><b>Stations (n):</b></td><td style="padding:2px 0;">${res.num_stations} points</td></tr>
+            <tr><td style="padding:2px 0;"><b>Total Length (L):</b></td><td style="padding:2px 0;">${res.D_sum.toFixed(4)} m</td></tr>
+            <tr><td style="padding:2px 0;"><b>Misclosure (ΔN):</b></td><td style="padding:2px 0; color:#ef4444;">${res.NF.toFixed(4)} m</td></tr>
+            <tr><td style="padding:2px 0;"><b>Misclosure (ΔE):</b></td><td style="padding:2px 0; color:#ef4444;">${res.EF.toFixed(4)} m</td></tr>
+            <tr><td style="padding:2px 0;"><b>Linear Misclosure:</b></td><td style="padding:2px 0; color:#ef4444; font-weight:bold;">${res.LCE.toFixed(4)} m</td></tr>
+            <tr><td style="padding:2px 0;"><b>Precision (1:R):</b></td><td style="padding:2px 0; color:#059669; font-weight:bold;">1:${Math.round(res.R_val).toLocaleString()}</td></tr>
+            <tr><td style="padding:2px 0;"><b>Horiz. Class:</b></td><td style="padding:2px 0;">${res.class_text}</td></tr>
+            <tr><td style="border-bottom:1px dashed #ccc; padding-bottom:5px;"><b>Horiz. Status:</b></td><td style="border-bottom:1px dashed #ccc; padding-bottom:5px; color:${res.status_text.includes('Required') ? '#ef4444' : '#059669'}; font-weight:bold;">${res.status_text}</td></tr>
+            <tr><td style="padding-top:5px;"><b>Vert. Misclosure:</b></td><td style="padding-top:5px; color:#ef4444; font-weight:bold;">${res.ZF.toFixed(4)} m</td></tr>
+            <tr><td style="padding:2px 0;"><b>Vert. Class:</b></td><td style="padding:2px 0;">${res.vert_class}</td></tr>
+            <tr><td style="padding:2px 0;"><b>Vert. Status:</b></td><td style="padding:2px 0; color:${res.vert_status.includes('Required') ? '#ef4444' : '#059669'}; font-weight:bold;">${res.vert_status}</td></tr>
+        </table>
     `;
-
     document.getElementById('trv_summary').innerHTML = summaryHTML;
     document.getElementById('trv_result_box').classList.remove('hidden');
+
+    window.drawTraverseCanvas(startCtrl, endCtrl, res.adjusted_points, type);
 };
 
-// 💾 CSV Report ဖိုင် ထုတ်ယူရန် (LISP ထဲက ဇယားပုံစံအတိုင်း ကွက်တိထွက်လာပါလိမ့်မည်)
-window.exportTrvCSV = function() {
+window.drawTraverseCanvas = function(startPt, endPt, adjPoints, type) {
+    let canvas = document.getElementById('trv_canvas');
+    if (!canvas) return;
+    let ctx = canvas.getContext('2d');
+    let w = canvas.width; let h = canvas.height;
+    
+    // Canvas အလွတ်လုပ်ခြင်း
+    ctx.clearRect(0, 0, w, h);
+
+    // Data ဖတ်ရာတွင် Error မတက်စေရန် Safely Extract လုပ်ခြင်း
+    let extractCoords = (pt) => {
+        let n = pt.n !== undefined ? pt.n : pt.n_adj;
+        let e = pt.e !== undefined ? pt.e : pt.e_adj;
+        return { n: parseFloat(n), e: parseFloat(e), p: pt.p || "Pt" };
+    };
+
+    let sPt = extractCoords(startPt);
+    let pts = adjPoints.map(extractCoords);
+    let ePt = type === 'O' ? extractCoords(endPt) : sPt;
+
+    let allPts = [sPt, ...pts];
+    if (type === 'O') allPts.push(ePt);
+
+    // Error ရှိသော Data များ ဖယ်ထုတ်ခြင်း
+    allPts = allPts.filter(pt => !isNaN(pt.n) && !isNaN(pt.e));
+    if (allPts.length === 0) return;
+
+    let minN = Math.min(...allPts.map(pt => pt.n));
+    let maxN = Math.max(...allPts.map(pt => pt.n));
+    let minE = Math.min(...allPts.map(pt => pt.e));
+    let maxE = Math.max(...allPts.map(pt => pt.e));
+
+    let padding = 40; 
+    let rangeN = maxN - minN; if(rangeN === 0) rangeN = 10;
+    let rangeE = maxE - minE; if(rangeE === 0) rangeE = 10;
+    
+    let scaleX = (w - padding * 2) / rangeE;
+    let scaleY = (h - padding * 2) / rangeN;
+    let scale = Math.min(scaleX, scaleY);
+    
+    let offsetX = (w - (rangeE * scale)) / 2;
+    let offsetY = (h - (rangeN * scale)) / 2;
+
+    // Coordinate မှ Screen Pixel သို့ ပြောင်းခြင်း
+    let toScreen = (n, e) => { 
+        return { 
+            x: offsetX + (e - minE) * scale, 
+            y: h - (offsetY + (n - minN) * scale) 
+        }; 
+    };
+
+    // 1. မျဉ်းများ (Lines) ဆွဲခြင်း
+    ctx.beginPath();
+    let sPos = toScreen(sPt.n, sPt.e);
+    ctx.moveTo(sPos.x, sPos.y);
+    pts.forEach(pt => {
+        let pos = toScreen(pt.n, pt.e);
+        ctx.lineTo(pos.x, pos.y);
+    });
+    if (type === 'O') {
+        let ePos = toScreen(ePt.n, ePt.e);
+        ctx.lineTo(ePos.x, ePos.y);
+    } else {
+        ctx.lineTo(sPos.x, sPos.y);
+    }
+    ctx.strokeStyle = "#475569"; 
+    ctx.lineWidth = 1.5; 
+    ctx.stroke();
+
+    // 2. Point ထပ်နေပါက / ခံ၍ ပေါင်းရန် စစ်ဆေးခြင်း
+    let screenPts = [];
+    let addOrMerge = (n, e, name, pType) => {
+        let pos = toScreen(n, e);
+        let merged = false;
+        for(let sp of screenPts) {
+            let dist = Math.sqrt((sp.x - pos.x)**2 + (sp.y - pos.y)**2);
+            if(dist < 10) { 
+                if(!sp.names.includes(name)) sp.names.push(name);
+                if(pType === 'start') sp.type = 'start';
+                if(pType === 'end' && sp.type !== 'start') sp.type = 'end';
+                merged = true; break;
+            }
+        }
+        if(!merged) screenPts.push({ x: pos.x, y: pos.y, names: [name], type: pType });
+    };
+
+    addOrMerge(sPt.n, sPt.e, sPt.p, 'start');
+    pts.forEach(pt => addOrMerge(pt.n, pt.e, pt.p, 'adj'));
+    if(type === 'O') addOrMerge(ePt.n, ePt.e, ePt.p, 'end');
+
+    // 3. Point လေးများနှင့် စာသား (Names) ဆွဲခြင်း
+    screenPts.forEach(sp => {
+        // ပုံဆွဲခြင်း (Shape)
+        if(sp.type === 'start' || sp.type === 'end') {
+            ctx.beginPath();
+            ctx.moveTo(sp.x, sp.y - 8); ctx.lineTo(sp.x + 8, sp.y + 6); ctx.lineTo(sp.x - 8, sp.y + 6);
+            ctx.closePath();
+            ctx.fillStyle = sp.type === 'start' ? "#dc2626" : "#16a34a"; // Red or Green Triangle
+            ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke();
+        } else {
+            ctx.beginPath(); ctx.arc(sp.x, sp.y, 4, 0, 2 * Math.PI);
+            ctx.fillStyle = "#3b82f6"; // Blue Circle
+            ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke();
+        }
+        
+        // စာသားရေးခြင်း (Text)
+        ctx.fillStyle = (sp.type === 'start') ? "#dc2626" : (sp.type === 'end') ? "#059669" : "#1e40af";
+        ctx.font = (sp.type === 'start' || sp.type === 'end') ? "bold 11px Arial" : "11px Arial";
+        let text = sp.names.join(' / ');
+        
+        // မျဉ်းနဲ့ စာသား ထပ်မသွားအောင် နောက်ခံအဖြူရောင် Shadow လေးထည့်ထားသည်
+        ctx.shadowColor = "white"; ctx.shadowBlur = 4;
+        ctx.fillText(text, sp.x + 10, sp.y + 3);
+        ctx.shadowBlur = 0; // Shadow ပြန်ပိတ်
+    });
+};
+
+window.exportTrvCSV = function(exportType) {
     let res = window.trvLastResult;
     if (!res) return alert("Calculate first!");
 
-    let csvContent = "Point_No,N_Observed,E_Observed,Z_Observed,N_Adjusted,E_Adjusted,Z_Adjusted,Total_Corr_N,Total_Corr_E,Total_Corr_Z,Total_Correction\n";
-    res.adjusted_points.forEach((pt, idx) => {
-        let total_corr = Math.sqrt(pt.dn_corr**2 + pt.de_corr**2 + pt.dz_corr**2);
-        csvContent += `${pt.p},${pt.n_obs.toFixed(4)},${pt.e_obs.toFixed(4)},${pt.z_obs.toFixed(4)},${pt.n_adj.toFixed(4)},${pt.e_adj.toFixed(4)},${pt.z_adj.toFixed(4)},${pt.dn_corr.toFixed(4)},${pt.de_corr.toFixed(4)},${pt.dz_corr.toFixed(4)},${total_corr.toFixed(4)}\n`;
-    });
-
-    csvContent += "\n";
-    csvContent += "--- Summary and Accuracy ---\n";
-    csvContent += `Traverse Type,${document.getElementById('trv_type').value === 'C' ? 'Closed' : 'Open'}\n`;
-    csvContent += `Total Measured Length (L),${res.D_sum.toFixed(4)},m\n`;
-    csvContent += `Horizontal Linear Misclosure (LCE),${res.LCE.toFixed(4)},m\n`;
-    csvContent += `Relative Precision (1:R),1:${Math.round(res.R_val)}\n`;
-    csvContent += `Horizontal Classification,${res.class_text}\n`;
-    csvContent += `Horizontal Status,${res.status_text}\n`;
-    csvContent += "\n";
-    csvContent += "--- Vertical Accuracy Classification ---\n";
-    csvContent += `Vertical Misclosure (ZF),${res.ZF.toFixed(4)},m\n`;
-    csvContent += `Vertical Classification,${res.vert_class}\n`;
-    csvContent += `Vertical Status,${res_status = res.vert_status}\n`;
+    let csvContent = ""; let fileName = "";
     
-    let fileName = `Traverse_Adjustment_Report_${new Date().getTime()}.csv`;
+    if (exportType === 'PNEZD') {
+        csvContent = "Point,Adjusted_N,Adjusted_E,Adjusted_Z,Description\n";
+        csvContent += `${res.startCtrl.p},${res.startCtrl.n.toFixed(4)},${res.startCtrl.e.toFixed(4)},${res.startCtrl.z.toFixed(4)},Start_Ctrl\n`;
+        res.adjusted_points.forEach(pt => { csvContent += `${pt.p},${pt.n_adj.toFixed(4)},${pt.e_adj.toFixed(4)},${pt.z_adj.toFixed(4)},${pt.d}\n`; });
+        if (document.getElementById('trv_type').value === 'O') {
+            csvContent += `${res.endCtrl.p},${res.endCtrl.n.toFixed(4)},${res.endCtrl.e.toFixed(4)},${res.endCtrl.z.toFixed(4)},End_Ctrl\n`;
+        }
+        fileName = `Traverse_Adjusted_${new Date().getTime()}.csv`;
+    } 
+    else {
+        csvContent = "Point_No,N_Observed,E_Observed,Z_Observed,N_Adjusted,E_Adjusted,Z_Adjusted,Total_Corr_N,Total_Corr_E,Total_Corr_Z\n";
+        res.adjusted_points.forEach(pt => {
+            csvContent += `${pt.p},${pt.n_obs.toFixed(4)},${pt.e_obs.toFixed(4)},${pt.z_obs.toFixed(4)},${pt.n_adj.toFixed(4)},${pt.e_adj.toFixed(4)},${pt.z_adj.toFixed(4)},${pt.dn_corr.toFixed(4)},${pt.de_corr.toFixed(4)},${pt.dz_corr.toFixed(4)}\n`;
+        });
+        
+        // 🔴 CSV Report သစ် (အသေးစိတ် အချက်အလက်များ)
+        csvContent += "\n--- Traverse Information ---\n";
+        csvContent += `Adjustment Method,Bowditch (Coordinate Base)\n`;
+        csvContent += `Traverse Type,${document.getElementById('trv_type').value === 'C' ? 'Closed Loop' : 'Open Link'}\n`;
+        csvContent += `Number of Stations (n),${res.num_stations}\n`;
+        csvContent += `Start Control,${res.startCtrl.p} (N:${res.startCtrl.n.toFixed(3)} E:${res.startCtrl.e.toFixed(3)})\n`;
+        if (document.getElementById('trv_type').value === 'O') {
+            csvContent += `End Control,${res.endCtrl.p} (N:${res.endCtrl.n.toFixed(3)} E:${res.endCtrl.e.toFixed(3)})\n`;
+        }
+        csvContent += `Total Length (L),${res.D_sum.toFixed(4)},m\n`;
+        csvContent += `Misclosure dN,${res.NF.toFixed(4)},m\n`;
+        csvContent += `Misclosure dE,${res.EF.toFixed(4)},m\n`;
+        csvContent += `Linear Misclosure,${res.LCE.toFixed(4)},m\n`;
+        csvContent += `Relative Precision,1:${Math.round(res.R_val)}\n`;
+        csvContent += `Horizontal Class,${res.class_text}\n`;
+        csvContent += `Horizontal Status,${res.status_text}\n`;
+        csvContent += `Vert Misclosure,${res.ZF.toFixed(4)},m\n`;
+        csvContent += `Vertical Class,${res.vert_class}\n`;
+        csvContent += `Vertical Status,${res.vert_status}\n`;
+        
+        fileName = `Traverse_FullReport_${new Date().getTime()}.csv`;
+    }
     
-    if (window.AndroidNative && window.AndroidNative.saveImageToGallery) {
-        // Android WebView ဖြစ်ပါက Base64 သို့မဟုတ် Text အနေနဲ့ သိမ်းရန် (မလိုအပ်ပါက Browser download သုံးမည်)
-        let blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        let reader = new FileReader();
-        reader.onload = function(e) {
-            let base64 = e.target.result.split(',')[1];
-            window.AndroidNative.saveImageToGallery(base64, fileName);
-        };
-        reader.readAsDataURL(blob);
+    if (window.AndroidNative && window.AndroidNative.downloadConvertedCSV) {
+        window.AndroidNative.downloadConvertedCSV(csvContent, fileName);
     } else {
-        // Web Browser ဖြစ်ပါက တိုက်ရိုက်ဒေါင်းမည်
         let blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        let url = URL.createObjectURL(blob);
-        let link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", fileName);
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        let url = URL.createObjectURL(blob); let link = document.createElement("a");
+        link.setAttribute("href", url); link.setAttribute("download", fileName);
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
     }
 };
