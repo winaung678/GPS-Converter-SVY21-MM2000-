@@ -218,6 +218,8 @@ function adjust3dTraverse(type, startCtrl, endCtrl, rawPoints) {
         else if (ZF_abs <= 0.020 * sqrtK) { vert_class = "Construction Grade (20mm/sqrt(K))"; vert_status = "Acceptable"; }
     }
 
+   // (အပေါ်က Code တွေ အတူတူပါပဲ၊ အောက်ဆုံးက return အပိုင်းကို အစားထိုးပါ)
+    
     return {
         adjusted_points: adjusted_points,
         D_sum: D_sum,
@@ -228,6 +230,9 @@ function adjust3dTraverse(type, startCtrl, endCtrl, rawPoints) {
         status_text: status_text,
         ZF: ZF,
         vert_class: vert_class,
-        vert_status: vert_status
+        vert_status: vert_status,
+        NF: NF, // <-- အသစ်ထည့်ထားသည် (Delta N)
+        EF: EF, // <-- အသစ်ထည့်ထားသည် (Delta E)
+        num_stations: rawPoints.length // <-- အသစ်ထည့်ထားသည်
     };
 }
