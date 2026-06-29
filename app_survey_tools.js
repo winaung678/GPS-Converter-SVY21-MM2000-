@@ -662,6 +662,123 @@ window.calculateTraverse = function() {
     window.drawTraverseCanvas(startCtrl, endCtrl, res.adjusted_points, type);
 };
 
+window.drawTraverseCanvas = function(startPt, endPt, adjPoints, type) {
+    let canvas = document.getElementById('trv_canvas');
+    if (!canvas) return;
+    let ctx = canvas.getContext('2d');
+    let w = canvas.width; let h = canvas.height;
+    
+    // Canvas အလွတ်လုပ်ခြင်း
+    ctx.clearRect(0, 0, w, h);
+
+    // Data ဖတ်ရာတွင် Error မတက်စေရန် Safely Extract လုပ်ခြင်း
+    let extractCoords = (pt) => {
+        let n = pt.n !== undefined ? pt.n : pt.n_adj;
+        let e = pt.e !== undefined ? pt.e : pt.e_adj;
+        return { n: parseFloat(n), e: parseFloat(e), p: pt.p || "Pt" };
+    };
+
+    let sPt = extractCoords(startPt);
+    let pts = adjPoints.map(extractCoords);
+    let ePt = type === 'O' ? extractCoords(endPt) : sPt;
+
+    let allPts = [sPt, ...pts];
+    if (type === 'O') allPts.push(ePt);
+
+    // Error ရှိသော Data များ ဖယ်ထုတ်ခြင်း
+    allPts = allPts.filter(pt => !isNaN(pt.n) && !isNaN(pt.e));
+    if (allPts.length === 0) return;
+
+    let minN = Math.min(...allPts.map(pt => pt.n));
+    let maxN = Math.max(...allPts.map(pt => pt.n));
+    let minE = Math.min(...allPts.map(pt => pt.e));
+    let maxE = Math.max(...allPts.map(pt => pt.e));
+
+    let padding = 40; 
+    let rangeN = maxN - minN; if(rangeN === 0) rangeN = 10;
+    let rangeE = maxE - minE; if(rangeE === 0) rangeE = 10;
+    
+    let scaleX = (w - padding * 2) / rangeE;
+    let scaleY = (h - padding * 2) / rangeN;
+    let scale = Math.min(scaleX, scaleY);
+    
+    let offsetX = (w - (rangeE * scale)) / 2;
+    let offsetY = (h - (rangeN * scale)) / 2;
+
+    // Coordinate မှ Screen Pixel သို့ ပြောင်းခြင်း
+    let toScreen = (n, e) => { 
+        return { 
+            x: offsetX + (e - minE) * scale, 
+            y: h - (offsetY + (n - minN) * scale) 
+        }; 
+    };
+
+    // 1. မျဉ်းများ (Lines) ဆွဲခြင်း
+    ctx.beginPath();
+    let sPos = toScreen(sPt.n, sPt.e);
+    ctx.moveTo(sPos.x, sPos.y);
+    pts.forEach(pt => {
+        let pos = toScreen(pt.n, pt.e);
+        ctx.lineTo(pos.x, pos.y);
+    });
+    if (type === 'O') {
+        let ePos = toScreen(ePt.n, ePt.e);
+        ctx.lineTo(ePos.x, ePos.y);
+    } else {
+        ctx.lineTo(sPos.x, sPos.y);
+    }
+    ctx.strokeStyle = "#475569"; 
+    ctx.lineWidth = 1.5; 
+    ctx.stroke();
+
+    // 2. Point ထပ်နေပါက / ခံ၍ ပေါင်းရန် စစ်ဆေးခြင်း
+    let screenPts = [];
+    let addOrMerge = (n, e, name, pType) => {
+        let pos = toScreen(n, e);
+        let merged = false;
+        for(let sp of screenPts) {
+            let dist = Math.sqrt((sp.x - pos.x)**2 + (sp.y - pos.y)**2);
+            if(dist < 10) { 
+                if(!sp.names.includes(name)) sp.names.push(name);
+                if(pType === 'start') sp.type = 'start';
+                if(pType === 'end' && sp.type !== 'start') sp.type = 'end';
+                merged = true; break;
+            }
+        }
+        if(!merged) screenPts.push({ x: pos.x, y: pos.y, names: [name], type: pType });
+    };
+
+    addOrMerge(sPt.n, sPt.e, sPt.p, 'start');
+    pts.forEach(pt => addOrMerge(pt.n, pt.e, pt.p, 'adj'));
+    if(type === 'O') addOrMerge(ePt.n, ePt.e, ePt.p, 'end');
+
+    // 3. Point လေးများနှင့် စာသား (Names) ဆွဲခြင်း
+    screenPts.forEach(sp => {
+        // ပုံဆွဲခြင်း (Shape)
+        if(sp.type === 'start' || sp.type === 'end') {
+            ctx.beginPath();
+            ctx.moveTo(sp.x, sp.y - 8); ctx.lineTo(sp.x + 8, sp.y + 6); ctx.lineTo(sp.x - 8, sp.y + 6);
+            ctx.closePath();
+            ctx.fillStyle = sp.type === 'start' ? "#dc2626" : "#16a34a"; // Red or Green Triangle
+            ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke();
+        } else {
+            ctx.beginPath(); ctx.arc(sp.x, sp.y, 4, 0, 2 * Math.PI);
+            ctx.fillStyle = "#3b82f6"; // Blue Circle
+            ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1; ctx.stroke();
+        }
+        
+        // စာသားရေးခြင်း (Text)
+        ctx.fillStyle = (sp.type === 'start') ? "#dc2626" : (sp.type === 'end') ? "#059669" : "#1e40af";
+        ctx.font = (sp.type === 'start' || sp.type === 'end') ? "bold 11px Arial" : "11px Arial";
+        let text = sp.names.join(' / ');
+        
+        // မျဉ်းနဲ့ စာသား ထပ်မသွားအောင် နောက်ခံအဖြူရောင် Shadow လေးထည့်ထားသည်
+        ctx.shadowColor = "white"; ctx.shadowBlur = 4;
+        ctx.fillText(text, sp.x + 10, sp.y + 3);
+        ctx.shadowBlur = 0; // Shadow ပြန်ပိတ်
+    });
+};
+
 window.exportTrvCSV = function(exportType) {
     let res = window.trvLastResult;
     if (!res) return alert("Calculate first!");
