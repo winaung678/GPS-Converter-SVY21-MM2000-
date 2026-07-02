@@ -519,7 +519,7 @@ window.plotPointsOnMap = function() {
                 L.DomEvent.stopPropagation(e);
                 if (window.isMeasuring) { window.leafletMap.fireEvent('click', {latlng: e.latlng}); }
                 else {
-                   let z_str = pt.z ? pt.z.toFixed(3) : "0.000";
+                    let z_str = pt.z ? pt.z.toFixed(3) : "0.000";
 
                     let popupContent = `<div style="text-align:left; padding: 2px; min-width: 140px; font-size:12px;">
                         <div style="font-weight:bold; font-size:14px; color:#1e40af; border-bottom:1px solid #ccc; margin-bottom:5px;">🎯 [ ${pt.p} ]</div>
@@ -531,4 +531,12 @@ window.plotPointsOnMap = function() {
                     if (window.activeApp === 4) { popupContent += `<button class="so-popup-btn" style="background:#10b981; width:100%; margin-top:8px;" onclick="window.addPointToArea(${i})">➕ Add to Area</button>`; }
                     else { popupContent += `<button class="so-popup-btn" style="background:#2563eb; width:100%; margin-top:8px;" onclick="window.startMapSetOut(${i})">🎯 Set Out Here</button>`; }
 
-                    popupContent += `</div>`;
+                    popupContent += `</div>`; L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(window.leafletMap);
+                }
+            });
+            ptMarker.addTo(window.pointsLayerGroup);
+        }
+        if (i < total) setTimeout(processChunk, 15);
+    }
+    processChunk();
+};
