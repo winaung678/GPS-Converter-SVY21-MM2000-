@@ -509,15 +509,24 @@ window.plotRecordedPointsOnMap = function() {
                 window.leafletMap.fireEvent('click', {latlng: e.latlng});
             }
             else {
-                let popupContent = `<div style="text-align:center; padding: 5px; min-width: 120px;">
-                                    <b style="font-size:14px; color:#f59e0b;">Point: ${pt.p}</b><br>
-                                    <span style="font-size:12px; color:#1e3a8a;">Code: ${pt.d || 'None'}</span><br>`;
+                // window.plotRecordedPointsOnMap = function() { ... အထဲက popupContent အပိုင်းကို ရှာပြီး အစားထိုးရန်
 
-                if (window.activeApp === 3) { popupContent += `<button class="so-popup-btn" style="background:#2563eb; width:100%; margin-top:8px;" onclick="window.startMapSetOutFromTopo(${index})">🎯 Set Out</button>`; }
-                else if (window.activeApp === 4) { popupContent += `<button class="so-popup-btn" style="background:#10b981; width:100%; margin-top:8px;" onclick="window.addTopoPointToArea(${index})">➕ Add to Area</button>`; }
-                else { popupContent += `<button class="so-popup-btn" style="background:#ef4444; width:100%; margin-top:8px;" onclick="window.deleteRecordedPoint(${index})">🗑️ Delete Point</button>`; }
+let lN_str = pt.lN ? pt.lN.toFixed(3) : "-";
+let lE_str = pt.lE ? pt.lE.toFixed(3) : "-";
+let z_str = pt.z ? pt.z.toFixed(3) : "0.000";
 
-                popupContent += `</div>`;
+let popupContent = `<div style="text-align:left; padding: 2px; min-width: 140px; font-size:12px;">
+    <div style="font-weight:bold; font-size:14px; color:#f59e0b; border-bottom:1px solid #ccc; margin-bottom:5px;">📍 [ ${pt.p} ]</div>
+    <b style="color:#1e40af;">N:</b> ${lN_str}<br>
+    <b style="color:#1e40af;">E:</b> ${lE_str}<br>
+    <b style="color:#059669;">Z:</b> ${z_str}<br>
+    <b style="color:#b91c1c;">C:</b> ${pt.d || '-'}<br>`;
+
+if (window.activeApp === 3) { popupContent += `<button class="so-popup-btn" style="background:#2563eb; width:100%; margin-top:8px;" onclick="window.startMapSetOutFromTopo(${index})">🎯 Set Out</button>`; }
+else if (window.activeApp === 4) { popupContent += `<button class="so-popup-btn" style="background:#10b981; width:100%; margin-top:8px;" onclick="window.addTopoPointToArea(${index})">➕ Add to Area</button>`; }
+else { popupContent += `<button class="so-popup-btn" style="background:#ef4444; width:100%; margin-top:8px;" onclick="window.deleteRecordedPoint(${index})">🗑️ Delete Point</button>`; }
+
+popupContent += `</div>`;
                 L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(window.leafletMap);
             }
         });
