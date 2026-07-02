@@ -395,7 +395,7 @@ window.toggleTracking = function() {
         btn.style.borderColor = "#2563eb";
         
         if (window.currentTrackCoords.length > 1) {
-            document.getElementById('track_info_text').innerText = Points recorded: ${window.currentTrackCoords.length};
+           document.getElementById('track_info_text').innerText = `Points recorded: ${window.currentTrackCoords.length}`;
             let nameInput = document.getElementById('track_name_input');
             nameInput.readOnly = false;
             nameInput.classList.remove('input-locked');
