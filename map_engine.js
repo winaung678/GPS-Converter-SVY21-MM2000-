@@ -519,24 +519,47 @@ window.plotPointsOnMap = function() {
                 L.DomEvent.stopPropagation(e);
                 if (window.isMeasuring) { window.leafletMap.fireEvent('click', {latlng: e.latlng}); }
                 else {
+                   // 🔴 လက်ရှိရွေးထားသော Datum အပေါ်မူတည်၍ Lat/Lon မှ N, E သို့ ပြန်ပြောင်းတွက်ခြင်း
+                    let currentDatum = document.getElementById('so_datum') ? document.getElementById('so_datum').value : "WGS_LL";
+                    let dispN = "-", dispE = "-";
+                    let isLatLon = false;
+
+                    if (currentDatum === "SVY21") {
+                        let pW = calc_v2_fwd(pt.lat, pt.lon); dispN = pW.N.toFixed(3); dispE = pW.E.toFixed(3);
+                    } else if (currentDatum === "WGS_LL") {
+                        isLatLon = true; dispN = pt.lat.toFixed(7); dispE = pt.lon.toFixed(7);
+                    } else if (currentDatum === "GLOBAL_UTM") {
+                        let zInput = document.getElementById('so_custom_zone'); let hInput = document.getElementById('so_custom_hemi'); 
+                        let zone = (zInput && zInput.value) ? parseInt(zInput.value) : (Math.floor((pt.lon + 180) / 6) + 1);
+                        let pW = m_project(pt.lat, pt.lon, zone, m_WGS);
+                        let n_val = pW.n; if(hInput && hInput.value === 'S') n_val += 10000000;
+                        dispN = n_val.toFixed(3); dispE = pW.e.toFixed(3);
+                    } else {
+                        // UTM & MM2000 Zones
+                        let autoZone = parseInt(currentDatum.slice(-2)) || (Math.floor((pt.lon + 180) / 6) + 1);
+                        if (currentDatum.startsWith("MM")) {
+                            let x = m_llh2xyz(pt.lat, pt.lon, 0, m_WGS);
+                            let mL = m_xyz2llh(x.x + m_DX, x.y + m_DY, x.z + m_DZ, m_EVE);
+                            let pM = m_project(mL.lat, mL.lon, autoZone, m_EVE);
+                            dispN = pM.n.toFixed(3); dispE = pM.e.toFixed(3);
+                        } else {
+                            let pW = m_project(pt.lat, pt.lon, autoZone, m_WGS);
+                            dispN = pW.n.toFixed(3); dispE = pW.e.toFixed(3);
+                        }
+                    }
+
                     let z_str = pt.z ? pt.z.toFixed(3) : "0.000";
+                    let label1 = isLatLon ? "Lat:" : "N:";
+                    let label2 = isLatLon ? "Lon:" : "E:";
 
                     let popupContent = `<div style="text-align:left; padding: 2px; min-width: 140px; font-size:12px;">
                         <div style="font-weight:bold; font-size:14px; color:#1e40af; border-bottom:1px solid #ccc; margin-bottom:5px;">🎯 [ ${pt.p} ]</div>
-                        <b style="color:#0f766e;">Lat:</b> ${pt.lat.toFixed(7)}<br>
-                        <b style="color:#0f766e;">Lon:</b> ${pt.lon.toFixed(7)}<br>
+                        <b style="color:#0f766e;">${label1}</b> ${dispN}<br>
+                        <b style="color:#0f766e;">${label2}</b> ${dispE}<br>
                         <b style="color:#059669;">Z:</b> ${z_str}<br>
                         <b style="color:#b91c1c;">C:</b> ${pt.d || '-'}<br>`;
 
                     if (window.activeApp === 4) { popupContent += `<button class="so-popup-btn" style="background:#10b981; width:100%; margin-top:8px;" onclick="window.addPointToArea(${i})">➕ Add to Area</button>`; }
                     else { popupContent += `<button class="so-popup-btn" style="background:#2563eb; width:100%; margin-top:8px;" onclick="window.startMapSetOut(${i})">🎯 Set Out Here</button>`; }
 
-                    popupContent += `</div>`; L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(window.leafletMap);
-                }
-            });
-            ptMarker.addTo(window.pointsLayerGroup);
-        }
-        if (i < total) setTimeout(processChunk, 15);
-    }
-    processChunk();
-};
+                    popupContent += `</div>`;
