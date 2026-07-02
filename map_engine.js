@@ -519,14 +519,18 @@ window.plotPointsOnMap = function() {
                 L.DomEvent.stopPropagation(e);
                 if (window.isMeasuring) { window.leafletMap.fireEvent('click', {latlng: e.latlng}); }
                 else {
-                    let popupContent = `<div style="text-align:center; padding: 5px; min-width: 120px;"><b style="font-size:14px; color:#1e3a8a;">Point: ${pt.p}</b>`;
-                    if (window.activeApp === 3) { popupContent += `<button class="so-popup-btn" style="background:#2563eb; width:100%; margin-top:8px;" onclick="window.startMapSetOut(${ptIndex})">🎯 Set Out</button>`; }
-                    else if (window.activeApp === 4) {
-                        let isSelected = window.orderedAreaPoints.includes(ptIndex);
-                        let btnText = isSelected ? "❌ Remove from Area" : "➕ Add to Area";
-                        let btnColor = isSelected ? "#ef4444" : "#10b981";
-                        popupContent += `<button class="so-popup-btn" style="background:${btnColor}; width:100%; margin-top:8px;" onclick="window.addPointToArea(${ptIndex})">${btnText}</button>`;
-                    }
+                    let z_str = pt.z ? pt.z.toFixed(3) : "0.000";
+
+                    let popupContent = `<div style="text-align:left; padding: 2px; min-width: 140px; font-size:12px;">
+                        <div style="font-weight:bold; font-size:14px; color:#1e40af; border-bottom:1px solid #ccc; margin-bottom:5px;">🎯 [ ${pt.p} ]</div>
+                        <b style="color:#0f766e;">Lat:</b> ${pt.lat.toFixed(7)}<br>
+                        <b style="color:#0f766e;">Lon:</b> ${pt.lon.toFixed(7)}<br>
+                        <b style="color:#059669;">Z:</b> ${z_str}<br>
+                        <b style="color:#b91c1c;">C:</b> ${pt.d || '-'}<br>`;
+
+                    if (window.activeApp === 4) { popupContent += `<button class="so-popup-btn" style="background:#10b981; width:100%; margin-top:8px;" onclick="window.addPointToArea(${i})">➕ Add to Area</button>`; }
+                    else { popupContent += `<button class="so-popup-btn" style="background:#2563eb; width:100%; margin-top:8px;" onclick="window.startMapSetOut(${i})">🎯 Set Out Here</button>`; }
+
                     popupContent += `</div>`; L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(window.leafletMap);
                 }
             });
