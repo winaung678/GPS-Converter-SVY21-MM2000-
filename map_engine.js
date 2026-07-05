@@ -674,6 +674,55 @@ window.toggleDxfLayers = function() {
     }
 };
 
+window.forceMapLayerRedraw = function(layerGroup) {
+    if (!layerGroup || !window.leafletMap) return;
+    if (window.leafletMap.hasLayer(layerGroup)) {
+        window.leafletMap.removeLayer(layerGroup);
+        window.leafletMap.addLayer(layerGroup);
+    }
+    try { window.leafletMap.panBy([0, 0], { animate: false }); } catch (e) {}
+};
+
+window.ensureSoPointsLayerVisible = function() {
+    if (!window.leafletMap || !window.pointsLayerGroup) return;
+    let chkPts = document.getElementById('tgl_so_pts');
+    if (chkPts && chkPts.checked && !window.leafletMap.hasLayer(window.pointsLayerGroup)) {
+        window.leafletMap.addLayer(window.pointsLayerGroup);
+    }
+};
+
+window.refreshMapPointLayers = function(n) {
+    if (!window.leafletMap) return;
+    window.leafletMap.invalidateSize({ animate: false });
+
+    if (typeof window.toggleDxfLayers === 'function') window.toggleDxfLayers();
+
+    if (n === 3 || n === 4 || n === 6) {
+        if (window.recordedLayerGroup && window.leafletMap.hasLayer(window.recordedLayerGroup)) {
+            window.leafletMap.removeLayer(window.recordedLayerGroup);
+        }
+        window.ensureSoPointsLayerVisible();
+        if (typeof window.plotPointsOnMap === 'function') window.plotPointsOnMap();
+        setTimeout(() => {
+            window.ensureSoPointsLayerVisible();
+            if (window.pointsLayerGroup) window.forceMapLayerRedraw(window.pointsLayerGroup);
+        }, 200);
+    }
+
+    if (n === 1 || n === 2 || n === 5) {
+        if (!window.recordedLayerGroup) {
+            window.recordedLayerGroup = L.layerGroup().addTo(window.leafletMap);
+        } else if (!window.leafletMap.hasLayer(window.recordedLayerGroup)) {
+            window.leafletMap.addLayer(window.recordedLayerGroup);
+        }
+        if (typeof window.plotRecordedPointsOnMap === 'function') window.plotRecordedPointsOnMap();
+        window.forceMapLayerRedraw(window.recordedLayerGroup);
+        if (window.pointsLayerGroup && window.leafletMap.hasLayer(window.pointsLayerGroup)) {
+            window.leafletMap.removeLayer(window.pointsLayerGroup);
+        }
+    }
+};
+
 window.plotPointsOnMap = function() {
     if(!window.pointsLayerGroup) return;
     window.pointsLayerGroup.clearLayers();
@@ -711,6 +760,10 @@ window.plotPointsOnMap = function() {
             ptMarker.addTo(window.pointsLayerGroup);
         }
         if (i < total) setTimeout(processChunk, 15);
+        else {
+            window.ensureSoPointsLayerVisible();
+            window.forceMapLayerRedraw(window.pointsLayerGroup);
+        }
     }
     processChunk();
 };

@@ -58,6 +58,9 @@ window.onload = function() {
     if(sSoDatum) { document.getElementById('so_datum').value = sSoDatum; window.toggleSoDatum(); }
     let sDxfDatum = localStorage.getItem('pref_dxf_datum');
     if(sDxfDatum) { document.getElementById('dxf_datum').value = sDxfDatum; window.toggleDxfDatum(); }
+    if (typeof window.syncTrackColorInputs === 'function') {
+        window.syncTrackColorInputs(localStorage.getItem('pref_track_color') || '#3b82f6');
+    }
 
     // 🔴 ဝင်ဝင်ချင်း အမြဲတမ်း Dashboard (Main Face) ကိုသာ ပြသမည်
     window.switchApp(0);
@@ -112,7 +115,12 @@ window.updateTopoUI = function() {
             btn.innerHTML = "🧮 Data View"; btn.classList.add('topo-active'); document.getElementById('shared_map_view').classList.remove('hidden');
             document.getElementById('v2_calc_ui').classList.add('hidden'); document.getElementById('m_calc_ui').classList.add('hidden'); document.getElementById('g_calc_ui').classList.add('hidden');
             if (!window.leafletMap) window.initMap();
-            setTimeout(() => { window.leafletMap.invalidateSize(); window.plotRecordedPointsOnMap(); }, 350);
+            setTimeout(() => {
+                window.leafletMap.invalidateSize({ animate: false });
+                if (typeof window.refreshMapPointLayers === 'function') {
+                    window.refreshMapPointLayers(window.activeApp);
+                }
+            }, 350);
         } else {
             btn.innerHTML = "🗺️ Map View"; btn.classList.remove('topo-active'); document.getElementById('shared_map_view').classList.add('hidden');
             if (n === 1) document.getElementById('v2_calc_ui').classList.remove('hidden'); if (n === 2) document.getElementById('m_calc_ui').classList.remove('hidden'); if (n === 5) document.getElementById('g_calc_ui').classList.remove('hidden');
@@ -172,16 +180,20 @@ window.switchApp = function(n) {
         }
 
         setTimeout(() => {
-            window.leafletMap.invalidateSize();
-            if (n === 3 || n === 4 || n === 6) { if (window.recordedLayerGroup && window.leafletMap.hasLayer(window.recordedLayerGroup)) { window.leafletMap.removeLayer(window.recordedLayerGroup); } if (window.pointsLayerGroup && !window.leafletMap.hasLayer(window.pointsLayerGroup)) { window.leafletMap.addLayer(window.pointsLayerGroup); } window.plotPointsOnMap(); }
-            if (n === 1 || n === 2 || n === 5) { if (window.recordedLayerGroup && !window.leafletMap.hasLayer(window.recordedLayerGroup)) { window.leafletMap.addLayer(window.recordedLayerGroup); } window.plotRecordedPointsOnMap(); window.updateTopoUI(); }
+            if (window.leafletMap) window.leafletMap.invalidateSize({ animate: false });
 
-            // 🔴 DXF ဆွဲမည့် အပိုင်းကို သေချာစစ်ဆေးမည်
             if (window.rawDxfEntities && window.rawDxfEntities.length > 0) {
-                if (window.dxfLineLayer === null) { window.renderDXF(); } else { window.toggleDxfLayers(); }
-            } else { window.toggleDxfLayers(); }
+                if (window.dxfLineLayer === null) { window.renderDXF(); }
+                else if (typeof window.toggleDxfLayers === 'function') { window.toggleDxfLayers(); }
+            }
 
-            if (n === 1 || n === 2 || n === 5) { if (window.pointsLayerGroup && window.leafletMap.hasLayer(window.pointsLayerGroup)) { window.leafletMap.removeLayer(window.pointsLayerGroup); } }
+            if (n === 1 || n === 2 || n === 5) { window.updateTopoUI(); }
+
+            let refreshPoints = () => {
+                if (typeof window.refreshMapPointLayers === 'function') window.refreshMapPointLayers(n);
+            };
+            refreshPoints();
+            setTimeout(refreshPoints, 200);
         }, 350);
     }
     if(n === 4) { window.populateAreaPoints(); window.updateAreaOrderUI(); }
@@ -357,6 +369,24 @@ window.activeTrackLine = null;
 window.renderedSavedTracks = {};
 window.trackDB = null;
 
+window.getTrackColor = function() {
+    let inp = document.getElementById('track_color_input') || document.getElementById('track_save_color_input');
+    return (inp && inp.value) ? inp.value : (localStorage.getItem('pref_track_color') || '#3b82f6');
+};
+
+window.syncTrackColorInputs = function(color) {
+    let panelInp = document.getElementById('track_color_input');
+    let modalInp = document.getElementById('track_save_color_input');
+    if (panelInp) panelInp.value = color;
+    if (modalInp) modalInp.value = color;
+    localStorage.setItem('pref_track_color', color);
+    if (window.activeTrackLine) window.activeTrackLine.setStyle({ color: color });
+};
+
+window.onTrackColorChange = function(color) {
+    window.syncTrackColorInputs(color);
+};
+
 // ၁။ Database တည်ဆောက်ခြင်း
 const initTrackDB = () => {
     let request = indexedDB.open("SurveyProDB", 1);
@@ -388,7 +418,8 @@ window.toggleTracking = function() {
         
         window.currentTrackCoords = [];
         if(window.activeTrackLine && window.leafletMap) window.leafletMap.removeLayer(window.activeTrackLine);
-        window.activeTrackLine = L.polyline([], {color: '#3b82f6', weight: 4, opacity: 0.8}).addTo(window.leafletMap);
+        let trackColor = window.getTrackColor();
+        window.activeTrackLine = L.polyline([], {color: trackColor, weight: 4, opacity: 0.8}).addTo(window.leafletMap);
     } else {
         btn.innerHTML = "👣"; // 🔴 ခြေရာပုံ ပြန်ပြောင်းမည်
         btn.style.background = "#3b82f6";
@@ -399,9 +430,10 @@ window.toggleTracking = function() {
             let nameInput = document.getElementById('track_name_input');
             nameInput.readOnly = false;
             nameInput.classList.remove('input-locked');
+            window.syncTrackColorInputs(window.getTrackColor());
             document.getElementById('saveTrackModal').style.display = 'flex';
         } else {
-            alert("⚠️ နေရာရွေ့လျားမှု မရှိသေးပါ (သို့) အမှတ်မလုံလောက်ပါ။");
+            alert("⚠️ Not enough movement recorded. Walk at least a few meters before stopping.");
             if(window.activeTrackLine) window.leafletMap.removeLayer(window.activeTrackLine);
         }
     }
@@ -445,6 +477,7 @@ window.confirmSaveTrack = function() {
         id: new Date().getTime().toString(),
         name: name,
         date: new Date().toLocaleString(),
+        color: window.getTrackColor(),
         coords: [...window.currentTrackCoords] 
     };
     
@@ -487,12 +520,16 @@ window.renderTrackListUI = function() {
         let isShowing = window.renderedSavedTracks[t.id] !== undefined;
         let btnColor = isShowing ? "#f59e0b" : "#10b981";
         let btnText = isShowing ? "🚫 Hide" : "👁️ Show";
+        let trackColor = t.color || '#8b5cf6';
         
         html += `
         <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--input-border); padding:5px 0;">
-            <div style="flex:1;">
-                <b style="color:var(--primary); font-size:12px;">${t.name}</b><br>
-                <span style="font-size:10px; color:var(--label-text);">${t.date} | Pts: ${t.coords.length}</span>
+            <div style="flex:1; display:flex; align-items:center; gap:6px;">
+                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:${trackColor}; border:1px solid rgba(0,0,0,0.2); flex-shrink:0;"></span>
+                <div>
+                    <b style="color:var(--primary); font-size:12px;">${t.name}</b><br>
+                    <span style="font-size:10px; color:var(--label-text);">${t.date} | Pts: ${t.coords.length}</span>
+                </div>
             </div>
             <div style="display:flex; gap:5px;">
                 <button class="top-btn" style="background:${btnColor}; color:white; padding:4px 8px; font-size:11px;" onclick="toggleTrackOnMap('${t.id}')">${btnText}</button>
@@ -514,7 +551,8 @@ window.toggleTrackOnMap = function(id) {
         delete window.renderedSavedTracks[id];
     } else {
         // Show
-        let layer = L.polyline(track.coords, {color: '#8b5cf6', weight: 4, opacity: 0.8}).addTo(window.leafletMap);
+        let trackColor = track.color || '#8b5cf6';
+        let layer = L.polyline(track.coords, {color: trackColor, weight: 4, opacity: 0.8}).addTo(window.leafletMap);
         layer.bindTooltip(track.name, {sticky: true, direction: 'top'});
         window.renderedSavedTracks[id] = layer;
         window.leafletMap.fitBounds(layer.getBounds(), {padding: [30, 30]});
