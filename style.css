@@ -101,6 +101,7 @@ select:disabled{opacity:0.6;background:#e2e8f0;cursor:not-allowed;}
 .zoom-out-texts .pt-tooltip { display: none !important; }
 
 .measure-label { background: rgba(255, 255, 255, 0.85); border: 1.5px solid #dc2626; color: #dc2626; font-size: 11px; font-weight: bold; border-radius: 6px; padding: 2px 6px; white-space: nowrap; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.3); pointer-events: none; }
+.measure-preview-label { border-style: dashed; opacity: 0.9; }
 .dark-mode .measure-label { background: rgba(30, 41, 59, 0.85); border-color: #f87171; color: #f87171; }
 
 .topo-tooltip { background: transparent !important; border: none !important; box-shadow: none !important; font-weight: 900; font-size: var(--pt-font-size) !important; color: #f59e0b !important; text-shadow: 1px 1px 0 #000, -1px 1px 0 #000, 1px -1px 0 #000, -1px -1px 0 #000 !important; }
