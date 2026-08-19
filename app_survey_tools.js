@@ -17,6 +17,7 @@ window.saveManualPoint = function(datumLabel, prefix) {
     if (window.AndroidNative && window.AndroidNative.savePoint) { window.AndroidNative.savePoint(p, window.latest_local_N.toFixed(3), window.latest_local_E.toFixed(3), window.latest_Z.toFixed(3), d); }
     if (pInp) pInp.value = incrementPointName(p);
     window.plotRecordedPointsOnMap();
+    window.refreshPointsAfterDataChange();
 };
 
 window.triggerRecord = function(isPrecise) {
@@ -60,7 +61,8 @@ function savePointToDevice(lN, lE, la, lo, wN, wE, Z, isAveraged) {
     if (window.AndroidNative && window.AndroidNative.savePoint) window.AndroidNative.savePoint(p, lN.toFixed(3), lE.toFixed(3), zStr, d);
     if (pInput) pInput.value = incrementPointName(p);
     window.plotRecordedPointsOnMap();
-}
+    window.refreshPointsAfterDataChange();
+};
 
 window.deleteRecordedPoint = function(index) {
     if(!confirm("Delete this point permanently?")) return;
@@ -68,6 +70,7 @@ window.deleteRecordedPoint = function(index) {
     localStorage.setItem('surveyProRecords', JSON.stringify(window.recordedPointsBank));
     if (window.leafletMap) window.leafletMap.closePopup();
     window.plotRecordedPointsOnMap();
+    window.refreshPointsAfterDataChange();
 };
 
 window.triggerExport = function() {
@@ -105,7 +108,7 @@ window.importTopoToSetOut = function() {
         if (!exists) { window.setOutPoints.push({p: pt.p, lat: pt.wLa, lon: pt.wLo, z: pt.z, d: pt.d}); addedCount++; }
     });
     if (addedCount > 0) {
-        savePointsToStorage(); updateTargetDropdown(); window.plotPointsOnMap(); window.populateAreaPoints();
+        savePointsToStorage(); updateTargetDropdown(); window.plotPointsOnMap(); window.refreshPointsAfterDataChange(); window.populateAreaPoints();
         alert(`Successfully imported ${addedCount} Topo points!`);
     } else { alert("Points are already in the list."); }
 };
@@ -122,7 +125,7 @@ window.stopNavigation = function() { window.targetPoint = null; let sel = docume
 window.clearSetOutPoints = function() { if(!confirm("Are you sure you want to delete ALL Points?")) return; window.setOutPoints = []; window.orderedAreaPoints = []; savePointsToStorage(); updateTargetDropdown(); window.stopNavigation(); if(window.pointsLayerGroup) window.pointsLayerGroup.clearLayers(); window.populateAreaPoints(); window.updateAreaOrderUI(); window.clearAreaCalc(); alert("Points Cleared!"); };
 window.loadSetOutCSV = function(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = function(e) { parseSetOutCSV(e.target.result); }; reader.readAsText(file); event.target.value = ''; };
 
-function parseSetOutCSV(text) { window.stopNavigation(); let lines = text.split('\n'); let successCount = 0; let errorCount = 0; for (let i = 0; i < lines.length; i++) { let line = lines[i].trim(); if(!line) continue; let cols = line.split(','); if (cols.length < 3) { errorCount++; continue; } let p = cols[0].trim(); let val1 = parseFloat(cols[1]); let val2 = parseFloat(cols[2]); if (isNaN(val1) || isNaN(val2)) { errorCount++; continue; } let z = parseFloat(cols[3]) || 0.000; processRawPointToTarget(p, val1, val2, z, "", true); successCount++; } savePointsToStorage(); updateTargetDropdown(); window.plotPointsOnMap(); window.populateAreaPoints(); if(errorCount > 0) alert(`Loaded ${successCount} points.\nSkipped ${errorCount} points.`); else alert(`Loaded ${successCount} points successfully!`); }
+function parseSetOutCSV(text) { window.stopNavigation(); let lines = text.split('\n'); let successCount = 0; let errorCount = 0; for (let i = 0; i < lines.length; i++) { let line = lines[i].trim(); if(!line) continue; let cols = line.split(','); if (cols.length < 3) { errorCount++; continue; } let p = cols[0].trim(); let val1 = parseFloat(cols[1]); let val2 = parseFloat(cols[2]); if (isNaN(val1) || isNaN(val2)) { errorCount++; continue; } let z = parseFloat(cols[3]) || 0.000; processRawPointToTarget(p, val1, val2, z, "", true); successCount++; } savePointsToStorage(); updateTargetDropdown(); window.plotPointsOnMap(); window.refreshPointsAfterDataChange(); window.populateAreaPoints(); if(errorCount > 0) alert(`Loaded ${successCount} points.\nSkipped ${errorCount} points.`); else alert(`Loaded ${successCount} points successfully!`); }
 
 window.addManualSetOut = function() { let p = document.getElementById('so_m_p').value || "M1"; let n = parseFloat(document.getElementById('so_m_n').value); let e = parseFloat(document.getElementById('so_m_e').value); if(isNaN(n) || isNaN(e)) return alert("Invalid Coordinates"); processRawPointToTarget(p, n, e, 0, "Manual", false); savePointsToStorage(); window.populateAreaPoints(); alert("Point Added!"); };
 
@@ -480,9 +483,18 @@ window.calcZ2FromGradient = function() {
 // --- TOPO / RECORDED POINTS ON MAP ---
 // ==========================================
 
+window.refreshPointsAfterDataChange = function() {
+    if (!window.leafletMap || typeof window.refreshMapPointLayers !== 'function') return;
+    setTimeout(() => window.refreshMapPointLayers(window.activeApp), 50);
+};
+
 window.plotRecordedPointsOnMap = function() {
     if (!window.leafletMap) return;
-    if (!window.recordedLayerGroup) { window.recordedLayerGroup = L.layerGroup().addTo(window.leafletMap); }
+    if (!window.recordedLayerGroup) {
+        window.recordedLayerGroup = L.layerGroup().addTo(window.leafletMap);
+    } else if (!window.leafletMap.hasLayer(window.recordedLayerGroup)) {
+        window.leafletMap.addLayer(window.recordedLayerGroup);
+    }
     window.recordedLayerGroup.clearLayers();
 
     window.recordedPointsBank.forEach((pt, index) => {
@@ -509,20 +521,18 @@ window.plotRecordedPointsOnMap = function() {
                 window.leafletMap.fireEvent('click', {latlng: e.latlng});
             }
             else {
-                let popupContent = `<div style="text-align:center; padding: 5px; min-width: 120px;">
-                                    <b style="font-size:14px; color:#f59e0b;">Point: ${pt.p}</b><br>
-                                    <span style="font-size:12px; color:#1e3a8a;">Code: ${pt.d || 'None'}</span><br>`;
-
-                if (window.activeApp === 3) { popupContent += `<button class="so-popup-btn" style="background:#2563eb; width:100%; margin-top:8px;" onclick="window.startMapSetOutFromTopo(${index})">🎯 Set Out</button>`; }
-                else if (window.activeApp === 4) { popupContent += `<button class="so-popup-btn" style="background:#10b981; width:100%; margin-top:8px;" onclick="window.addTopoPointToArea(${index})">➕ Add to Area</button>`; }
-                else { popupContent += `<button class="so-popup-btn" style="background:#ef4444; width:100%; margin-top:8px;" onclick="window.deleteRecordedPoint(${index})">🗑️ Delete Point</button>`; }
-
-                popupContent += `</div>`;
+                let buttonsHtml = '';
+                if (window.activeApp === 3) { buttonsHtml = `<button class="so-popup-btn" style="background:#2563eb; margin-top:8px;" onclick="window.startMapSetOutFromTopo(${index})">🎯 Set Out</button>`; }
+                else if (window.activeApp === 4) { buttonsHtml = `<button class="so-popup-btn" style="background:#10b981; margin-top:8px;" onclick="window.addTopoPointToArea(${index})">➕ Add to Area</button>`; }
+                else { buttonsHtml = `<button class="so-popup-btn" style="background:#ef4444; margin-top:8px;" onclick="window.deleteRecordedPoint(${index})">🗑️ Delete Point</button>`; }
+                let popupContent = window.buildSavedPointPopup(pLat, pLon, { pointName: pt.p, z: pt.z, icon: '📍', nameColor: '#f59e0b', buttonsHtml: buttonsHtml });
                 L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(window.leafletMap);
             }
         });
         ptMarker.addTo(window.recordedLayerGroup);
     });
+
+    window.forceMapLayerRedraw(window.recordedLayerGroup);
 };
 
 // ==========================================

@@ -65,6 +65,11 @@ window.isMeasuring = false;
 window.measureLatLngs = [];
 window.measureLineLayer = null;
 window.measureMarkersLayer = null;
+window.measureSessions = [];
+window.activeMeasureSession = null;
+window.measurePreviewLine = null;
+window.measurePreviewLabel = null;
+window.nextMeasureSessionId = 1;
 
 // Offline DB Variables
 window.mapDB = null;

@@ -1,19 +1,283 @@
 // ==========================================
+// --- MEASURE TOOL ---
+// ==========================================
+
+function calcMeasureTotal(latlngs) {
+    let total = 0;
+    for (let i = 0; i < latlngs.length - 1; i++) {
+        total += calcDistance(latlngs[i][0], latlngs[i][1], latlngs[i + 1][0], latlngs[i + 1][1]);
+    }
+    return total;
+}
+
+function buildMeasureSessionPopup(session) {
+    let total = calcMeasureTotal(session.latlngs);
+    let segs = session.latlngs.length - 1;
+    return `<div style="text-align:center; padding:5px;">
+        <b style="color:#b91c1c; font-size:14px;">Total: ${total.toFixed(3)} m</b><br>
+        <span style="font-size:11px; color:#64748b;">${segs} segment(s), ${session.latlngs.length} point(s)</span><br>
+        <button class="so-popup-btn" style="background:#ef4444; margin-top:8px;" onclick="window.deleteMeasureSession(${session.id})">🗑️ Delete Line</button>
+    </div>`;
+}
+
+function bindMeasureSessionClick(session) {
+    session.hitLineLayer = L.polyline(session.latlngs, {
+        color: '#dc2626', weight: 20, opacity: 0, interactive: true
+    }).addTo(window.leafletMap);
+    session.hitLineLayer.on('click', function(e) {
+        if (window.isMeasuring) return;
+        L.DomEvent.stopPropagation(e);
+        L.popup().setLatLng(e.latlng).setContent(buildMeasureSessionPopup(session)).openOn(window.leafletMap);
+    });
+}
+
+window.deleteMeasureSession = function(id) {
+    let idx = window.measureSessions.findIndex(s => s.id === id);
+    if (idx === -1) return;
+    let session = window.measureSessions[idx];
+    if (session.lineLayer) window.leafletMap.removeLayer(session.lineLayer);
+    if (session.hitLineLayer) window.leafletMap.removeLayer(session.hitLineLayer);
+    if (session.markersLayer) window.leafletMap.removeLayer(session.markersLayer);
+    window.measureSessions.splice(idx, 1);
+    if (window.leafletMap) window.leafletMap.closePopup();
+};
+
+function clearMeasurePreview() {
+    if (window.measurePreviewLine && window.leafletMap) {
+        window.leafletMap.removeLayer(window.measurePreviewLine);
+        window.measurePreviewLine = null;
+    }
+    if (window.measurePreviewLabel && window.leafletMap) {
+        window.leafletMap.removeLayer(window.measurePreviewLabel);
+        window.measurePreviewLabel = null;
+    }
+}
+
+function updateMeasurePreview(from, to) {
+    if (!window.measurePreviewLine || !window.measurePreviewLabel) return;
+    window.measurePreviewLine.setLatLngs([from, to]);
+    let dist = calcDistance(from[0], from[1], to[0], to[1]);
+    let midLat = (from[0] + to[0]) / 2;
+    let midLon = (from[1] + to[1]) / 2;
+    window.measurePreviewLabel.setLatLng([midLat, midLon]);
+    window.measurePreviewLabel.setIcon(L.divIcon({
+        className: 'measure-label measure-preview-label',
+        html: `${dist.toFixed(2)} m`,
+        iconSize: [50, 20],
+        iconAnchor: [25, 10]
+    }));
+}
+
+window._measureMouseMoveHandler = function(e) {
+    if (!window.isMeasuring || !window.activeMeasureSession) return;
+    let latlngs = window.activeMeasureSession.latlngs;
+    if (latlngs.length === 0) return;
+    let last = latlngs[latlngs.length - 1];
+    let lat = e.latlng.lat;
+    let lon = ((e.latlng.lng + 180) % 360 + 360) % 360 - 180;
+    updateMeasurePreview(last, [lat, lon]);
+};
+
+function attachMeasurePreviewListeners() {
+    if (!window.leafletMap) return;
+    window.leafletMap.on('mousemove', window._measureMouseMoveHandler);
+    window.leafletMap.on('touchmove', window._measureMouseMoveHandler);
+}
+
+function detachMeasurePreviewListeners() {
+    if (!window.leafletMap) return;
+    window.leafletMap.off('mousemove', window._measureMouseMoveHandler);
+    window.leafletMap.off('touchmove', window._measureMouseMoveHandler);
+}
+
+function discardActiveMeasureSession() {
+    let active = window.activeMeasureSession;
+    if (!active) return;
+    if (active.lineLayer && window.leafletMap) window.leafletMap.removeLayer(active.lineLayer);
+    if (active.markersLayer && window.leafletMap) window.leafletMap.removeLayer(active.markersLayer);
+    window.activeMeasureSession = null;
+    window.measureLineLayer = null;
+    window.measureMarkersLayer = null;
+    window.measureLatLngs = [];
+}
+
+function finalizeActiveMeasureSession() {
+    let active = window.activeMeasureSession;
+    if (!active || active.latlngs.length < 2) {
+        discardActiveMeasureSession();
+        return;
+    }
+    active.id = window.nextMeasureSessionId++;
+    bindMeasureSessionClick(active);
+    window.measureSessions.push(active);
+    window.activeMeasureSession = null;
+    window.measureLineLayer = null;
+    window.measureMarkersLayer = null;
+    window.measureLatLngs = [];
+}
+
+function startActiveMeasureSession() {
+    let active = {
+        id: null,
+        latlngs: [],
+        lineLayer: L.polyline([], { color: '#dc2626', weight: 4, dashArray: '5, 5' }).addTo(window.leafletMap),
+        hitLineLayer: null,
+        markersLayer: L.layerGroup().addTo(window.leafletMap)
+    };
+    window.activeMeasureSession = active;
+    window.measureLineLayer = active.lineLayer;
+    window.measureMarkersLayer = active.markersLayer;
+    window.measureLatLngs = active.latlngs;
+
+    window.measurePreviewLine = L.polyline([], { color: '#f87171', weight: 3, dashArray: '8, 8', opacity: 0.85, interactive: false }).addTo(window.leafletMap);
+    window.measurePreviewLabel = L.marker([0, 0], {
+        icon: L.divIcon({ className: 'measure-label measure-preview-label', html: '', iconSize: [0, 0] }),
+        interactive: false
+    }).addTo(window.leafletMap);
+
+    attachMeasurePreviewListeners();
+}
+
+function stopMeasureMode() {
+    detachMeasurePreviewListeners();
+    clearMeasurePreview();
+    finalizeActiveMeasureSession();
+}
+
+function addMeasurePoint(finalLat, finalLon, snapResult) {
+    let active = window.activeMeasureSession;
+    if (!active) return;
+
+    active.latlngs.push([finalLat, finalLon]);
+    active.lineLayer.setLatLngs(active.latlngs);
+
+    let markerColor = snapResult.snapped ? "#10b981" : "#ef4444";
+    let markerIcon = L.divIcon({
+        className: 'dxf-text-label',
+        html: `<div style="background:white; border-radius:50%; width:12px; height:12px; border:3px solid ${markerColor};"></div>`,
+        iconSize: [16, 16]
+    });
+    L.marker([finalLat, finalLon], { icon: markerIcon }).addTo(active.markersLayer);
+
+    if (active.latlngs.length > 1) {
+        let prevLat = active.latlngs[active.latlngs.length - 2][0];
+        let prevLon = active.latlngs[active.latlngs.length - 2][1];
+        let lastSegDist = calcDistance(prevLat, prevLon, finalLat, finalLon);
+        let totalDist = calcMeasureTotal(active.latlngs);
+
+        let snapText = snapResult.snapped ? `<br><span style="color:#10b981; font-size:10px;">🧲 Snapped to DXF</span>` : "";
+        L.popup().setLatLng([finalLat, finalLon]).setContent(
+            `<b style="color:#0f172a; font-size:12px;">Segment: ${lastSegDist.toFixed(3)} m</b><br><b style="color:#b91c1c; font-size:14px;">Total: ${totalDist.toFixed(3)} m</b>${snapText}`
+        ).openOn(window.leafletMap);
+
+        let midLat = (prevLat + finalLat) / 2;
+        let midLon = (prevLon + finalLon) / 2;
+        L.marker([midLat, midLon], {
+            icon: L.divIcon({ className: 'measure-label', html: `${lastSegDist.toFixed(2)} m`, iconSize: [50, 20], iconAnchor: [25, 10] })
+        }).addTo(active.markersLayer);
+    } else {
+        let snapText = snapResult.snapped ? `<br><span style="color:#10b981; font-size:10px;">🧲 Snapped to DXF</span>` : "";
+        L.popup().setLatLng([finalLat, finalLon]).setContent(`<b style="color:#1e40af;">Start Point</b>${snapText}`).openOn(window.leafletMap);
+    }
+}
+
+window.toggleMeasureMode = function() {
+    window.isMeasuring = !window.isMeasuring;
+    let btn = document.getElementById('measureBtn');
+    if (window.isMeasuring) {
+        btn.style.background = "#dc2626";
+        btn.style.borderColor = "#991b1b";
+        if (!window.leafletMap) return;
+        startActiveMeasureSession();
+        alert("📏 Measure Mode ON.\nTap on the map or points to measure distances.\nTurn OFF to keep the line on the map.");
+    } else {
+        btn.style.background = "#f59e0b";
+        btn.style.borderColor = "#d97706";
+        stopMeasureMode();
+    }
+};
+
+// ==========================================
 // --- ONLINE MAP ENGINE ---
 // ==========================================
 
-window.toggleMeasureMode = function() {
-    window.isMeasuring = !window.isMeasuring; let btn = document.getElementById('measureBtn');
-    if (window.isMeasuring) {
-        btn.style.background = "#dc2626"; btn.style.borderColor = "#991b1b"; window.measureLatLngs = [];
-        if(window.measureLineLayer) window.leafletMap.removeLayer(window.measureLineLayer); if(window.measureMarkersLayer) window.leafletMap.removeLayer(window.measureMarkersLayer);
-        window.measureLineLayer = L.polyline([], {color: '#dc2626', weight: 4, dashArray: '5, 5'}).addTo(window.leafletMap); window.measureMarkersLayer = L.layerGroup().addTo(window.leafletMap);
-        alert("📏 Measure Mode ON.\nTap on the map or points to measure distances.");
+window.getDatumCoordsForLatLon = function(finalLat, finalLon) {
+    let datumLabel = "WGS_LL", localN = 0, localE = 0, showLocal = false;
+    let autoDetectedZone = Math.floor((finalLon + 180) / 6) + 1;
+
+    if (window.activeApp === 1) {
+        if (finalLat >= 1.0 && finalLat <= 2.0 && finalLon >= 103.0 && finalLon <= 104.5) {
+            let pW = calc_v2_fwd(finalLat, finalLon); localN = pW.N; localE = pW.E; datumLabel = "SVY21"; showLocal = true;
+        }
+    } else if (window.activeApp === 2) {
+        if (finalLat >= 9.0 && finalLat <= 29.0 && finalLon >= 92.0 && finalLon <= 102.0) {
+            let x = m_llh2xyz(finalLat, finalLon, 0, m_WGS);
+            let mL = m_xyz2llh(x.x+m_DX, x.y+m_DY, x.z+m_DZ, m_EVE);
+            let pM = m_project(mL.lat, mL.lon, autoDetectedZone, m_EVE);
+            localN = pM.n; localE = pM.e; datumLabel = `MM2000 Z${autoDetectedZone}`; showLocal = true;
+        }
+    } else if (window.activeApp === 5) {
+        let hemi = finalLat >= 0 ? 'N' : 'S';
+        let pW = m_project(finalLat, finalLon, autoDetectedZone, m_WGS);
+        localN = pW.n; localE = pW.e; if(hemi === 'S') localN += 10000000;
+        datumLabel = `UTM Z${autoDetectedZone}${hemi}`; showLocal = true;
     } else {
-        btn.style.background = "#f59e0b"; btn.style.borderColor = "#d97706";
-        if(window.measureLineLayer) window.leafletMap.removeLayer(window.measureLineLayer); if(window.measureMarkersLayer) window.leafletMap.removeLayer(window.measureMarkersLayer);
-        window.measureLineLayer = null; window.measureMarkersLayer = null;
+        let soDatumVal = document.getElementById('so_datum') ? document.getElementById('so_datum').value : "WGS_LL";
+        let cogoDatumVal = document.getElementById('cogo_datum') ? document.getElementById('cogo_datum').value : "WGS_LL";
+        let dxfDatumVal = document.getElementById('dxf_datum') ? document.getElementById('dxf_datum').value : "WGS_LL";
+        let datum = "WGS_LL";
+        if (window.activeApp === 3) datum = soDatumVal;
+        else if (window.activeApp === 4) datum = cogoDatumVal;
+        else if (window.activeApp === 6) datum = dxfDatumVal;
+
+        if (datum === "SVY21") {
+            if (finalLat >= 1.0 && finalLat <= 2.0 && finalLon >= 103.0 && finalLon <= 104.5) {
+                let pW = calc_v2_fwd(finalLat, finalLon); localN = pW.N; localE = pW.E; datumLabel = "SVY21"; showLocal = true;
+            }
+        } else if (datum.startsWith("MM")) {
+            if (finalLat >= 9.0 && finalLat <= 29.0 && finalLon >= 92.0 && finalLon <= 102.0) {
+                let x = m_llh2xyz(finalLat, finalLon, 0, m_WGS);
+                let mL = m_xyz2llh(x.x+m_DX, x.y+m_DY, x.z+m_DZ, m_EVE);
+                let pM = m_project(mL.lat, mL.lon, autoDetectedZone, m_EVE);
+                localN = pM.n; localE = pM.e; datumLabel = `MM2000 Z${autoDetectedZone}`; showLocal = true;
+            }
+        } else if (datum.startsWith("WGS_UTM")) {
+            let pW = m_project(finalLat, finalLon, autoDetectedZone, m_WGS);
+            localN = pW.n; localE = pW.e; datumLabel = `UTM Z${autoDetectedZone}`; showLocal = true;
+        } else if (datum === "GLOBAL_UTM") {
+            let zInput = (window.activeApp === 6) ? document.getElementById('dxf_custom_zone') : (window.activeApp === 4 ? document.getElementById('cogo_custom_zone') : document.getElementById('so_custom_zone'));
+            let hInput = (window.activeApp === 6) ? document.getElementById('dxf_custom_hemi') : (window.activeApp === 4 ? document.getElementById('cogo_custom_hemi') : document.getElementById('so_custom_hemi'));
+            let customZone = (zInput && zInput.value) ? parseInt(zInput.value) : autoDetectedZone;
+            let hemi = hInput ? hInput.value : (finalLat >= 0 ? 'N' : 'S');
+            let pW = m_project(finalLat, finalLon, customZone, m_WGS);
+            localN = pW.n; localE = pW.e; if(hemi === 'S') localN += 10000000; datumLabel = `UTM Z${customZone}${hemi}`; showLocal = true;
+        }
     }
+    return { datumLabel, localN, localE, showLocal };
+};
+
+window.buildSavedPointPopup = function(lat, lon, opts) {
+    opts = opts || {};
+    let coords = window.getDatumCoordsForLatLon(lat, lon);
+    let zVal = (opts.z !== undefined && opts.z !== null && !isNaN(opts.z)) ? opts.z : 0;
+    let icon = opts.icon || '📍';
+    let nameColor = opts.nameColor || '#f59e0b';
+
+    let html = `<div style="text-align:center; padding: 5px;">`;
+    if (opts.pointName) {
+        html += `<div style="font-weight:bold; font-size:14px; color:${nameColor}; margin-bottom:5px;">${icon} [ ${opts.pointName} ]</div>`;
+    }
+    if (coords.showLocal) {
+        html += `<b style="font-size:12px; color:#d97706;">[${coords.datumLabel}]</b><br><b style="font-size:14px; color:#b91c1c;">N: ${coords.localN.toFixed(3)}<br>E: ${coords.localE.toFixed(3)}<br>Z: ${zVal.toFixed(3)}</b>`;
+    } else {
+        html += `<b style="font-size:11px; color:#ef4444; background:#fee2e2; padding:3px; border-radius:4px; display:block; margin-bottom:5px;">⚠️ Out of Local Bounds</b>`;
+        html += `<b style="font-size:14px; color:#b91c1c;">Z: ${zVal.toFixed(3)}</b>`;
+    }
+    html += `<hr style="margin:5px 0; border:0.5px solid #ccc;">`;
+    html += `<b style="font-size:12px; color:#1e3a8a;">Lat: ${lat.toFixed(7)}<br>Lon: ${lon.toFixed(7)}</b>`;
+    if (opts.buttonsHtml) html += opts.buttonsHtml;
+    html += `</div>`;
+    return html;
 };
 
 function getSnapPoint(lat, lon, zoomLevel) {
@@ -70,98 +334,16 @@ window.initMap = function() {
         let finalLat = snapResult.lat; let finalLon = snapResult.lon;
 
         if (window.isMeasuring) {
-            window.measureLatLngs.push([finalLat, finalLon]); window.measureLineLayer.setLatLngs(window.measureLatLngs);
-            let markerColor = snapResult.snapped ? "#10b981" : "#ef4444";
-            let markerIcon = L.divIcon({ className: 'dxf-text-label', html: `<div style="background:white; border-radius:50%; width:12px; height:12px; border:3px solid ${markerColor};"></div>`, iconSize: [16, 16] });
-            L.marker([finalLat, finalLon], {icon: markerIcon}).addTo(window.measureMarkersLayer);
-
-            if (window.measureLatLngs.length > 1) {
-                let prevLat = window.measureLatLngs[window.measureLatLngs.length-2][0];
-                let prevLon = window.measureLatLngs[window.measureLatLngs.length-2][1];
-                let lastSegDist = calcDistance(prevLat, prevLon, finalLat, finalLon);
-
-                let totalDist = 0;
-                for(let i=0; i<window.measureLatLngs.length-1; i++) { totalDist += calcDistance(window.measureLatLngs[i][0], window.measureLatLngs[i][1], window.measureLatLngs[i+1][0], window.measureLatLngs[i+1][1]); }
-
-                let snapText = snapResult.snapped ? `<br><span style="color:#10b981; font-size:10px;">🧲 Snapped to DXF</span>` : "";
-                L.popup().setLatLng([finalLat, finalLon]).setContent(`<b style="color:#0f172a; font-size:12px;">Segment: ${lastSegDist.toFixed(3)} m</b><br><b style="color:#b91c1c; font-size:14px;">Total: ${totalDist.toFixed(3)} m</b>${snapText}`).openOn(window.leafletMap);
-
-                let midLat = (prevLat + finalLat) / 2;
-                let midLon = (prevLon + finalLon) / 2;
-                let distanceIcon = L.divIcon({ className: 'measure-label', html: `${lastSegDist.toFixed(2)} m`, iconSize: [50, 20], iconAnchor: [25, 10] });
-                L.marker([midLat, midLon], {icon: distanceIcon}).addTo(window.measureMarkersLayer);
-
-            } else {
-                let snapText = snapResult.snapped ? `<br><span style="color:#10b981; font-size:10px;">🧲 Snapped to DXF</span>` : "";
-                L.popup().setLatLng([finalLat, finalLon]).setContent(`<b style="color:#1e40af;">Start Point</b>${snapText}`).openOn(window.leafletMap);
-            }
+            addMeasurePoint(finalLat, finalLon, snapResult);
             return;
         }
 
-        let datumLabel = "WGS_LL"; let localN = 0, localE = 0;
-        let showLocal = false;
-        let autoDetectedZone = Math.floor((finalLon + 180) / 6) + 1;
-
-        if (window.activeApp === 1) {
-            if (finalLat >= 1.0 && finalLat <= 2.0 && finalLon >= 103.0 && finalLon <= 104.5) {
-                let pW = calc_v2_fwd(finalLat, finalLon); localN = pW.N; localE = pW.E; datumLabel = "SVY21"; showLocal = true;
-            }
-        }
-        else if (window.activeApp === 2) {
-            if (finalLat >= 9.0 && finalLat <= 29.0 && finalLon >= 92.0 && finalLon <= 102.0) {
-                let x = m_llh2xyz(finalLat, finalLon, 0, m_WGS);
-                let mL = m_xyz2llh(x.x+m_DX, x.y+m_DY, x.z+m_DZ, m_EVE);
-                let pM = m_project(mL.lat, mL.lon, autoDetectedZone, m_EVE);
-                localN = pM.n; localE = pM.e; datumLabel = `MM2000 Z${autoDetectedZone}`; showLocal = true;
-            }
-        }
-        else if (window.activeApp === 5) {
-            let hemi = finalLat >= 0 ? 'N' : 'S';
-            let pW = m_project(finalLat, finalLon, autoDetectedZone, m_WGS);
-            localN = pW.n; localE = pW.e; if(hemi === 'S') localN += 10000000;
-            datumLabel = `UTM Z${autoDetectedZone}${hemi}`; showLocal = true;
-        }
-        else {
-            let soDatumVal = document.getElementById('so_datum') ? document.getElementById('so_datum').value : "WGS_LL";
-            let cogoDatumVal = document.getElementById('cogo_datum') ? document.getElementById('cogo_datum').value : "WGS_LL";
-            let dxfDatumVal = document.getElementById('dxf_datum') ? document.getElementById('dxf_datum').value : "WGS_LL";
-
-            let datum = "WGS_LL";
-            if (window.activeApp === 3) datum = soDatumVal;
-            else if (window.activeApp === 4) datum = cogoDatumVal;
-            else if (window.activeApp === 6) datum = dxfDatumVal;
-
-            if (datum === "SVY21") {
-                if (finalLat >= 1.0 && finalLat <= 2.0 && finalLon >= 103.0 && finalLon <= 104.5) {
-                    let pW = calc_v2_fwd(finalLat, finalLon); localN = pW.N; localE = pW.E; datumLabel = "SVY21"; showLocal = true;
-                }
-            }
-            else if (datum.startsWith("MM")) {
-                if (finalLat >= 9.0 && finalLat <= 29.0 && finalLon >= 92.0 && finalLon <= 102.0) {
-                    let x = m_llh2xyz(finalLat, finalLon, 0, m_WGS);
-                    let mL = m_xyz2llh(x.x+m_DX, x.y+m_DY, x.z+m_DZ, m_EVE);
-                    let pM = m_project(mL.lat, mL.lon, autoDetectedZone, m_EVE);
-                    localN = pM.n; localE = pM.e; datumLabel = `MM2000 Z${autoDetectedZone}`; showLocal = true;
-                }
-            }
-            else if (datum.startsWith("WGS_UTM")) {
-                let pW = m_project(finalLat, finalLon, autoDetectedZone, m_WGS);
-                localN = pW.n; localE = pW.e; datumLabel = `UTM Z${autoDetectedZone}`; showLocal = true;
-            }
-            else if (datum === "GLOBAL_UTM") {
-                let zInput = (window.activeApp === 6) ? document.getElementById('dxf_custom_zone') : (window.activeApp === 4 ? document.getElementById('cogo_custom_zone') : document.getElementById('so_custom_zone'));
-                let hInput = (window.activeApp === 6) ? document.getElementById('dxf_custom_hemi') : (window.activeApp === 4 ? document.getElementById('cogo_custom_hemi') : document.getElementById('so_custom_hemi'));
-                let customZone = (zInput && zInput.value) ? parseInt(zInput.value) : autoDetectedZone;
-                let hemi = hInput ? hInput.value : (finalLat >= 0 ? 'N' : 'S');
-                let pW = m_project(finalLat, finalLon, customZone, m_WGS);
-                localN = pW.n; localE = pW.e; if(hemi === 'S') localN += 10000000; datumLabel = `UTM Z${customZone}${hemi}`; showLocal = true;
-            }
-        }
+        let coords = window.getDatumCoordsForLatLon(finalLat, finalLon);
 
         let popupContent = `<div style="text-align:center; padding: 5px;">`;
         if (snapResult.snapped) { popupContent += `<div style="background:#10b981; color:white; font-size:11px; font-weight:bold; padding:3px; border-radius:4px; margin-bottom:5px;">🧲 Snapped to DXF Node</div>`; }
 
-        if (showLocal) { popupContent += `<b style="font-size:12px; color:#d97706;">[${datumLabel}]</b><br><b style="font-size:14px; color:#b91c1c;">N: ${localN.toFixed(3)}<br>E: ${localE.toFixed(3)}</b><hr style="margin:5px 0; border:0.5px solid #ccc;">`; }
+        if (coords.showLocal) { popupContent += `<b style="font-size:12px; color:#d97706;">[${coords.datumLabel}]</b><br><b style="font-size:14px; color:#b91c1c;">N: ${coords.localN.toFixed(3)}<br>E: ${coords.localE.toFixed(3)}</b><hr style="margin:5px 0; border:0.5px solid #ccc;">`; }
         else { popupContent += `<b style="font-size:11px; color:#ef4444; background:#fee2e2; padding:3px; border-radius:4px; display:block; margin-bottom:5px;">⚠️ Out of Local Bounds</b>`; }
 
         popupContent += `<b style="font-size:12px; color:#1e3a8a;">Lat: ${finalLat.toFixed(7)}<br>Lon: ${finalLon.toFixed(7)}</b>`;
@@ -492,6 +674,55 @@ window.toggleDxfLayers = function() {
     }
 };
 
+window.forceMapLayerRedraw = function(layerGroup) {
+    if (!layerGroup || !window.leafletMap) return;
+    if (window.leafletMap.hasLayer(layerGroup)) {
+        window.leafletMap.removeLayer(layerGroup);
+        window.leafletMap.addLayer(layerGroup);
+    }
+    try { window.leafletMap.panBy([0, 0], { animate: false }); } catch (e) {}
+};
+
+window.ensureSoPointsLayerVisible = function() {
+    if (!window.leafletMap || !window.pointsLayerGroup) return;
+    let chkPts = document.getElementById('tgl_so_pts');
+    if (chkPts && chkPts.checked && !window.leafletMap.hasLayer(window.pointsLayerGroup)) {
+        window.leafletMap.addLayer(window.pointsLayerGroup);
+    }
+};
+
+window.refreshMapPointLayers = function(n) {
+    if (!window.leafletMap) return;
+    window.leafletMap.invalidateSize({ animate: false });
+
+    if (typeof window.toggleDxfLayers === 'function') window.toggleDxfLayers();
+
+    if (n === 3 || n === 4 || n === 6) {
+        if (window.recordedLayerGroup && window.leafletMap.hasLayer(window.recordedLayerGroup)) {
+            window.leafletMap.removeLayer(window.recordedLayerGroup);
+        }
+        window.ensureSoPointsLayerVisible();
+        if (typeof window.plotPointsOnMap === 'function') window.plotPointsOnMap();
+        setTimeout(() => {
+            window.ensureSoPointsLayerVisible();
+            if (window.pointsLayerGroup) window.forceMapLayerRedraw(window.pointsLayerGroup);
+        }, 200);
+    }
+
+    if (n === 1 || n === 2 || n === 5) {
+        if (!window.recordedLayerGroup) {
+            window.recordedLayerGroup = L.layerGroup().addTo(window.leafletMap);
+        } else if (!window.leafletMap.hasLayer(window.recordedLayerGroup)) {
+            window.leafletMap.addLayer(window.recordedLayerGroup);
+        }
+        if (typeof window.plotRecordedPointsOnMap === 'function') window.plotRecordedPointsOnMap();
+        window.forceMapLayerRedraw(window.recordedLayerGroup);
+        if (window.pointsLayerGroup && window.leafletMap.hasLayer(window.pointsLayerGroup)) {
+            window.leafletMap.removeLayer(window.pointsLayerGroup);
+        }
+    }
+};
+
 window.plotPointsOnMap = function() {
     if(!window.pointsLayerGroup) return;
     window.pointsLayerGroup.clearLayers();
@@ -519,20 +750,20 @@ window.plotPointsOnMap = function() {
                 L.DomEvent.stopPropagation(e);
                 if (window.isMeasuring) { window.leafletMap.fireEvent('click', {latlng: e.latlng}); }
                 else {
-                    let popupContent = `<div style="text-align:center; padding: 5px; min-width: 120px;"><b style="font-size:14px; color:#1e3a8a;">Point: ${pt.p}</b>`;
-                    if (window.activeApp === 3) { popupContent += `<button class="so-popup-btn" style="background:#2563eb; width:100%; margin-top:8px;" onclick="window.startMapSetOut(${ptIndex})">🎯 Set Out</button>`; }
-                    else if (window.activeApp === 4) {
-                        let isSelected = window.orderedAreaPoints.includes(ptIndex);
-                        let btnText = isSelected ? "❌ Remove from Area" : "➕ Add to Area";
-                        let btnColor = isSelected ? "#ef4444" : "#10b981";
-                        popupContent += `<button class="so-popup-btn" style="background:${btnColor}; width:100%; margin-top:8px;" onclick="window.addPointToArea(${ptIndex})">${btnText}</button>`;
-                    }
-                    popupContent += `</div>`; L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(window.leafletMap);
+                    let buttonsHtml = '';
+                    if (window.activeApp === 4) { buttonsHtml = `<button class="so-popup-btn" style="background:#10b981; margin-top:8px;" onclick="window.addPointToArea(${ptIndex})">➕ Add to Area</button>`; }
+                    else { buttonsHtml = `<button class="so-popup-btn" style="background:#2563eb; margin-top:8px;" onclick="window.startMapSetOut(${ptIndex})">🎯 Set Out Here</button>`; }
+                    let popupContent = window.buildSavedPointPopup(pt.lat, pt.lon, { pointName: pt.p, z: pt.z, icon: '🎯', nameColor: '#1e40af', buttonsHtml: buttonsHtml });
+                    L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(window.leafletMap);
                 }
             });
             ptMarker.addTo(window.pointsLayerGroup);
         }
         if (i < total) setTimeout(processChunk, 15);
+        else {
+            window.ensureSoPointsLayerVisible();
+            window.forceMapLayerRedraw(window.pointsLayerGroup);
+        }
     }
     processChunk();
 };

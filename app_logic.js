@@ -58,6 +58,9 @@ window.onload = function() {
     if(sSoDatum) { document.getElementById('so_datum').value = sSoDatum; window.toggleSoDatum(); }
     let sDxfDatum = localStorage.getItem('pref_dxf_datum');
     if(sDxfDatum) { document.getElementById('dxf_datum').value = sDxfDatum; window.toggleDxfDatum(); }
+    if (typeof window.syncTrackColorInputs === 'function') {
+        window.syncTrackColorInputs(localStorage.getItem('pref_track_color') || '#3b82f6');
+    }
 
     // 🔴 ဝင်ဝင်ချင်း အမြဲတမ်း Dashboard (Main Face) ကိုသာ ပြသမည်
     window.switchApp(0);
@@ -112,7 +115,12 @@ window.updateTopoUI = function() {
             btn.innerHTML = "🧮 Data View"; btn.classList.add('topo-active'); document.getElementById('shared_map_view').classList.remove('hidden');
             document.getElementById('v2_calc_ui').classList.add('hidden'); document.getElementById('m_calc_ui').classList.add('hidden'); document.getElementById('g_calc_ui').classList.add('hidden');
             if (!window.leafletMap) window.initMap();
-            setTimeout(() => { window.leafletMap.invalidateSize(); window.plotRecordedPointsOnMap(); }, 350);
+            setTimeout(() => {
+                window.leafletMap.invalidateSize({ animate: false });
+                if (typeof window.refreshMapPointLayers === 'function') {
+                    window.refreshMapPointLayers(window.activeApp);
+                }
+            }, 350);
         } else {
             btn.innerHTML = "🗺️ Map View"; btn.classList.remove('topo-active'); document.getElementById('shared_map_view').classList.add('hidden');
             if (n === 1) document.getElementById('v2_calc_ui').classList.remove('hidden'); if (n === 2) document.getElementById('m_calc_ui').classList.remove('hidden'); if (n === 5) document.getElementById('g_calc_ui').classList.remove('hidden');
@@ -172,16 +180,20 @@ window.switchApp = function(n) {
         }
 
         setTimeout(() => {
-            window.leafletMap.invalidateSize();
-            if (n === 3 || n === 4 || n === 6) { if (window.recordedLayerGroup && window.leafletMap.hasLayer(window.recordedLayerGroup)) { window.leafletMap.removeLayer(window.recordedLayerGroup); } if (window.pointsLayerGroup && !window.leafletMap.hasLayer(window.pointsLayerGroup)) { window.leafletMap.addLayer(window.pointsLayerGroup); } window.plotPointsOnMap(); }
-            if (n === 1 || n === 2 || n === 5) { if (window.recordedLayerGroup && !window.leafletMap.hasLayer(window.recordedLayerGroup)) { window.leafletMap.addLayer(window.recordedLayerGroup); } window.plotRecordedPointsOnMap(); window.updateTopoUI(); }
+            if (window.leafletMap) window.leafletMap.invalidateSize({ animate: false });
 
-            // 🔴 DXF ဆွဲမည့် အပိုင်းကို သေချာစစ်ဆေးမည်
             if (window.rawDxfEntities && window.rawDxfEntities.length > 0) {
-                if (window.dxfLineLayer === null) { window.renderDXF(); } else { window.toggleDxfLayers(); }
-            } else { window.toggleDxfLayers(); }
+                if (window.dxfLineLayer === null) { window.renderDXF(); }
+                else if (typeof window.toggleDxfLayers === 'function') { window.toggleDxfLayers(); }
+            }
 
-            if (n === 1 || n === 2 || n === 5) { if (window.pointsLayerGroup && window.leafletMap.hasLayer(window.pointsLayerGroup)) { window.leafletMap.removeLayer(window.pointsLayerGroup); } }
+            if (n === 1 || n === 2 || n === 5) { window.updateTopoUI(); }
+
+            let refreshPoints = () => {
+                if (typeof window.refreshMapPointLayers === 'function') window.refreshMapPointLayers(n);
+            };
+            refreshPoints();
+            setTimeout(refreshPoints, 200);
         }, 350);
     }
     if(n === 4) { window.populateAreaPoints(); window.updateAreaOrderUI(); }
@@ -346,3 +358,302 @@ window.addEventListener("popstate", function(e) {
         window.switchApp(0);
     }
 });
+
+// ==========================================
+// --- GPS TRACKING & ROUTE MANAGER (IndexedDB) ---
+// ==========================================
+
+window.isTrackingGPS = false;
+window.currentTrackCoords = [];
+window.activeTrackLine = null;
+window.renderedSavedTracks = {};
+window.trackDB = null;
+
+window.getTrackColor = function() {
+    let inp = document.getElementById('track_color_input') || document.getElementById('track_save_color_input');
+    return (inp && inp.value) ? inp.value : (localStorage.getItem('pref_track_color') || '#3b82f6');
+};
+
+window.syncTrackColorInputs = function(color) {
+    let panelInp = document.getElementById('track_color_input');
+    let modalInp = document.getElementById('track_save_color_input');
+    if (panelInp) panelInp.value = color;
+    if (modalInp) modalInp.value = color;
+    localStorage.setItem('pref_track_color', color);
+    if (window.activeTrackLine) window.activeTrackLine.setStyle({ color: color });
+};
+
+window.onTrackColorChange = function(color) {
+    window.syncTrackColorInputs(color);
+};
+
+// ၁။ Database တည်ဆောက်ခြင်း
+const initTrackDB = () => {
+    let request = indexedDB.open("SurveyProDB", 1);
+    request.onupgradeneeded = (e) => {
+        let db = e.target.result;
+        if (!db.objectStoreNames.contains("tracks")) {
+            db.createObjectStore("tracks", { keyPath: "id" });
+        }
+    };
+    request.onsuccess = (e) => {
+        window.trackDB = e.target.result;
+        window.loadTracksFromDB();
+    };
+};
+initTrackDB();
+
+// ၂။ Start/Stop ခလုတ် နှိပ်သောအခါ
+window.toggleTracking = function() {
+    if (!window.isNativeGPSActive) return alert("⚠️ Please start GPS tracking first!");
+    
+    let btn = document.getElementById('trackBtn');
+    window.isTrackingGPS = !window.isTrackingGPS;
+    
+    if (window.isTrackingGPS) {
+        alert("✅ Route Tracking Started!"); 
+        btn.innerHTML = "⏹️"; // 🔴 ရပ်ရန် ခလုတ်ပြောင်းမည်
+        btn.style.background = "#ef4444";
+        btn.style.borderColor = "#b91c1c";
+        
+        window.currentTrackCoords = [];
+        if(window.activeTrackLine && window.leafletMap) window.leafletMap.removeLayer(window.activeTrackLine);
+        let trackColor = window.getTrackColor();
+        window.activeTrackLine = L.polyline([], {color: trackColor, weight: 4, opacity: 0.8}).addTo(window.leafletMap);
+    } else {
+        btn.innerHTML = "👣"; // 🔴 ခြေရာပုံ ပြန်ပြောင်းမည်
+        btn.style.background = "#3b82f6";
+        btn.style.borderColor = "#2563eb";
+        
+        if (window.currentTrackCoords.length > 1) {
+           document.getElementById('track_info_text').innerText = `Points recorded: ${window.currentTrackCoords.length}`;
+            let nameInput = document.getElementById('track_name_input');
+            nameInput.readOnly = false;
+            nameInput.classList.remove('input-locked');
+            window.syncTrackColorInputs(window.getTrackColor());
+            document.getElementById('saveTrackModal').style.display = 'flex';
+        } else {
+            alert("⚠️ Not enough movement recorded. Walk at least a few meters before stopping.");
+            if(window.activeTrackLine) window.leafletMap.removeLayer(window.activeTrackLine);
+        }
+    }
+};
+
+// ၃။ GPS Data အသစ်ဝင်လာတိုင်း ကြားဖြတ်ဖမ်းယူခြင်း (Distance Filter ပါဝင်သည်)
+let originalGPSUpdateHook = window.onNativeGPSUpdate;
+window.onNativeGPSUpdate = function(d) {
+    if(typeof originalGPSUpdateHook === 'function') originalGPSUpdateHook(d);
+    
+    if (window.isTrackingGPS && window.currentLat && window.currentLon) {
+        let pts = window.currentTrackCoords;
+        let shouldAdd = true;
+        
+        // နောက်ဆုံးမှတ်နှင့် ၂ မီတာ ကွာမှသာ အမှတ်သစ်မှတ်မည်
+        if (pts.length > 0) {
+            let lastPt = pts[pts.length - 1];
+            let dist = calcDistance(lastPt[0], lastPt[1], window.currentLat, window.currentLon);
+            if (dist < 2.0) shouldAdd = false; 
+        }
+        
+        if (shouldAdd) {
+            pts.push([window.currentLat, window.currentLon]);
+            if (window.activeTrackLine) window.activeTrackLine.setLatLngs(pts);
+        }
+    }
+};
+
+// ၄။ Popup တွင် Save/Discard လုပ်ခြင်း
+window.cancelSaveTrack = function() {
+    document.getElementById('saveTrackModal').style.display = 'none';
+    if(window.activeTrackLine && window.leafletMap) window.leafletMap.removeLayer(window.activeTrackLine);
+    window.currentTrackCoords = [];
+};
+
+window.confirmSaveTrack = function() {
+    let nameInp = document.getElementById('track_name_input').value.trim();
+    let name = nameInp ? nameInp : `Track_${new Date().getHours()}${new Date().getMinutes()}`;
+    
+    let trackObj = {
+        id: new Date().getTime().toString(),
+        name: name,
+        date: new Date().toLocaleString(),
+        color: window.getTrackColor(),
+        coords: [...window.currentTrackCoords] 
+    };
+    
+    let tx = window.trackDB.transaction(["tracks"], "readwrite");
+    let store = tx.objectStore("tracks");
+    store.add(trackObj);
+    
+    tx.oncomplete = () => {
+        window.cancelSaveTrack(); 
+        document.getElementById('track_name_input').value = "";
+        window.loadTracksFromDB();
+        alert("Track saved successfully!");
+    };
+};
+
+// ၅။ Database မှ Data များပြန်ခေါ်၍ ဇယားဆွဲခြင်း
+window.loadTracksFromDB = function() {
+    if (!window.trackDB) return;
+    let tx = window.trackDB.transaction(["tracks"], "readonly");
+    let store = tx.objectStore("tracks");
+    let req = store.getAll();
+    
+    req.onsuccess = (e) => {
+        window.allSavedTracks = e.target.result;
+        window.renderTrackListUI();
+    };
+};
+
+window.renderTrackListUI = function() {
+    let listDiv = document.getElementById('track_list_container');
+    if (!listDiv) return;
+    
+    if (!window.allSavedTracks || window.allSavedTracks.length === 0) {
+        listDiv.innerHTML = '<div style="text-align:center; color:var(--label-text); font-size: 12px; margin-top: 10px;">No tracks saved yet.</div>';
+        return;
+    }
+    
+    let html = '';
+    window.allSavedTracks.forEach(t => {
+        let isShowing = window.renderedSavedTracks[t.id] !== undefined;
+        let btnColor = isShowing ? "#f59e0b" : "#10b981";
+        let btnText = isShowing ? "🚫 Hide" : "👁️ Show";
+        let trackColor = t.color || '#8b5cf6';
+        
+        html += `
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--input-border); padding:5px 0;">
+            <div style="flex:1; display:flex; align-items:center; gap:6px;">
+                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:${trackColor}; border:1px solid rgba(0,0,0,0.2); flex-shrink:0;"></span>
+                <div>
+                    <b style="color:var(--primary); font-size:12px;">${t.name}</b><br>
+                    <span style="font-size:10px; color:var(--label-text);">${t.date} | Pts: ${t.coords.length}</span>
+                </div>
+            </div>
+            <div style="display:flex; gap:5px;">
+                <button class="top-btn" style="background:${btnColor}; color:white; padding:4px 8px; font-size:11px;" onclick="toggleTrackOnMap('${t.id}')">${btnText}</button>
+                <button class="top-btn" style="background:#ef4444; color:white; padding:4px 8px; font-size:11px;" onclick="deleteTrack('${t.id}')">🗑️</button>
+            </div>
+        </div>`;
+    });
+    listDiv.innerHTML = html;
+};
+
+// ၆။ မြေပုံပေါ်တွင် လမ်းကြောင်း ဖော်ခြင်း/ဖျောက်ခြင်း
+window.toggleTrackOnMap = function(id) {
+    let track = window.allSavedTracks.find(t => t.id === id);
+    if (!track) return;
+
+    if (window.renderedSavedTracks[id]) {
+        // Hide
+        window.leafletMap.removeLayer(window.renderedSavedTracks[id]);
+        delete window.renderedSavedTracks[id];
+    } else {
+        // Show
+        let trackColor = track.color || '#8b5cf6';
+        let layer = L.polyline(track.coords, {color: trackColor, weight: 4, opacity: 0.8}).addTo(window.leafletMap);
+        layer.bindTooltip(track.name, {sticky: true, direction: 'top'});
+        window.renderedSavedTracks[id] = layer;
+        window.leafletMap.fitBounds(layer.getBounds(), {padding: [30, 30]});
+    }
+    window.renderTrackListUI();
+};
+
+window.deleteTrack = function(id) {
+    if(!confirm("Delete this track?")) return;
+    if (window.renderedSavedTracks[id]) {
+        window.leafletMap.removeLayer(window.renderedSavedTracks[id]);
+        delete window.renderedSavedTracks[id];
+    }
+    let tx = window.trackDB.transaction(["tracks"], "readwrite");
+    tx.objectStore("tracks").delete(id);
+    tx.oncomplete = () => window.loadTracksFromDB();
+};
+
+window.clearAllTracks = function() {
+    if(!confirm("Are you sure you want to delete ALL saved tracks?")) return;
+    for (let id in window.renderedSavedTracks) { window.leafletMap.removeLayer(window.renderedSavedTracks[id]); }
+    window.renderedSavedTracks = {};
+    let tx = window.trackDB.transaction(["tracks"], "readwrite");
+    tx.objectStore("tracks").clear();
+    tx.oncomplete = () => window.loadTracksFromDB();
+};
+
+// ၇။ KML Export
+window.exportTrackToKML = function() {
+    if (!window.allSavedTracks || window.allSavedTracks.length === 0) return alert("No tracks to export!");
+    
+    let kmlString = `<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+<Document>
+<name>SurveyPro_Tracks</name>
+<description>Exported GPS Tracks</description>`;
+
+    window.allSavedTracks.forEach(t => {
+        let coordsStr = t.coords.map(c => `${c[1]},${c[0]},0`).join(" ");
+        kmlString += `
+<Placemark>
+  <name>${t.name}</name>
+  <description>Recorded: ${t.date}</description>
+  <LineString>
+    <coordinates>${coordsStr}</coordinates>
+  </LineString>
+</Placemark>`;
+    });
+    kmlString += `\n</Document>\n</kml>`;
+    
+    let fileName = `SurveyPro_Tracks_${new Date().getTime()}.kml`;
+    if (window.AndroidNative && window.AndroidNative.downloadConvertedKML) {
+        window.AndroidNative.downloadConvertedKML(kmlString, fileName);
+    } else {
+        let blob = new Blob([kmlString], { type: 'application/vnd.google-earth.kml+xml;charset=utf-8;' });
+        let link = document.createElement("a"); link.href = URL.createObjectURL(blob);
+        link.download = fileName; document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
+};
+
+// ၈။ UI အဖွင့်အပိတ်များကို ကြားဖြတ်ထိန်းချုပ်ခြင်း (Map View တွင်သာ ပေါ်ရန် ပြင်ဆင်ချက်)
+window.updateTrackUIVisibility = function() {
+    let n = window.activeApp;
+    let trackPanel = document.getElementById('track_manager_panel');
+    let trackBtn = document.getElementById('trackBtn');
+    
+    // Map View ပွင့်နေသလား စစ်ဆေးခြင်း
+    let mapContainer = document.getElementById('shared_map_view');
+    let isMapView = mapContainer && !mapContainer.classList.contains('hidden');
+
+    if(trackPanel) {
+        // App 1, 2, 5 ဖြစ်ပြီး Map View ပွင့်နေမှသာ ဇယားပြမည်
+        trackPanel.style.display = ((n === 1 || n === 2 || n === 5) && isMapView) ? 'block' : 'none';
+    }
+    if(trackBtn) {
+        // App 1, 2, 5 တွင် GPS ဖွင့်ထားပြီး Map View ဖြစ်နေမှသာ Track ခလုတ်ပြမည် (SO နှင့် DXF တွင် ဖြုတ်ထားသည်)
+        trackBtn.style.display = ((n === 1 || n === 2 || n === 5) && window.isNativeGPSActive && isMapView) ? 'block' : 'none';
+    }
+};
+
+// မူလ Function များကို ကြားဖြတ် ချိတ်ဆက်ခြင်း
+let hookSwitchAppForTrack = window.switchApp;
+window.switchApp = function(n) {
+    if(typeof hookSwitchAppForTrack === 'function') hookSwitchAppForTrack(n);
+    setTimeout(window.updateTrackUIVisibility, 100);
+};
+
+let hookGpsToggleForTrack = window.toggleGlobalGPS;
+window.toggleGlobalGPS = function() {
+    if(typeof hookGpsToggleForTrack === 'function') hookGpsToggleForTrack();
+    setTimeout(window.updateTrackUIVisibility, 100);
+};
+
+let hookUpdateTopoUI = window.updateTopoUI;
+window.updateTopoUI = function() {
+    if(typeof hookUpdateTopoUI === 'function') hookUpdateTopoUI();
+    setTimeout(window.updateTrackUIVisibility, 100);
+};
+
+let hookCogoTool = window.openCogoTool;
+window.openCogoTool = function(toolName) {
+    if(typeof hookCogoTool === 'function') hookCogoTool(toolName);
+    setTimeout(window.updateTrackUIVisibility, 100);
+};
