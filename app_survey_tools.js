@@ -272,6 +272,7 @@ window.openCogoTool = function(toolName) {
     document.getElementById('cogo_inv_tool').classList.add('hidden');
     document.getElementById('cogo_grad_tool').classList.add('hidden');
     document.getElementById('cogo_trv_tool').classList.add('hidden'); // 🔴 Added
+    document.getElementById('cogo_ecc_tool').classList.add('hidden');
 
     let titleEl = document.getElementById('cogo_tool_title');
     let mapContainer = document.getElementById('shared_map_view');
@@ -305,6 +306,12 @@ window.openCogoTool = function(toolName) {
         document.getElementById('cogo_trv_tool').classList.remove('hidden');
         titleEl.innerText = '🔗 Traverse Adjustment';
         titleEl.style.color = '#0ea5e9';
+        mapContainer.classList.add('hidden');
+        gpsBtn.classList.add('hidden');
+    } else if (toolName === 'ecc') { // 🔴 အသစ်ထည့်ရန်
+        document.getElementById('cogo_ecc_tool').classList.remove('hidden');
+        titleEl.innerText = '🏗️ Pile Eccentricity';
+        titleEl.style.color = '#f59e0b';
         mapContainer.classList.add('hidden');
         gpsBtn.classList.add('hidden');
     }
@@ -840,5 +847,225 @@ window.exportTrvCSV = function(exportType) {
         let url = URL.createObjectURL(blob); let link = document.createElement("a");
         link.setAttribute("href", url); link.setAttribute("download", fileName);
         document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    }
+};
+
+// ==========================================
+// --- PILE ECCENTRICITY LOGIC (UPDATED FLOW) ---
+// ==========================================
+
+window.eccRecords = [];
+window.editingEccIndex = -1; // Edit လုပ်နေသည့် Point ၏ နေရာ
+
+window.toggleEccMethod = function() {
+    let m = document.getElementById('ecc_method').value;
+    if (m === 'direct') {
+        document.getElementById('ecc_direct_div').classList.remove('hidden');
+        document.getElementById('ecc_3points_div').classList.add('hidden');
+    } else {
+        document.getElementById('ecc_direct_div').classList.add('hidden');
+        document.getElementById('ecc_3points_div').classList.remove('hidden');
+    }
+};
+
+window.calcPileEccentricity = function() {
+    let dN = parseFloat(document.getElementById('ecc_d_n').value);
+    let dE = parseFloat(document.getElementById('ecc_d_e').value);
+    let pNo = document.getElementById('ecc_pile_no').value || "Unknown";
+
+    if (isNaN(dN) || isNaN(dE)) return alert("Please enter valid Design Center N and E.");
+
+    let aN = 0, aE = 0, radiusText = "", is3Point = false;
+    let method = document.getElementById('ecc_method').value;
+
+    let n1=0, e1=0, n2=0, e2=0, n3=0, e3=0;
+
+    if (method === 'direct') {
+        aN = parseFloat(document.getElementById('ecc_a_n').value);
+        aE = parseFloat(document.getElementById('ecc_a_e').value);
+        if (isNaN(aN) || isNaN(aE)) return alert("Please enter valid Actual N and E.");
+        document.getElementById('ecc_calc_center_res').innerText = ""; 
+    } else {
+        is3Point = true;
+        n1 = parseFloat(document.getElementById('ecc_p1_n').value); e1 = parseFloat(document.getElementById('ecc_p1_e').value);
+        n2 = parseFloat(document.getElementById('ecc_p2_n').value); e2 = parseFloat(document.getElementById('ecc_p2_e').value);
+        n3 = parseFloat(document.getElementById('ecc_p3_n').value); e3 = parseFloat(document.getElementById('ecc_p3_e').value);
+        
+        if (isNaN(n1) || isNaN(n2) || isNaN(n3) || isNaN(e1) || isNaN(e2) || isNaN(e3)) return alert("Please enter all 3 valid Points on the Casing Edge.");
+        
+        let center = calcCircleCenterFrom3Points(n1, e1, n2, e2, n3, e3);
+        if (!center) return alert("Points are invalid (they form a straight line). Cannot form a circle.");
+        
+        aN = center.n; aE = center.e;
+        document.getElementById('ecc_calc_center_res').innerText = `Calculated Casing Center N: ${aN.toFixed(3)}, E: ${aE.toFixed(3)} | Radius: ${(center.r * 1000).toFixed(0)} mm`;
+        radiusText = `<br>Computed Radius: ${(center.r * 1000).toFixed(0)} mm`;
+    }
+
+    let diffN = aN - dN; 
+    let diffE = aE - dE; 
+    let eccMM = Math.sqrt((diffN * diffN) + (diffE * diffE)) * 1000;
+    let dirN = diffN >= 0 ? "North" : "South";
+    let dirE = diffE >= 0 ? "East" : "West";
+
+    let html = `<b>Pile No:</b> <span style="color:#1e40af;">${pNo}</span><br>`;
+    html += `<b>Design:</b> N: ${dN.toFixed(3)}, E: ${dE.toFixed(3)}<br>`;
+    html += `<b>Actual:</b> N: ${aN.toFixed(3)}, E: ${aE.toFixed(3)}${radiusText}<hr style="margin:5px 0;">`;
+    html += `<b>Δ N:</b> ${(diffN * 1000).toFixed(0)} mm (${dirN})<br>`;
+    html += `<b>Δ E:</b> ${(diffE * 1000).toFixed(0)} mm (${dirE})<br>`;
+    html += `<b style="font-size:16px; color:#b91c1c;">Total Eccentricity: ${eccMM.toFixed(0)} mm</b>`;
+
+    document.getElementById('ecc_summary').innerHTML = html;
+    document.getElementById('ecc_result_box').classList.remove('hidden');
+
+    // Add To Report ခလုတ်အတွက် ယာယီမှတ်ထားခြင်း
+    window.tempEccResult = { pNo, dN, dE, aN, aE, diffN: diffN*1000, diffE: diffE*1000, eccMM, method, n1, e1, n2, e2, n3, e3 };
+};
+
+// 🔴 Report ထဲသို့ အမှတ်ပေါင်းထည့်ခြင်း
+window.addEccToRecord = function() {
+    if (!window.tempEccResult) return;
+
+    if (window.editingEccIndex !== -1) {
+        // Edit လုပ်နေလျှင် အဟောင်းနေရာတွင် အစားထိုးမည်
+        window.eccRecords[window.editingEccIndex] = window.tempEccResult;
+        window.editingEccIndex = -1;
+    } else {
+        // အသစ်ဆိုလျှင် အဆုံးတွင် ထပ်ပေါင်းထည့်မည်
+        window.eccRecords.push(window.tempEccResult);
+    }
+    
+    window.tempEccResult = null;
+    document.getElementById('ecc_result_box').classList.add('hidden');
+    
+    // Box များကို အလွတ်လုပ်ပေးခြင်း (နောက်တစ်မှတ်အတွက် အဆင်သင့်ဖြစ်စေရန်)
+    document.getElementById('ecc_pile_no').value = '';
+    
+    updateEccRecordUI();
+};
+
+// 🔴 UI တွင် Record များကို ဇယားပုံစံဖြင့် ပြသခြင်း
+function updateEccRecordUI() {
+    let panel = document.getElementById('ecc_records_panel');
+    let listDiv = document.getElementById('ecc_record_list');
+    
+    if (window.eccRecords.length === 0) {
+        panel.classList.add('hidden');
+        return;
+    }
+    
+    panel.classList.remove('hidden');
+    document.getElementById('ecc_record_count').innerText = window.eccRecords.length;
+    
+    let html = '';
+    window.eccRecords.forEach((r, idx) => {
+        html += `
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ccc; padding:5px 0;">
+            <div style="font-size:13px; color:var(--text);">
+                <b>${idx+1}. [${r.pNo}]</b> &rarr; Dev: <b style="color:#b91c1c;">${r.eccMM.toFixed(0)}mm</b>
+            </div>
+            <div style="display:flex; gap:5px;">
+                <button class="top-btn" style="background:#3b82f6; color:white; padding:4px 8px;" onclick="editEccRecord(${idx})">✏️</button>
+                <button class="top-btn" style="background:#ef4444; color:white; padding:4px 8px;" onclick="deleteEccRecord(${idx})">🗑️</button>
+            </div>
+        </div>`;
+    });
+    listDiv.innerHTML = html;
+}
+
+// 🔴 မှတ်တမ်းကို ပြန်ခေါ်၍ ပြင်ဆင်ခြင်း
+window.editEccRecord = function(idx) {
+    let r = window.eccRecords[idx];
+    window.editingEccIndex = idx;
+    
+    document.getElementById('ecc_pile_no').value = r.pNo;
+    document.getElementById('ecc_d_n').value = r.dN;
+    document.getElementById('ecc_d_e').value = r.dE;
+    
+    document.getElementById('ecc_method').value = r.method;
+    window.toggleEccMethod();
+    
+    if (r.method === 'direct') {
+        document.getElementById('ecc_a_n').value = r.aN;
+        document.getElementById('ecc_a_e').value = r.aE;
+    } else {
+        document.getElementById('ecc_p1_n').value = r.n1; document.getElementById('ecc_p1_e').value = r.e1;
+        document.getElementById('ecc_p2_n').value = r.n2; document.getElementById('ecc_p2_e').value = r.e2;
+        document.getElementById('ecc_p3_n').value = r.n3; document.getElementById('ecc_p3_e').value = r.e3;
+    }
+    document.getElementById('ecc_result_box').classList.add('hidden');
+    alert(`Editing Point: ${r.pNo}. Modify data and click Calculate -> Add to Report.`);
+};
+
+// 🔴 မှတ်တမ်းမှ ဖယ်ထုတ်ခြင်း
+window.deleteEccRecord = function(idx) {
+    if (!confirm("Remove this point from the report?")) return;
+    window.eccRecords.splice(idx, 1);
+    updateEccRecordUI();
+};
+
+// 🔴 အားလုံးကို ရှင်းလင်းခြင်း (Clear All)
+window.clearAllEccData = function() {
+    if (!confirm("Clear ALL data and start a new report?")) return;
+    window.eccRecords = [];
+    window.editingEccIndex = -1;
+    updateEccRecordUI();
+    document.getElementById('ecc_result_box').classList.add('hidden');
+    document.querySelectorAll('#cogo_ecc_tool input').forEach(inp => inp.value = '');
+    document.getElementById('ecc_calc_center_res').innerText = '';
+};
+
+// 🔴 Excel Report ထုတ်ခြင်း
+window.exportEccExcel = function() {
+    if (window.eccRecords.length === 0) return alert("No points added to the report yet!");
+
+    let now = new Date();
+    let formattedDate = `${("0"+now.getDate()).slice(-2)}/${("0"+(now.getMonth()+1)).slice(-2)}/${now.getFullYear()}, ${now.toLocaleTimeString('en-US')}`;
+
+    let excelContent = `
+        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+        <head><meta charset="utf-8"></head>
+        <body>
+            <h2 style="text-align:center; color:#1e40af;">Pile Eccentricity Report</h2>
+            <p><b>Generated Date:</b> ${formattedDate}</p>
+            <table border="1" style="border-collapse:collapse; text-align:center; font-family: sans-serif;">
+                <tr style="font-weight:bold;">
+                    <th style="background-color:#f1f5f9; color:#334155; padding:5px;">No.</th>
+                    <th style="background-color:#f1f5f9; color:#334155; padding:5px;">Pile No</th>
+                    <th style="background-color:#e0f2fe; color:#0284c7; padding:5px;">Design N</th>
+                    <th style="background-color:#e0f2fe; color:#0284c7; padding:5px;">Design E</th>
+                    <th style="background-color:#dcfce7; color:#16a34a; padding:5px;">Actual N</th>
+                    <th style="background-color:#dcfce7; color:#16a34a; padding:5px;">Actual E</th>
+                    <th style="background-color:#fef3c7; color:#d97706; padding:5px;">&Delta; N (mm)</th>
+                    <th style="background-color:#fef3c7; color:#d97706; padding:5px;">&Delta; E (mm)</th>
+                    <th style="background-color:#fee2e2; color:#b91c1c; padding:5px;">Total Deviation (mm)</th>
+                </tr>
+    `;
+
+    window.eccRecords.forEach((r, index) => {
+        excelContent += `
+                <tr>
+                    <td>${index + 1}</td>
+                    <td><b>${r.pNo}</b></td>
+                    <td style="background-color:#f0f9ff;">${r.dN.toFixed(3)}</td>
+                    <td style="background-color:#f0f9ff;">${r.dE.toFixed(3)}</td>
+                    <td style="background-color:#f0fdf4;">${r.aN.toFixed(3)}</td>
+                    <td style="background-color:#f0fdf4;">${r.aE.toFixed(3)}</td>
+                    <td style="background-color:#fffbeb;">${r.diffN.toFixed(0)}</td>
+                    <td style="background-color:#fffbeb;">${r.diffE.toFixed(0)}</td>
+                    <td style="font-weight:bold; color:#b91c1c; background-color:#fef2f2;">${r.eccMM.toFixed(0)}</td>
+                </tr>
+        `;
+    });
+
+    excelContent += `</table></body></html>`;
+
+    let fileName = `Eccentricity_Report_${new Date().getTime()}.xls`;
+    
+    if (window.AndroidNative && window.AndroidNative.downloadConvertedCSV) {
+        window.AndroidNative.downloadConvertedCSV(excelContent, fileName);
+    } else {
+        let blob = new Blob([excelContent], { type: 'application/vnd.ms-excel' });
+        let url = URL.createObjectURL(blob); let a = document.createElement("a");
+        a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
 };
