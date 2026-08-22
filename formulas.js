@@ -236,3 +236,24 @@ function adjust3dTraverse(type, startCtrl, endCtrl, rawPoints) {
         num_stations: rawPoints.length // <-- အသစ်ထည့်ထားသည်
     };
 }
+
+// ==========================================
+// --- PILE 3-POINTS CIRCLE CENTER FORMULA ---
+// ==========================================
+function calcCircleCenterFrom3Points(n1, e1, n2, e2, n3, e3) {
+    // Math Formula for Circumcenter (Easting = X, Northing = Y)
+    let d = 2 * (e1 * (n2 - n3) + e2 * (n3 - n1) + e3 * (n1 - n2));
+    if (d === 0) return null; // Points are in a straight line
+
+    let u1 = (e1 * e1 + n1 * n1);
+    let u2 = (e2 * e2 + n2 * n2);
+    let u3 = (e3 * e3 + n3 * n3);
+
+    let ce = (u1 * (n2 - n3) + u2 * (n3 - n1) + u3 * (n1 - n2)) / d;
+    let cn = (u1 * (e3 - e2) + u2 * (e1 - e3) + u3 * (e2 - e1)) / d;
+    
+    // Radius (Distance from Center to Pt1)
+    let r = Math.sqrt(Math.pow(ce - e1, 2) + Math.pow(cn - n1, 2));
+
+    return { n: cn, e: ce, r: r };
+}
