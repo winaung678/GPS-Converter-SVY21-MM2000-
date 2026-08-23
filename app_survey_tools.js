@@ -851,7 +851,7 @@ window.exportTrvCSV = function(exportType) {
 };
 
 // ==========================================
-// --- PILE ECCENTRICITY LOGIC (UPDATED WITH DXF) ---
+// --- PILE ECCENTRICITY LOGIC (UPDATED DIAMETER & DXF FIX) ---
 // ==========================================
 
 window.eccRecords = [];
@@ -871,12 +871,12 @@ window.toggleEccMethod = function() {
 window.calcPileEccentricity = function() {
     let dN = parseFloat(document.getElementById('ecc_d_n').value);
     let dE = parseFloat(document.getElementById('ecc_d_e').value);
-    let dDia = parseFloat(document.getElementById('ecc_d_dia').value) || 0; // Design Dia in mm
+    let dDia = parseFloat(document.getElementById('ecc_d_dia').value) || 0; 
     let pNo = document.getElementById('ecc_pile_no').value || "Unknown";
 
     if (isNaN(dN) || isNaN(dE)) return alert("Please enter valid Design Center N and E.");
 
-    let aN = 0, aE = 0, aRadText = "", aRad = 0, is3Point = false;
+    let aN = 0, aE = 0, aDiaText = "", aRad = 0, is3Point = false;
     let method = document.getElementById('ecc_method').value;
 
     let n1=0, e1=0, n2=0, e2=0, n3=0, e3=0;
@@ -885,7 +885,7 @@ window.calcPileEccentricity = function() {
         aN = parseFloat(document.getElementById('ecc_a_n').value);
         aE = parseFloat(document.getElementById('ecc_a_e').value);
         if (isNaN(aN) || isNaN(aE)) return alert("Please enter valid Actual N and E.");
-        aRad = dDia / 2000; // direct method တွင် actual radius ကို design radius အတိုင်း ယူဆမည်
+        aRad = dDia / 2000; 
         document.getElementById('ecc_calc_center_res').innerText = ""; 
     } else {
         is3Point = true;
@@ -899,8 +899,10 @@ window.calcPileEccentricity = function() {
         if (!center) return alert("Points are invalid (straight line).");
         
         aN = center.n; aE = center.e; aRad = center.r;
-        document.getElementById('ecc_calc_center_res').innerText = `Calculated Casing Center N: ${aN.toFixed(3)}, E: ${aE.toFixed(3)} | Radius: ${(aRad * 1000).toFixed(0)} mm`;
-        aRadText = `<br>Computed Radius: ${(aRad * 1000).toFixed(0)} mm`;
+        let actualDiaMM = (aRad * 2000).toFixed(0); // 🔴 Radius ကို 2 နဲ့မြှောက်ပြီး Diameter အဖြစ်ပြမည်
+        
+        document.getElementById('ecc_calc_center_res').innerText = `Calculated Center N: ${aN.toFixed(3)}, E: ${aE.toFixed(3)} | Dia: ${actualDiaMM} mm`;
+        aDiaText = `<br>Computed Diameter: ${actualDiaMM} mm`;
     }
 
     let diffN = aN - dN; 
@@ -911,7 +913,7 @@ window.calcPileEccentricity = function() {
 
     let html = `<b>Pile No:</b> <span style="color:#1e40af;">${pNo}</span><br>`;
     html += `<b>Design:</b> N: ${dN.toFixed(3)}, E: ${dE.toFixed(3)} (Dia: ${dDia}mm)<br>`;
-    html += `<b>Actual:</b> N: ${aN.toFixed(3)}, E: ${aE.toFixed(3)}${aRadText}<hr style="margin:5px 0;">`;
+    html += `<b>Actual:</b> N: ${aN.toFixed(3)}, E: ${aE.toFixed(3)}${aDiaText}<hr style="margin:5px 0;">`;
     html += `<b>Δ N:</b> ${(diffN * 1000).toFixed(0)} mm (${dirN})<br>`;
     html += `<b>Δ E:</b> ${(diffE * 1000).toFixed(0)} mm (${dirE})<br>`;
     html += `<b style="font-size:16px; color:#b91c1c;">Total Deviation: ${eccMM.toFixed(0)} mm</b>`;
@@ -927,9 +929,7 @@ window.addEccToRecord = function() {
     if (window.editingEccIndex !== -1) {
         window.eccRecords[window.editingEccIndex] = window.tempEccResult;
         window.editingEccIndex = -1;
-    } else {
-        window.eccRecords.push(window.tempEccResult);
-    }
+    } else { window.eccRecords.push(window.tempEccResult); }
     window.tempEccResult = null;
     document.getElementById('ecc_result_box').classList.add('hidden');
     document.getElementById('ecc_pile_no').value = '';
@@ -939,22 +939,13 @@ window.addEccToRecord = function() {
 function updateEccRecordUI() {
     let panel = document.getElementById('ecc_records_panel');
     let listDiv = document.getElementById('ecc_record_list');
-    
-    if (window.eccRecords.length === 0) {
-        panel.classList.add('hidden');
-        return;
-    }
-    
+    if (window.eccRecords.length === 0) { panel.classList.add('hidden'); return; }
     panel.classList.remove('hidden');
     document.getElementById('ecc_record_count').innerText = window.eccRecords.length;
-    
     let html = '';
     window.eccRecords.forEach((r, idx) => {
-        html += `
-        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ccc; padding:5px 0;">
-            <div style="font-size:13px; color:var(--text);">
-                <b>${idx+1}. [${r.pNo}]</b> &rarr; Dev: <b style="color:#b91c1c;">${r.eccMM.toFixed(0)}mm</b>
-            </div>
+        html += `<div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #ccc; padding:5px 0;">
+            <div style="font-size:13px; color:var(--text);"><b>${idx+1}. [${r.pNo}]</b> &rarr; Dev: <b style="color:#b91c1c;">${r.eccMM.toFixed(0)}mm</b></div>
             <div style="display:flex; gap:5px;">
                 <button class="top-btn" style="background:#3b82f6; color:white; padding:4px 8px;" onclick="editEccRecord(${idx})">✏️</button>
                 <button class="top-btn" style="background:#ef4444; color:white; padding:4px 8px;" onclick="deleteEccRecord(${idx})">🗑️</button>
@@ -967,18 +958,14 @@ function updateEccRecordUI() {
 window.editEccRecord = function(idx) {
     let r = window.eccRecords[idx];
     window.editingEccIndex = idx;
-    
     document.getElementById('ecc_pile_no').value = r.pNo;
     document.getElementById('ecc_d_dia').value = r.dDia || "";
     document.getElementById('ecc_d_n').value = r.dN;
     document.getElementById('ecc_d_e').value = r.dE;
-    
     document.getElementById('ecc_method').value = r.method;
     window.toggleEccMethod();
-    
     if (r.method === 'direct') {
-        document.getElementById('ecc_a_n').value = r.aN;
-        document.getElementById('ecc_a_e').value = r.aE;
+        document.getElementById('ecc_a_n').value = r.aN; document.getElementById('ecc_a_e').value = r.aE;
     } else {
         document.getElementById('ecc_p1_n').value = r.n1; document.getElementById('ecc_p1_e').value = r.e1;
         document.getElementById('ecc_p2_n').value = r.n2; document.getElementById('ecc_p2_e').value = r.e2;
@@ -990,75 +977,30 @@ window.editEccRecord = function(idx) {
 
 window.deleteEccRecord = function(idx) {
     if (!confirm("Remove this point from the report?")) return;
-    window.eccRecords.splice(idx, 1);
-    updateEccRecordUI();
+    window.eccRecords.splice(idx, 1); updateEccRecordUI();
 };
 
 window.clearAllEccData = function() {
     if (!confirm("Clear ALL data and start a new report?")) return;
-    window.eccRecords = [];
-    window.editingEccIndex = -1;
-    updateEccRecordUI();
+    window.eccRecords = []; window.editingEccIndex = -1; updateEccRecordUI();
     document.getElementById('ecc_result_box').classList.add('hidden');
     document.querySelectorAll('#cogo_ecc_tool input').forEach(inp => inp.value = '');
     document.getElementById('ecc_calc_center_res').innerText = '';
 };
 
+// --- Excel Export (No change needed here for this fix) ---
 window.exportEccExcel = function() {
     if (window.eccRecords.length === 0) return alert("No points added to the report yet!");
-
-    let now = new Date();
-    let formattedDate = `${("0"+now.getDate()).slice(-2)}/${("0"+(now.getMonth()+1)).slice(-2)}/${now.getFullYear()}, ${now.toLocaleTimeString('en-US')}`;
-
-    let excelContent = `
-        <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-        <head><meta charset="utf-8"></head>
-        <body>
-            <h2 style="text-align:center; color:#1e40af;">Pile Eccentricity Report</h2>
-            <p><b>Generated Date:</b> ${formattedDate}</p>
-            <table border="1" style="border-collapse:collapse; text-align:center; font-family: sans-serif;">
-                <tr style="font-weight:bold;">
-                    <th style="background-color:#f1f5f9; color:#334155; padding:5px;">No.</th>
-                    <th style="background-color:#f1f5f9; color:#334155; padding:5px;">Pile No</th>
-                    <th style="background-color:#e0f2fe; color:#0284c7; padding:5px;">Design N</th>
-                    <th style="background-color:#e0f2fe; color:#0284c7; padding:5px;">Design E</th>
-                    <th style="background-color:#dcfce7; color:#16a34a; padding:5px;">Actual N</th>
-                    <th style="background-color:#dcfce7; color:#16a34a; padding:5px;">Actual E</th>
-                    <th style="background-color:#fef3c7; color:#d97706; padding:5px;">&Delta; N (mm)</th>
-                    <th style="background-color:#fef3c7; color:#d97706; padding:5px;">&Delta; E (mm)</th>
-                    <th style="background-color:#fee2e2; color:#b91c1c; padding:5px;">Total Deviation (mm)</th>
-                </tr>
-    `;
-
-    window.eccRecords.forEach((r, index) => {
-        excelContent += `
-                <tr>
-                    <td>${index + 1}</td>
-                    <td><b>${r.pNo}</b></td>
-                    <td style="background-color:#f0f9ff;">${r.dN.toFixed(3)}</td>
-                    <td style="background-color:#f0f9ff;">${r.dE.toFixed(3)}</td>
-                    <td style="background-color:#f0fdf4;">${r.aN.toFixed(3)}</td>
-                    <td style="background-color:#f0fdf4;">${r.aE.toFixed(3)}</td>
-                    <td style="background-color:#fffbeb;">${r.diffN.toFixed(0)}</td>
-                    <td style="background-color:#fffbeb;">${r.diffE.toFixed(0)}</td>
-                    <td style="font-weight:bold; color:#b91c1c; background-color:#fef2f2;">${r.eccMM.toFixed(0)}</td>
-                </tr>
-        `;
-    });
-
+    let now = new Date(); let formattedDate = `${("0"+now.getDate()).slice(-2)}/${("0"+(now.getMonth()+1)).slice(-2)}/${now.getFullYear()}, ${now.toLocaleTimeString('en-US')}`;
+    let excelContent = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"></head><body><h2 style="text-align:center; color:#1e40af;">Pile Eccentricity Report</h2><p><b>Generated Date:</b> ${formattedDate}</p><table border="1" style="border-collapse:collapse; text-align:center; font-family: sans-serif;"><tr style="font-weight:bold;"><th style="background-color:#f1f5f9; color:#334155; padding:5px;">No.</th><th style="background-color:#f1f5f9; color:#334155; padding:5px;">Pile No</th><th style="background-color:#e0f2fe; color:#0284c7; padding:5px;">Design N</th><th style="background-color:#e0f2fe; color:#0284c7; padding:5px;">Design E</th><th style="background-color:#dcfce7; color:#16a34a; padding:5px;">Actual N</th><th style="background-color:#dcfce7; color:#16a34a; padding:5px;">Actual E</th><th style="background-color:#fef3c7; color:#d97706; padding:5px;">&Delta; N (mm)</th><th style="background-color:#fef3c7; color:#d97706; padding:5px;">&Delta; E (mm)</th><th style="background-color:#fee2e2; color:#b91c1c; padding:5px;">Total Deviation (mm)</th></tr>`;
+    window.eccRecords.forEach((r, index) => { excelContent += `<tr><td>${index + 1}</td><td><b>${r.pNo}</b></td><td style="background-color:#f0f9ff;">${r.dN.toFixed(3)}</td><td style="background-color:#f0f9ff;">${r.dE.toFixed(3)}</td><td style="background-color:#f0fdf4;">${r.aN.toFixed(3)}</td><td style="background-color:#f0fdf4;">${r.aE.toFixed(3)}</td><td style="background-color:#fffbeb;">${(r.diffN).toFixed(0)}</td><td style="background-color:#fffbeb;">${(r.diffE).toFixed(0)}</td><td style="font-weight:bold; color:#b91c1c; background-color:#fef2f2;">${r.eccMM.toFixed(0)}</td></tr>`; });
     excelContent += `</table></body></html>`;
     let fileName = `Eccentricity_Report_${new Date().getTime()}.xls`;
-    
-    if (window.AndroidNative && window.AndroidNative.downloadConvertedCSV) {
-        window.AndroidNative.downloadConvertedCSV(excelContent, fileName);
-    } else {
-        let blob = new Blob([excelContent], { type: 'application/vnd.ms-excel' });
-        let url = URL.createObjectURL(blob); let a = document.createElement("a");
-        a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    }
+    if (window.AndroidNative && window.AndroidNative.downloadConvertedCSV) { window.AndroidNative.downloadConvertedCSV(excelContent, fileName); } 
+    else { let blob = new Blob([excelContent], { type: 'application/vnd.ms-excel' }); let url = URL.createObjectURL(blob); let a = document.createElement("a"); a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); document.body.removeChild(a); }
 };
 
-// 🔴 AUTOCAD DXF REPORT GENERATOR (FIXED TEXT OVERLAP & RESIZED TEXT) 🔴
+// 🔴 AUTOCAD DXF REPORT GENERATOR (TEXT ALIGNED IN FRONT OF ARROWS) 🔴
 window.exportEccDXF = function() {
     if (window.eccRecords.length === 0) return alert("No points added to the report yet!");
 
@@ -1072,14 +1014,11 @@ window.exportEccDXF = function() {
     window.eccRecords.forEach(r => {
         let dRad = r.dDia > 0 ? (r.dDia / 2000) : 0.3; 
         let aRad = r.aRad > 0 ? r.aRad : dRad;
-        
-        // 🔴 Text Size ကို 0.4 ကနေ 0.15 ထိ သေးလိုက်ပါပြီ
-        let txtH = dRad * 0.15; 
+        let txtH = dRad * 0.4; // Text size (Radius ၏ 40%)
 
         // 1. Design Circle (White)
         dxfContent += `0\nCIRCLE\n8\nDESIGN_PILE\n10\n${r.dE.toFixed(3)}\n20\n${r.dN.toFixed(3)}\n30\n0.0\n40\n${dRad.toFixed(3)}\n`;
-        // Pile Name Text
-        dxfContent += `0\nTEXT\n8\nDESIGN_PILE\n10\n${(r.dE + dRad + (dRad*0.2)).toFixed(3)}\n20\n${(r.dN + dRad + (dRad*0.2)).toFixed(3)}\n30\n0.0\n40\n${txtH * 1.5}\n1\n${r.pNo}\n`; // နာမည်ကို နည်းနည်း ပိုကြီးထားသည်
+        dxfContent += `0\nTEXT\n8\nDESIGN_PILE\n10\n${(r.dE + dRad + (dRad*0.2)).toFixed(3)}\n20\n${(r.dN + dRad + (dRad*0.2)).toFixed(3)}\n30\n0.0\n40\n${txtH}\n1\n${r.pNo}\n`;
 
         // 2. Actual Circle (Red)
         dxfContent += `0\nCIRCLE\n8\nASBUILT_PILE\n10\n${r.aE.toFixed(3)}\n20\n${r.aN.toFixed(3)}\n30\n0.0\n40\n${aRad.toFixed(3)}\n`;
@@ -1087,7 +1026,6 @@ window.exportEccDXF = function() {
         // 3. Deviation Lines & Arrows
         let fixedLineLength = aRad * 0.6; 
         let arrowSize = aRad * 0.15; 
-
         let diffE_m = r.aE - r.dE; 
         let diffN_m = r.aN - r.dN;
 
@@ -1097,19 +1035,22 @@ window.exportEccDXF = function() {
             let endE = r.aE + (fixedLineLength * directionE);
             let endN = r.aN;
 
+            // Line
             dxfContent += `0\nLINE\n8\nASBUILT_PILE\n10\n${r.aE.toFixed(3)}\n20\n${r.aN.toFixed(3)}\n30\n0.0\n11\n${endE.toFixed(3)}\n21\n${endN.toFixed(3)}\n31\n0.0\n`;
             
+            // Arrowhead
             let p1E = endE, p1N = endN;
             let p2E = endE - (arrowSize * directionE), p2N = endN + (arrowSize * 0.4);
             let p3E = endE - (arrowSize * directionE), p3N = endN - (arrowSize * 0.4);
-
             dxfContent += `0\nSOLID\n8\nASBUILT_PILE\n10\n${p1E.toFixed(3)}\n20\n${p1N.toFixed(3)}\n30\n0.0\n11\n${p2E.toFixed(3)}\n21\n${p2N.toFixed(3)}\n31\n0.0\n12\n${p3E.toFixed(3)}\n22\n${p3N.toFixed(3)}\n32\n0.0\n13\n${p3E.toFixed(3)}\n23\n${p3N.toFixed(3)}\n33\n0.0\n`;
             
-            // 🔴 Text ကို မြှားခေါင်း၏ အပြင်ဘက် (ထိပ်နား) သို့ ရွှေ့လိုက်ပါသည်
-            let textPosE = endE + (txtH * 0.5 * directionE);
-            let textPosN = endN - (txtH * 0.5); // စာလုံးကို မျဉ်းနဲ့ တစ်တန်းတည်းဖြစ်အောင် နည်းနည်း အောက်ချသည်
+            // 🔴 Text in FRONT of Arrow (Center Aligned vertically)
+            // Group 72 = 0 (Left align) if Right arrow, Group 72 = 2 (Right align) if Left arrow
+            // Group 73 = 2 (Middle center align vertically)
+            let txtAlignH = directionE > 0 ? 0 : 2; 
+            let textOffsetX = directionE > 0 ? (arrowSize * 0.5) : -(arrowSize * 0.5); 
             
-            dxfContent += `0\nTEXT\n8\nASBUILT_PILE\n10\n${textPosE.toFixed(3)}\n20\n${textPosN.toFixed(3)}\n30\n0.0\n40\n${txtH}\n1\n${Math.abs(diffE_m * 1000).toFixed(0)}\n`;
+            dxfContent += `0\nTEXT\n8\nASBUILT_PILE\n10\n${(endE + textOffsetX).toFixed(3)}\n20\n${endN.toFixed(3)}\n30\n0.0\n40\n${txtH}\n1\n${Math.abs(diffE_m * 1000).toFixed(0)}\n72\n${txtAlignH}\n11\n${(endE + textOffsetX).toFixed(3)}\n21\n${endN.toFixed(3)}\n31\n0.0\n73\n2\n`;
         }
 
         // --- Northing Line (Vertical) ---
@@ -1118,31 +1059,122 @@ window.exportEccDXF = function() {
             let endE = r.aE;
             let endN = r.aN + (fixedLineLength * directionN);
 
+            // Line
             dxfContent += `0\nLINE\n8\nASBUILT_PILE\n10\n${r.aE.toFixed(3)}\n20\n${r.aN.toFixed(3)}\n30\n0.0\n11\n${endE.toFixed(3)}\n21\n${endN.toFixed(3)}\n31\n0.0\n`;
             
+            // Arrowhead
             let p1E = endE, p1N = endN;
             let p2E = endE + (arrowSize * 0.4), p2N = endN - (arrowSize * directionN);
             let p3E = endE - (arrowSize * 0.4), p3N = endN - (arrowSize * directionN);
-
             dxfContent += `0\nSOLID\n8\nASBUILT_PILE\n10\n${p1E.toFixed(3)}\n20\n${p1N.toFixed(3)}\n30\n0.0\n11\n${p2E.toFixed(3)}\n21\n${p2N.toFixed(3)}\n31\n0.0\n12\n${p3E.toFixed(3)}\n22\n${p3N.toFixed(3)}\n32\n0.0\n13\n${p3E.toFixed(3)}\n23\n${p3N.toFixed(3)}\n33\n0.0\n`;
             
-            // 🔴 Text ကို မြှားခေါင်း၏ အပြင်ဘက် (ထိပ်နား) သို့ ရွှေ့လိုက်ပါသည်
-            let textPosE = endE - (txtH * 0.5); // စာလုံးကို မျဉ်းနဲ့ တစ်တန်းတည်းဖြစ်အောင် နည်းနည်း ဘယ်ရွှေ့သည်
-            let textPosN = endN + (txtH * 0.5 * directionN);
-            
-            dxfContent += `0\nTEXT\n8\nASBUILT_PILE\n10\n${textPosE.toFixed(3)}\n20\n${textPosN.toFixed(3)}\n30\n0.0\n40\n${txtH}\n1\n${Math.abs(diffN_m * 1000).toFixed(0)}\n`;
+            // 🔴 Text in FRONT of Arrow (Center Aligned horizontally)
+            // Group 72 = 1 (Center align horizontally)
+            // Group 73 = 1 (Bottom align) if Up arrow, Group 73 = 3 (Top align) if Down arrow
+            let txtAlignV = directionN > 0 ? 1 : 3; 
+            let textOffsetY = directionN > 0 ? (arrowSize * 0.5) : -(arrowSize * 0.5); 
+
+            dxfContent += `0\nTEXT\n8\nASBUILT_PILE\n10\n${endE.toFixed(3)}\n20\n${(endN + textOffsetY).toFixed(3)}\n30\n0.0\n40\n${txtH}\n1\n${Math.abs(diffN_m * 1000).toFixed(0)}\n72\n1\n11\n${endE.toFixed(3)}\n21\n${(endN + textOffsetY).toFixed(3)}\n31\n0.0\n73\n${txtAlignV}\n`;
         }
     });
 
     dxfContent += "0\nENDSEC\n0\nEOF\n";
 
     let fileName = `Eccentricity_Drawing_${new Date().getTime()}.dxf`;
-    if (window.AndroidNative && window.AndroidNative.downloadConvertedKML) {
-        window.AndroidNative.downloadConvertedKML(dxfContent, fileName);
+    if (window.AndroidNative && window.AndroidNative.downloadConvertedCSV) {
+        window.AndroidNative.downloadConvertedCSV(dxfContent, fileName);
     } else {
         let blob = new Blob([dxfContent], { type: 'application/dxf' });
         let url = URL.createObjectURL(blob); let a = document.createElement("a");
         a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
     alert("AutoCAD DXF Generated! Please open in AutoCAD.");
+};
+
+// ==========================================
+// --- CSV BULK UPLOAD FOR ECCENTRICITY ---
+// ==========================================
+
+window.loadEccCSV = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        let lines = e.target.result.split('\n');
+        let successCount = 0;
+        let errorCount = 0;
+
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            if (!line) continue;
+            
+            // Header စာကြောင်းများ (ဥပမာ- Point, N, E စသည်) ကို ကျော်ဖတ်မည်
+            if (line.toUpperCase().includes("PILE") || line.toUpperCase().includes("DESIGN")) continue;
+
+            let cols = line.split(',');
+            if (cols.length < 6) { errorCount++; continue; }
+
+            let pNo = cols[0].trim();
+            let dN = parseFloat(cols[1]);
+            let dE = parseFloat(cols[2]);
+            let dDia = parseFloat(cols[3]) || 600; // မပါခဲ့လျှင် 600mm ဟု ယူဆမည်
+
+            if (isNaN(dN) || isNaN(dE)) { errorCount++; continue; }
+
+            let aN = 0, aE = 0, aRad = 0, method = "direct";
+            let diffN = 0, diffE = 0, eccMM = 0;
+
+            // 🔴 3 Points Method (Column ၁၀ ခု ရှိလျှင်)
+            if (cols.length >= 10 && !isNaN(parseFloat(cols[8]))) {
+                method = "3points";
+                let n1 = parseFloat(cols[4]), e1 = parseFloat(cols[5]);
+                let n2 = parseFloat(cols[6]), e2 = parseFloat(cols[7]);
+                let n3 = parseFloat(cols[8]), e3 = parseFloat(cols[9]);
+
+                if (isNaN(n1) || isNaN(n2) || isNaN(n3)) { errorCount++; continue; }
+
+                let center = calcCircleCenterFrom3Points(n1, e1, n2, e2, n3, e3);
+                if (!center) { errorCount++; continue; }
+
+                aN = center.n; 
+                aE = center.e; 
+                aRad = center.r;
+            } 
+            // 🔴 Direct Method (Column ၆ ခုသာ ရှိလျှင်)
+            else {
+                method = "direct";
+                aN = parseFloat(cols[4]);
+                aE = parseFloat(cols[5]);
+                aRad = dDia / 2000;
+
+                if (isNaN(aN) || isNaN(aE)) { errorCount++; continue; }
+            }
+
+            // Calculation
+            diffN = aN - dN; 
+            diffE = aE - dE; 
+            eccMM = Math.sqrt((diffN * diffN) + (diffE * diffE)) * 1000;
+
+            // Array ထဲသို့ ပေါင်းထည့်မည် (addEccToRecord ပုံစံအတိုင်း)
+            window.eccRecords.push({
+                pNo: pNo, dN: dN, dE: dE, dDia: dDia, 
+                aN: aN, aE: aE, aRad: aRad, 
+                diffN: diffN * 1000, diffE: diffE * 1000, eccMM: eccMM, 
+                method: method
+            });
+            successCount++;
+        }
+
+        // ဇယား (UI) ကို Update လုပ်မည်
+        updateEccRecordUI();
+        
+        if (successCount > 0) {
+            alert(`✅ Successfully loaded and calculated ${successCount} piles from CSV!\n(Skipped/Errors: ${errorCount})`);
+        } else {
+            alert(`❌ No valid pile data found in CSV.\nPlease check the format:\nPileNo, Design_N, Design_E, Dia_mm, Actual_N, Actual_E`);
+        }
+    };
+    reader.readAsText(file);
+    event.target.value = ''; // Input file ကို reset လုပ်မည်
 };
