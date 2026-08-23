@@ -851,11 +851,11 @@ window.exportTrvCSV = function(exportType) {
 };
 
 // ==========================================
-// --- PILE ECCENTRICITY LOGIC (UPDATED FLOW) ---
+// --- PILE ECCENTRICITY LOGIC (UPDATED WITH DXF) ---
 // ==========================================
 
 window.eccRecords = [];
-window.editingEccIndex = -1; // Edit လုပ်နေသည့် Point ၏ နေရာ
+window.editingEccIndex = -1; 
 
 window.toggleEccMethod = function() {
     let m = document.getElementById('ecc_method').value;
@@ -871,11 +871,12 @@ window.toggleEccMethod = function() {
 window.calcPileEccentricity = function() {
     let dN = parseFloat(document.getElementById('ecc_d_n').value);
     let dE = parseFloat(document.getElementById('ecc_d_e').value);
+    let dDia = parseFloat(document.getElementById('ecc_d_dia').value) || 0; // Design Dia in mm
     let pNo = document.getElementById('ecc_pile_no').value || "Unknown";
 
     if (isNaN(dN) || isNaN(dE)) return alert("Please enter valid Design Center N and E.");
 
-    let aN = 0, aE = 0, radiusText = "", is3Point = false;
+    let aN = 0, aE = 0, aRadText = "", aRad = 0, is3Point = false;
     let method = document.getElementById('ecc_method').value;
 
     let n1=0, e1=0, n2=0, e2=0, n3=0, e3=0;
@@ -884,6 +885,7 @@ window.calcPileEccentricity = function() {
         aN = parseFloat(document.getElementById('ecc_a_n').value);
         aE = parseFloat(document.getElementById('ecc_a_e').value);
         if (isNaN(aN) || isNaN(aE)) return alert("Please enter valid Actual N and E.");
+        aRad = dDia / 2000; // direct method တွင် actual radius ကို design radius အတိုင်း ယူဆမည်
         document.getElementById('ecc_calc_center_res').innerText = ""; 
     } else {
         is3Point = true;
@@ -891,14 +893,14 @@ window.calcPileEccentricity = function() {
         n2 = parseFloat(document.getElementById('ecc_p2_n').value); e2 = parseFloat(document.getElementById('ecc_p2_e').value);
         n3 = parseFloat(document.getElementById('ecc_p3_n').value); e3 = parseFloat(document.getElementById('ecc_p3_e').value);
         
-        if (isNaN(n1) || isNaN(n2) || isNaN(n3) || isNaN(e1) || isNaN(e2) || isNaN(e3)) return alert("Please enter all 3 valid Points on the Casing Edge.");
+        if (isNaN(n1) || isNaN(n2) || isNaN(n3) || isNaN(e1) || isNaN(e2) || isNaN(e3)) return alert("Please enter all 3 valid Points.");
         
         let center = calcCircleCenterFrom3Points(n1, e1, n2, e2, n3, e3);
-        if (!center) return alert("Points are invalid (they form a straight line). Cannot form a circle.");
+        if (!center) return alert("Points are invalid (straight line).");
         
-        aN = center.n; aE = center.e;
-        document.getElementById('ecc_calc_center_res').innerText = `Calculated Casing Center N: ${aN.toFixed(3)}, E: ${aE.toFixed(3)} | Radius: ${(center.r * 1000).toFixed(0)} mm`;
-        radiusText = `<br>Computed Radius: ${(center.r * 1000).toFixed(0)} mm`;
+        aN = center.n; aE = center.e; aRad = center.r;
+        document.getElementById('ecc_calc_center_res').innerText = `Calculated Casing Center N: ${aN.toFixed(3)}, E: ${aE.toFixed(3)} | Radius: ${(aRad * 1000).toFixed(0)} mm`;
+        aRadText = `<br>Computed Radius: ${(aRad * 1000).toFixed(0)} mm`;
     }
 
     let diffN = aN - dN; 
@@ -908,42 +910,32 @@ window.calcPileEccentricity = function() {
     let dirE = diffE >= 0 ? "East" : "West";
 
     let html = `<b>Pile No:</b> <span style="color:#1e40af;">${pNo}</span><br>`;
-    html += `<b>Design:</b> N: ${dN.toFixed(3)}, E: ${dE.toFixed(3)}<br>`;
-    html += `<b>Actual:</b> N: ${aN.toFixed(3)}, E: ${aE.toFixed(3)}${radiusText}<hr style="margin:5px 0;">`;
+    html += `<b>Design:</b> N: ${dN.toFixed(3)}, E: ${dE.toFixed(3)} (Dia: ${dDia}mm)<br>`;
+    html += `<b>Actual:</b> N: ${aN.toFixed(3)}, E: ${aE.toFixed(3)}${aRadText}<hr style="margin:5px 0;">`;
     html += `<b>Δ N:</b> ${(diffN * 1000).toFixed(0)} mm (${dirN})<br>`;
     html += `<b>Δ E:</b> ${(diffE * 1000).toFixed(0)} mm (${dirE})<br>`;
-    html += `<b style="font-size:16px; color:#b91c1c;">Total Eccentricity: ${eccMM.toFixed(0)} mm</b>`;
+    html += `<b style="font-size:16px; color:#b91c1c;">Total Deviation: ${eccMM.toFixed(0)} mm</b>`;
 
     document.getElementById('ecc_summary').innerHTML = html;
     document.getElementById('ecc_result_box').classList.remove('hidden');
 
-    // Add To Report ခလုတ်အတွက် ယာယီမှတ်ထားခြင်း
-    window.tempEccResult = { pNo, dN, dE, aN, aE, diffN: diffN*1000, diffE: diffE*1000, eccMM, method, n1, e1, n2, e2, n3, e3 };
+    window.tempEccResult = { pNo, dN, dE, dDia, aN, aE, aRad, diffN: diffN*1000, diffE: diffE*1000, eccMM, method, n1, e1, n2, e2, n3, e3 };
 };
 
-// 🔴 Report ထဲသို့ အမှတ်ပေါင်းထည့်ခြင်း
 window.addEccToRecord = function() {
     if (!window.tempEccResult) return;
-
     if (window.editingEccIndex !== -1) {
-        // Edit လုပ်နေလျှင် အဟောင်းနေရာတွင် အစားထိုးမည်
         window.eccRecords[window.editingEccIndex] = window.tempEccResult;
         window.editingEccIndex = -1;
     } else {
-        // အသစ်ဆိုလျှင် အဆုံးတွင် ထပ်ပေါင်းထည့်မည်
         window.eccRecords.push(window.tempEccResult);
     }
-    
     window.tempEccResult = null;
     document.getElementById('ecc_result_box').classList.add('hidden');
-    
-    // Box များကို အလွတ်လုပ်ပေးခြင်း (နောက်တစ်မှတ်အတွက် အဆင်သင့်ဖြစ်စေရန်)
     document.getElementById('ecc_pile_no').value = '';
-    
     updateEccRecordUI();
 };
 
-// 🔴 UI တွင် Record များကို ဇယားပုံစံဖြင့် ပြသခြင်း
 function updateEccRecordUI() {
     let panel = document.getElementById('ecc_records_panel');
     let listDiv = document.getElementById('ecc_record_list');
@@ -972,12 +964,12 @@ function updateEccRecordUI() {
     listDiv.innerHTML = html;
 }
 
-// 🔴 မှတ်တမ်းကို ပြန်ခေါ်၍ ပြင်ဆင်ခြင်း
 window.editEccRecord = function(idx) {
     let r = window.eccRecords[idx];
     window.editingEccIndex = idx;
     
     document.getElementById('ecc_pile_no').value = r.pNo;
+    document.getElementById('ecc_d_dia').value = r.dDia || "";
     document.getElementById('ecc_d_n').value = r.dN;
     document.getElementById('ecc_d_e').value = r.dE;
     
@@ -996,14 +988,12 @@ window.editEccRecord = function(idx) {
     alert(`Editing Point: ${r.pNo}. Modify data and click Calculate -> Add to Report.`);
 };
 
-// 🔴 မှတ်တမ်းမှ ဖယ်ထုတ်ခြင်း
 window.deleteEccRecord = function(idx) {
     if (!confirm("Remove this point from the report?")) return;
     window.eccRecords.splice(idx, 1);
     updateEccRecordUI();
 };
 
-// 🔴 အားလုံးကို ရှင်းလင်းခြင်း (Clear All)
 window.clearAllEccData = function() {
     if (!confirm("Clear ALL data and start a new report?")) return;
     window.eccRecords = [];
@@ -1014,7 +1004,6 @@ window.clearAllEccData = function() {
     document.getElementById('ecc_calc_center_res').innerText = '';
 };
 
-// 🔴 Excel Report ထုတ်ခြင်း
 window.exportEccExcel = function() {
     if (window.eccRecords.length === 0) return alert("No points added to the report yet!");
 
@@ -1058,7 +1047,6 @@ window.exportEccExcel = function() {
     });
 
     excelContent += `</table></body></html>`;
-
     let fileName = `Eccentricity_Report_${new Date().getTime()}.xls`;
     
     if (window.AndroidNative && window.AndroidNative.downloadConvertedCSV) {
@@ -1068,4 +1056,93 @@ window.exportEccExcel = function() {
         let url = URL.createObjectURL(blob); let a = document.createElement("a");
         a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
+};
+
+// 🔴 AUTOCAD DXF REPORT GENERATOR (FIXED TEXT OVERLAP & RESIZED TEXT) 🔴
+window.exportEccDXF = function() {
+    if (window.eccRecords.length === 0) return alert("No points added to the report yet!");
+
+    let dxfContent = "0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n0\nENDSEC\n";
+    dxfContent += "0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n2\n";
+    dxfContent += "0\nLAYER\n2\nDESIGN_PILE\n70\n0\n62\n7\n6\nCONTINUOUS\n";
+    dxfContent += "0\nLAYER\n2\nASBUILT_PILE\n70\n0\n62\n1\n6\nCONTINUOUS\n";
+    dxfContent += "0\nENDTAB\n0\nENDSEC\n";
+    dxfContent += "0\nSECTION\n2\nENTITIES\n";
+
+    window.eccRecords.forEach(r => {
+        let dRad = r.dDia > 0 ? (r.dDia / 2000) : 0.3; 
+        let aRad = r.aRad > 0 ? r.aRad : dRad;
+        
+        // 🔴 Text Size ကို 0.4 ကနေ 0.15 ထိ သေးလိုက်ပါပြီ
+        let txtH = dRad * 0.15; 
+
+        // 1. Design Circle (White)
+        dxfContent += `0\nCIRCLE\n8\nDESIGN_PILE\n10\n${r.dE.toFixed(3)}\n20\n${r.dN.toFixed(3)}\n30\n0.0\n40\n${dRad.toFixed(3)}\n`;
+        // Pile Name Text
+        dxfContent += `0\nTEXT\n8\nDESIGN_PILE\n10\n${(r.dE + dRad + (dRad*0.2)).toFixed(3)}\n20\n${(r.dN + dRad + (dRad*0.2)).toFixed(3)}\n30\n0.0\n40\n${txtH * 1.5}\n1\n${r.pNo}\n`; // နာမည်ကို နည်းနည်း ပိုကြီးထားသည်
+
+        // 2. Actual Circle (Red)
+        dxfContent += `0\nCIRCLE\n8\nASBUILT_PILE\n10\n${r.aE.toFixed(3)}\n20\n${r.aN.toFixed(3)}\n30\n0.0\n40\n${aRad.toFixed(3)}\n`;
+
+        // 3. Deviation Lines & Arrows
+        let fixedLineLength = aRad * 0.6; 
+        let arrowSize = aRad * 0.15; 
+
+        let diffE_m = r.aE - r.dE; 
+        let diffN_m = r.aN - r.dN;
+
+        // --- Easting Line (Horizontal) ---
+        if (Math.abs(diffE_m) > 0.001) { 
+            let directionE = diffE_m > 0 ? 1 : -1; 
+            let endE = r.aE + (fixedLineLength * directionE);
+            let endN = r.aN;
+
+            dxfContent += `0\nLINE\n8\nASBUILT_PILE\n10\n${r.aE.toFixed(3)}\n20\n${r.aN.toFixed(3)}\n30\n0.0\n11\n${endE.toFixed(3)}\n21\n${endN.toFixed(3)}\n31\n0.0\n`;
+            
+            let p1E = endE, p1N = endN;
+            let p2E = endE - (arrowSize * directionE), p2N = endN + (arrowSize * 0.4);
+            let p3E = endE - (arrowSize * directionE), p3N = endN - (arrowSize * 0.4);
+
+            dxfContent += `0\nSOLID\n8\nASBUILT_PILE\n10\n${p1E.toFixed(3)}\n20\n${p1N.toFixed(3)}\n30\n0.0\n11\n${p2E.toFixed(3)}\n21\n${p2N.toFixed(3)}\n31\n0.0\n12\n${p3E.toFixed(3)}\n22\n${p3N.toFixed(3)}\n32\n0.0\n13\n${p3E.toFixed(3)}\n23\n${p3N.toFixed(3)}\n33\n0.0\n`;
+            
+            // 🔴 Text ကို မြှားခေါင်း၏ အပြင်ဘက် (ထိပ်နား) သို့ ရွှေ့လိုက်ပါသည်
+            let textPosE = endE + (txtH * 0.5 * directionE);
+            let textPosN = endN - (txtH * 0.5); // စာလုံးကို မျဉ်းနဲ့ တစ်တန်းတည်းဖြစ်အောင် နည်းနည်း အောက်ချသည်
+            
+            dxfContent += `0\nTEXT\n8\nASBUILT_PILE\n10\n${textPosE.toFixed(3)}\n20\n${textPosN.toFixed(3)}\n30\n0.0\n40\n${txtH}\n1\n${Math.abs(diffE_m * 1000).toFixed(0)}\n`;
+        }
+
+        // --- Northing Line (Vertical) ---
+        if (Math.abs(diffN_m) > 0.001) { 
+            let directionN = diffN_m > 0 ? 1 : -1; 
+            let endE = r.aE;
+            let endN = r.aN + (fixedLineLength * directionN);
+
+            dxfContent += `0\nLINE\n8\nASBUILT_PILE\n10\n${r.aE.toFixed(3)}\n20\n${r.aN.toFixed(3)}\n30\n0.0\n11\n${endE.toFixed(3)}\n21\n${endN.toFixed(3)}\n31\n0.0\n`;
+            
+            let p1E = endE, p1N = endN;
+            let p2E = endE + (arrowSize * 0.4), p2N = endN - (arrowSize * directionN);
+            let p3E = endE - (arrowSize * 0.4), p3N = endN - (arrowSize * directionN);
+
+            dxfContent += `0\nSOLID\n8\nASBUILT_PILE\n10\n${p1E.toFixed(3)}\n20\n${p1N.toFixed(3)}\n30\n0.0\n11\n${p2E.toFixed(3)}\n21\n${p2N.toFixed(3)}\n31\n0.0\n12\n${p3E.toFixed(3)}\n22\n${p3N.toFixed(3)}\n32\n0.0\n13\n${p3E.toFixed(3)}\n23\n${p3N.toFixed(3)}\n33\n0.0\n`;
+            
+            // 🔴 Text ကို မြှားခေါင်း၏ အပြင်ဘက် (ထိပ်နား) သို့ ရွှေ့လိုက်ပါသည်
+            let textPosE = endE - (txtH * 0.5); // စာလုံးကို မျဉ်းနဲ့ တစ်တန်းတည်းဖြစ်အောင် နည်းနည်း ဘယ်ရွှေ့သည်
+            let textPosN = endN + (txtH * 0.5 * directionN);
+            
+            dxfContent += `0\nTEXT\n8\nASBUILT_PILE\n10\n${textPosE.toFixed(3)}\n20\n${textPosN.toFixed(3)}\n30\n0.0\n40\n${txtH}\n1\n${Math.abs(diffN_m * 1000).toFixed(0)}\n`;
+        }
+    });
+
+    dxfContent += "0\nENDSEC\n0\nEOF\n";
+
+    let fileName = `Eccentricity_Drawing_${new Date().getTime()}.dxf`;
+    if (window.AndroidNative && window.AndroidNative.downloadConvertedKML) {
+        window.AndroidNative.downloadConvertedKML(dxfContent, fileName);
+    } else {
+        let blob = new Blob([dxfContent], { type: 'application/dxf' });
+        let url = URL.createObjectURL(blob); let a = document.createElement("a");
+        a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    }
+    alert("AutoCAD DXF Generated! Please open in AutoCAD.");
 };
