@@ -1000,84 +1000,128 @@ window.exportEccExcel = function() {
     else { let blob = new Blob([excelContent], { type: 'application/vnd.ms-excel' }); let url = URL.createObjectURL(blob); let a = document.createElement("a"); a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); document.body.removeChild(a); }
 };
 
-// 🔴 AUTOCAD DXF REPORT GENERATOR (TEXT ALIGNED IN FRONT OF ARROWS) 🔴
+// 🔴 AUTOCAD DXF REPORT GENERATOR (WITH SUMMARY TABLE) 🔴
 window.exportEccDXF = function() {
     if (window.eccRecords.length === 0) return alert("No points added to the report yet!");
 
     let dxfContent = "0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n0\nENDSEC\n";
-    dxfContent += "0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n2\n";
+    dxfContent += "0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n3\n";
     dxfContent += "0\nLAYER\n2\nDESIGN_PILE\n70\n0\n62\n7\n6\nCONTINUOUS\n";
     dxfContent += "0\nLAYER\n2\nASBUILT_PILE\n70\n0\n62\n1\n6\nCONTINUOUS\n";
+    dxfContent += "0\nLAYER\n2\nREPORT_TABLE\n70\n0\n62\n3\n6\nCONTINUOUS\n"; // Layer for Table (Green)
     dxfContent += "0\nENDTAB\n0\nENDSEC\n";
     dxfContent += "0\nSECTION\n2\nENTITIES\n";
 
+    // 1. Drawing the Piles and Deviations
     window.eccRecords.forEach(r => {
         let dRad = r.dDia > 0 ? (r.dDia / 2000) : 0.3; 
         let aRad = r.aRad > 0 ? r.aRad : dRad;
-        let txtH = dRad * 0.4; // Text size (Radius ၏ 40%)
+        let txtH = dRad * 0.4; 
 
-        // 1. Design Circle (White)
         dxfContent += `0\nCIRCLE\n8\nDESIGN_PILE\n10\n${r.dE.toFixed(3)}\n20\n${r.dN.toFixed(3)}\n30\n0.0\n40\n${dRad.toFixed(3)}\n`;
-        dxfContent += `0\nTEXT\n8\nDESIGN_PILE\n10\n${(r.dE + dRad + (dRad*0.2)).toFixed(3)}\n20\n${(r.dN + dRad + (dRad*0.2)).toFixed(3)}\n30\n0.0\n40\n${txtH}\n1\n${r.pNo}\n`;
-
-        // 2. Actual Circle (Red)
+        dxfContent += `0\nTEXT\n8\nDESIGN_PILE\n10\n${(r.dE + dRad + (dRad*0.2)).toFixed(3)}\n20\n${(r.dN + dRad + (dRad*0.2)).toFixed(3)}\n30\n0.0\n40\n${txtH * 1.5}\n1\n${r.pNo}\n`;
         dxfContent += `0\nCIRCLE\n8\nASBUILT_PILE\n10\n${r.aE.toFixed(3)}\n20\n${r.aN.toFixed(3)}\n30\n0.0\n40\n${aRad.toFixed(3)}\n`;
 
-        // 3. Deviation Lines & Arrows
         let fixedLineLength = aRad * 0.6; 
         let arrowSize = aRad * 0.15; 
         let diffE_m = r.aE - r.dE; 
         let diffN_m = r.aN - r.dN;
 
-        // --- Easting Line (Horizontal) ---
         if (Math.abs(diffE_m) > 0.001) { 
             let directionE = diffE_m > 0 ? 1 : -1; 
             let endE = r.aE + (fixedLineLength * directionE);
-            let endN = r.aN;
-
-            // Line
-            dxfContent += `0\nLINE\n8\nASBUILT_PILE\n10\n${r.aE.toFixed(3)}\n20\n${r.aN.toFixed(3)}\n30\n0.0\n11\n${endE.toFixed(3)}\n21\n${endN.toFixed(3)}\n31\n0.0\n`;
+            dxfContent += `0\nLINE\n8\nASBUILT_PILE\n10\n${r.aE.toFixed(3)}\n20\n${r.aN.toFixed(3)}\n30\n0.0\n11\n${endE.toFixed(3)}\n21\n${r.aN.toFixed(3)}\n31\n0.0\n`;
             
-            // Arrowhead
-            let p1E = endE, p1N = endN;
-            let p2E = endE - (arrowSize * directionE), p2N = endN + (arrowSize * 0.4);
-            let p3E = endE - (arrowSize * directionE), p3N = endN - (arrowSize * 0.4);
-            dxfContent += `0\nSOLID\n8\nASBUILT_PILE\n10\n${p1E.toFixed(3)}\n20\n${p1N.toFixed(3)}\n30\n0.0\n11\n${p2E.toFixed(3)}\n21\n${p2N.toFixed(3)}\n31\n0.0\n12\n${p3E.toFixed(3)}\n22\n${p3N.toFixed(3)}\n32\n0.0\n13\n${p3E.toFixed(3)}\n23\n${p3N.toFixed(3)}\n33\n0.0\n`;
+            let p2E = endE - (arrowSize * directionE), p2N = r.aN + (arrowSize * 0.4);
+            let p3E = endE - (arrowSize * directionE), p3N = r.aN - (arrowSize * 0.4);
+            dxfContent += `0\nSOLID\n8\nASBUILT_PILE\n10\n${endE.toFixed(3)}\n20\n${r.aN.toFixed(3)}\n30\n0.0\n11\n${p2E.toFixed(3)}\n21\n${p2N.toFixed(3)}\n31\n0.0\n12\n${p3E.toFixed(3)}\n22\n${p3N.toFixed(3)}\n32\n0.0\n13\n${p3E.toFixed(3)}\n23\n${p3N.toFixed(3)}\n33\n0.0\n`;
             
-            // 🔴 Text in FRONT of Arrow (Center Aligned vertically)
-            // Group 72 = 0 (Left align) if Right arrow, Group 72 = 2 (Right align) if Left arrow
-            // Group 73 = 2 (Middle center align vertically)
+            let textPosE = endE + (txtH * 0.5 * directionE);
             let txtAlignH = directionE > 0 ? 0 : 2; 
-            let textOffsetX = directionE > 0 ? (arrowSize * 0.5) : -(arrowSize * 0.5); 
-            
-            dxfContent += `0\nTEXT\n8\nASBUILT_PILE\n10\n${(endE + textOffsetX).toFixed(3)}\n20\n${endN.toFixed(3)}\n30\n0.0\n40\n${txtH}\n1\n${Math.abs(diffE_m * 1000).toFixed(0)}\n72\n${txtAlignH}\n11\n${(endE + textOffsetX).toFixed(3)}\n21\n${endN.toFixed(3)}\n31\n0.0\n73\n2\n`;
+            dxfContent += `0\nTEXT\n8\nASBUILT_PILE\n10\n${textPosE.toFixed(3)}\n20\n${r.aN.toFixed(3)}\n30\n0.0\n40\n${txtH}\n1\n${Math.abs(diffE_m * 1000).toFixed(0)}\n72\n${txtAlignH}\n11\n${textPosE.toFixed(3)}\n21\n${r.aN.toFixed(3)}\n31\n0.0\n73\n2\n`;
         }
 
-        // --- Northing Line (Vertical) ---
         if (Math.abs(diffN_m) > 0.001) { 
             let directionN = diffN_m > 0 ? 1 : -1; 
-            let endE = r.aE;
             let endN = r.aN + (fixedLineLength * directionN);
-
-            // Line
-            dxfContent += `0\nLINE\n8\nASBUILT_PILE\n10\n${r.aE.toFixed(3)}\n20\n${r.aN.toFixed(3)}\n30\n0.0\n11\n${endE.toFixed(3)}\n21\n${endN.toFixed(3)}\n31\n0.0\n`;
+            dxfContent += `0\nLINE\n8\nASBUILT_PILE\n10\n${r.aE.toFixed(3)}\n20\n${r.aN.toFixed(3)}\n30\n0.0\n11\n${r.aE.toFixed(3)}\n21\n${endN.toFixed(3)}\n31\n0.0\n`;
             
-            // Arrowhead
-            let p1E = endE, p1N = endN;
-            let p2E = endE + (arrowSize * 0.4), p2N = endN - (arrowSize * directionN);
-            let p3E = endE - (arrowSize * 0.4), p3N = endN - (arrowSize * directionN);
-            dxfContent += `0\nSOLID\n8\nASBUILT_PILE\n10\n${p1E.toFixed(3)}\n20\n${p1N.toFixed(3)}\n30\n0.0\n11\n${p2E.toFixed(3)}\n21\n${p2N.toFixed(3)}\n31\n0.0\n12\n${p3E.toFixed(3)}\n22\n${p3N.toFixed(3)}\n32\n0.0\n13\n${p3E.toFixed(3)}\n23\n${p3N.toFixed(3)}\n33\n0.0\n`;
+            let p2E = r.aE + (arrowSize * 0.4), p2N = endN - (arrowSize * directionN);
+            let p3E = r.aE - (arrowSize * 0.4), p3N = endN - (arrowSize * directionN);
+            dxfContent += `0\nSOLID\n8\nASBUILT_PILE\n10\n${r.aE.toFixed(3)}\n20\n${endN.toFixed(3)}\n30\n0.0\n11\n${p2E.toFixed(3)}\n21\n${p2N.toFixed(3)}\n31\n0.0\n12\n${p3E.toFixed(3)}\n22\n${p3N.toFixed(3)}\n32\n0.0\n13\n${p3E.toFixed(3)}\n23\n${p3N.toFixed(3)}\n33\n0.0\n`;
             
-            // 🔴 Text in FRONT of Arrow (Center Aligned horizontally)
-            // Group 72 = 1 (Center align horizontally)
-            // Group 73 = 1 (Bottom align) if Up arrow, Group 73 = 3 (Top align) if Down arrow
+            let textPosN = endN + (txtH * 0.5 * directionN);
             let txtAlignV = directionN > 0 ? 1 : 3; 
-            let textOffsetY = directionN > 0 ? (arrowSize * 0.5) : -(arrowSize * 0.5); 
-
-            dxfContent += `0\nTEXT\n8\nASBUILT_PILE\n10\n${endE.toFixed(3)}\n20\n${(endN + textOffsetY).toFixed(3)}\n30\n0.0\n40\n${txtH}\n1\n${Math.abs(diffN_m * 1000).toFixed(0)}\n72\n1\n11\n${endE.toFixed(3)}\n21\n${(endN + textOffsetY).toFixed(3)}\n31\n0.0\n73\n${txtAlignV}\n`;
+            dxfContent += `0\nTEXT\n8\nASBUILT_PILE\n10\n${r.aE.toFixed(3)}\n20\n${textPosN.toFixed(3)}\n30\n0.0\n40\n${txtH}\n1\n${Math.abs(diffN_m * 1000).toFixed(0)}\n72\n1\n11\n${r.aE.toFixed(3)}\n21\n${textPosN.toFixed(3)}\n31\n0.0\n73\n${txtAlignV}\n`;
         }
     });
 
+    // ==========================================
+    // 🔴 2. Drawing the Summary Table in DXF
+    // ==========================================
+    
+    // ဇယားကို ပုံများ၏ အရှေ့ဘက် (Right Side) တွင် ထားမည်
+    let maxE = Math.max(...window.eccRecords.map(r => r.dE));
+    let maxN = Math.max(...window.eccRecords.map(r => r.dN));
+    
+    let tableX = maxE + 5.0; // ပုံနှင့် ၅ မီတာ အကွာတွင် စမည်
+    let tableY = maxN; 
+    let rowH = 0.5; // ဇယားတစ်ကြောင်း၏ အမြင့် (0.5m)
+    let tblTxtH = 0.2; // ဇယားတွင်းရှိ စာလုံးအမြင့်
+
+    let colWidths = [1.0, 1.5, 2.5, 2.5, 2.5, 2.5, 1.5, 1.5, 2.0]; // Column များ၏ အကျယ်
+    let headers = ["No", "Pile", "Design N", "Design E", "Actual N", "Actual E", "dN(mm)", "dE(mm)", "Ecc(mm)"];
+    
+    let totalCols = colWidths.length;
+    let tableWidth = colWidths.reduce((a, b) => a + b, 0);
+    let totalRows = window.eccRecords.length + 1; // +1 for Header
+
+    // ဇယားခေါင်းစဉ် (Title)
+    dxfContent += `0\nTEXT\n8\nREPORT_TABLE\n10\n${tableX + (tableWidth/2)}\n20\n${tableY + 0.8}\n30\n0.0\n40\n0.4\n1\nPILE ECCENTRICITY SUMMARY REPORT\n72\n1\n11\n${tableX + (tableWidth/2)}\n21\n${tableY + 0.8}\n31\n0.0\n73\n2\n`;
+
+    // ဇယား၏ အလျားလိုက် မျဉ်းများ (Horizontal Lines)
+    for (let i = 0; i <= totalRows; i++) {
+        let y = tableY - (i * rowH);
+        dxfContent += `0\nLINE\n8\nREPORT_TABLE\n10\n${tableX}\n20\n${y}\n30\n0.0\n11\n${tableX + tableWidth}\n21\n${y}\n31\n0.0\n`;
+    }
+
+    // ဇယား၏ ဒေါင်လိုက် မျဉ်းများ (Vertical Lines)
+    let curX = tableX;
+    dxfContent += `0\nLINE\n8\nREPORT_TABLE\n10\n${curX}\n20\n${tableY}\n30\n0.0\n11\n${curX}\n21\n${tableY - (totalRows * rowH)}\n31\n0.0\n`;
+    for (let c = 0; c < totalCols; c++) {
+        curX += colWidths[c];
+        dxfContent += `0\nLINE\n8\nREPORT_TABLE\n10\n${curX}\n20\n${tableY}\n30\n0.0\n11\n${curX}\n21\n${tableY - (totalRows * rowH)}\n31\n0.0\n`;
+    }
+
+    // ဇယားအတွင်းရှိ စာသားများ ရေးခြင်း (Text Function)
+    function writeTableText(row, col, text) {
+        let xPos = tableX;
+        for(let i=0; i<col; i++) xPos += colWidths[i];
+        xPos += (colWidths[col] / 2); // Center alignment
+        let yPos = tableY - (row * rowH) - (rowH / 2);
+        dxfContent += `0\nTEXT\n8\nREPORT_TABLE\n10\n${xPos}\n20\n${yPos}\n30\n0.0\n40\n${tblTxtH}\n1\n${text}\n72\n1\n11\n${xPos}\n21\n${yPos}\n31\n0.0\n73\n2\n`;
+    }
+
+    // Headers များ ရေးခြင်း (Row 0)
+    for (let c = 0; c < totalCols; c++) {
+        writeTableText(0, c, headers[c]);
+    }
+
+    // Data များ ရေးခြင်း (Row 1 မှစ၍)
+    window.eccRecords.forEach((r, idx) => {
+        let row = idx + 1;
+        writeTableText(row, 0, (idx + 1).toString());
+        writeTableText(row, 1, r.pNo);
+        writeTableText(row, 2, r.dN.toFixed(3));
+        writeTableText(row, 3, r.dE.toFixed(3));
+        writeTableText(row, 4, r.aN.toFixed(3));
+        writeTableText(row, 5, r.aE.toFixed(3));
+        writeTableText(row, 6, r.diffN.toFixed(0));
+        writeTableText(row, 7, r.diffE.toFixed(0));
+        writeTableText(row, 8, r.eccMM.toFixed(0));
+    });
+
+    // End DXF
     dxfContent += "0\nENDSEC\n0\nEOF\n";
 
     let fileName = `Eccentricity_Drawing_${new Date().getTime()}.dxf`;
@@ -1088,7 +1132,6 @@ window.exportEccDXF = function() {
         let url = URL.createObjectURL(blob); let a = document.createElement("a");
         a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
-    alert("AutoCAD DXF Generated! Please open in AutoCAD.");
 };
 
 // ==========================================
@@ -1171,8 +1214,10 @@ window.loadEccCSV = function(event) {
         
         if (successCount > 0) {
             alert(`✅ Successfully loaded and calculated ${successCount} piles from CSV!\n(Skipped/Errors: ${errorCount})`);
+            // UI Box လေးကို အလိုအလျောက် ပေါ်လာစေရန်
+            document.getElementById('ecc_records_panel').classList.remove('hidden');
         } else {
-            alert(`❌ No valid pile data found in CSV.\nPlease check the format:\nPileNo, Design_N, Design_E, Dia_mm, Actual_N, Actual_E`);
+            alert(`❌ No valid pile data found in CSV.\nPlease check the format:\n[1-Point]: PileNo, Design_N, Design_E, Dia_mm, Actual_N, Actual_E\n[3-Points]: PileNo, Design_N, Design_E, Dia_mm, Pt1_N, Pt1_E, Pt2_N, Pt2_E, Pt3_N, Pt3_E`);
         }
     };
     reader.readAsText(file);
