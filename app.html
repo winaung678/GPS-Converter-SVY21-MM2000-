@@ -26,9 +26,9 @@
     <link rel="stylesheet" href="style.css">
    <script>
   // 🔴 ပိုမိုသေချာသော လမ်းကြောင်းလွှဲ Logic (Sub-folder ကော Cache ပါ ကျော်ဖြတ်နိုင်ရန်)
- if (window.location.hostname !== "gpsconverter.site" && window.location.hostname !== "localhost") {
+ // if (window.location.hostname !== "gpsconverter.site" && window.location.hostname !== "localhost") {
     // လက်ရှိ ဝင်ထားတဲ့ Domain က gpsconverter.site မဟုတ်ရင် (github.io ဖြစ်နေရင်) Custom Domain ဆီ အတင်းလွှဲမည်
- window.location.replace("https://gpsconverter.site/");
+  // window.location.replace("https://gpsconverter.site/");
   }
 </script>
 </head>
@@ -591,10 +591,14 @@
 <!-- 5. PILE ECCENTRICITY TOOL (MANUAL INPUT) -->
 <!-- ========================================== -->
 <div id="cogo_ecc_tool" class="hidden">
-    <!-- Design Data -->
+   <!-- Design Data -->
     <div style="background:#f1f5f9; padding:10px; border-radius:8px; border:1px solid #cbd5e1; margin-bottom:10px;">
         <label class="v2-label" style="margin-top:0; color:#1e40af; font-weight:bold;">1. Design Center (Target)</label>
-        <input type="text" id="ecc_pile_no" class="v2-input" placeholder="Pile No (e.g. P-01)" style="font-weight:bold; color:#1e40af;">
+        <div style="display:flex; gap:5px; margin-bottom:5px;">
+            <!-- 🔴 Flex အချိုးကို ပြင်ထားပါသည် (ဘောင်မကျော်အောင်) -->
+            <input type="text" id="ecc_pile_no" class="v2-input" placeholder="Pile No" style="flex:1.5; font-weight:bold; color:#1e40af; margin:0;">
+            <input type="text" id="ecc_d_dia" class="v2-input" placeholder="Dia(mm)" style="flex:1; margin:0;">
+        </div>
         <div style="display:flex; gap:5px;">
             <input type="text" inputmode="text" id="ecc_d_n" class="v2-input" placeholder="Design N">
             <input type="text" inputmode="text" id="ecc_d_e" class="v2-input" placeholder="Design E">
@@ -603,20 +607,26 @@
 
     <!-- As-built Data -->
     <label class="v2-label" style="color:#b91c1c; font-weight:bold;">2. Actual As-built Data</label>
-    <select id="ecc_method" class="v2-input" onchange="toggleEccMethod()">
-        <option value="direct">Direct Center (1 Point)</option>
-        <option value="3points">Casing Edge (3 Points)</option>
-    </select>
+    
+    <!-- 🔴 CSV Upload ခလုတ် အသစ် -->
+    <div style="display:flex; gap:5px; margin-bottom:10px;">
+        <select id="ecc_method" class="v2-input" style="flex:2; margin:0;" onchange="toggleEccMethod()">
+            <option value="direct">Direct Center (1 Point)</option>
+            <option value="3points">Casing Edge (3 Points)</option>
+        </select>
+        <input type="file" id="ecc_csv_file" accept=".csv" style="display:none;" onchange="loadEccCSV(event)">
+        <button class="btn-action" style="background:#3b82f6; flex:1; margin:0; padding:10px; font-size:13px;" onclick="document.getElementById('ecc_csv_file').click()">📂 Load CSV</button>
+    </div>
 
-    <!-- Direct Method Box -->
+    <!-- Direct Method -->
     <div id="ecc_direct_div">
-        <div style="display:flex; gap:5px;">
+        <div style="display:flex; gap:5px; margin-bottom:5px;">
             <input type="text" inputmode="text" id="ecc_a_n" class="v2-input" placeholder="Actual N">
             <input type="text" inputmode="text" id="ecc_a_e" class="v2-input" placeholder="Actual E">
         </div>
     </div>
 
-    <!-- 3 Points Method Box -->
+    <!-- 3 Points Method -->
     <div id="ecc_3points_div" class="hidden">
         <div style="display:flex; gap:5px; margin-bottom:5px;">
             <input type="text" inputmode="text" id="ecc_p1_n" class="v2-input" placeholder="Pt 1 N">
@@ -630,11 +640,11 @@
             <input type="text" inputmode="text" id="ecc_p3_n" class="v2-input" placeholder="Pt 3 N">
             <input type="text" inputmode="text" id="ecc_p3_e" class="v2-input" placeholder="Pt 3 E">
         </div>
-        <div id="ecc_calc_center_res" style="font-size:12px; color:#059669; text-align:center; font-weight:bold;"></div>
+        <div id="ecc_calc_center_res" style="font-size:12px; color:#059669; text-align:center; font-weight:bold; margin-bottom:5px;"></div>
     </div>
 
     <!-- Calculate Button -->
-    <button class="btn-action" style="background:#f59e0b; width:100%; padding:15px; font-size:16px; margin-top:15px;" onclick="calcPileEccentricity()">⚙️ Calculate Eccentricity</button>
+    <button class="btn-action" style="background:#f59e0b; width:100%; padding:15px; font-size:16px; margin-top:5px;" onclick="calcPileEccentricity()">⚙️ Calculate Eccentricity</button>
 
     <!-- Results & Add to Report Box -->
     <div id="ecc_result_box" class="hidden" style="margin-top:15px; border-top:2px dashed #cbd5e1; padding-top:15px;">
@@ -642,18 +652,17 @@
         <button class="btn-action" style="background:#3b82f6; width:100%; padding:12px; font-size:14px; margin-top:10px;" onclick="addEccToRecord()">➕ Add Point to Report</button>
     </div>
 
-    <!-- 🔴 Saved Records List (New) -->
+    <!-- Saved Records List -->
     <div id="ecc_records_panel" class="hidden" style="margin-top:20px; border-top:2px solid #10b981; padding-top:15px;">
         <div style="font-size:14px; font-weight:bold; color:#10b981; text-align:center; margin-bottom:10px;">📋 Points Ready for Report (<span id="ecc_record_count">0</span>)</div>
         
-        <div id="ecc_record_list" style="max-height:150px; overflow-y:auto; background:var(--res-bg); border:1px solid var(--input-border); border-radius:8px; padding:5px; margin-bottom:10px;">
-            <!-- Record items will appear here -->
-        </div>
+        <div id="ecc_record_list" style="max-height:150px; overflow-y:auto; background:var(--res-bg); border:1px solid var(--input-border); border-radius:8px; padding:5px; margin-bottom:10px;"></div>
 
-        <div style="display:flex; gap:5px;">
-            <button class="btn-action" style="background:#10b981; flex:2; padding:12px; font-size:13px;" onclick="exportEccExcel()">📄 Export Excel</button>
-            <button class="btn-action" style="background:#ef4444; flex:1; padding:12px; font-size:13px;" onclick="clearAllEccData()">🗑️ Clear All</button>
+        <div style="display:flex; gap:5px; margin-bottom:5px;">
+            <button class="btn-action" style="background:#10b981; flex:1; padding:12px; font-size:13px;" onclick="exportEccExcel()">📄 Export Excel</button>
+            <button class="btn-action" style="background:#ca8a04; flex:1; padding:12px; font-size:13px;" onclick="exportEccDXF()">🗺️ Export DXF</button>
         </div>
+        <button class="btn-action" style="background:#ef4444; width:100%; padding:12px; font-size:13px;" onclick="clearAllEccData()">🗑️ Clear All Data</button>
     </div>
 </div>
                     </div>
