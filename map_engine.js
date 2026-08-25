@@ -263,23 +263,37 @@ window.buildSavedPointPopup = function(lat, lon, opts) {
     let icon = opts.icon || '📍';
     let nameColor = opts.nameColor || '#f59e0b';
 
-    let html = `<div style="text-align:center; padding: 5px;">`;
+    // 🔴 Padding များကို လျှော့ချထားသည်
+    let html = `<div style="text-align:center; padding: 2px;">`;
+    
     if (opts.pointName) {
-        html += `<div style="font-weight:bold; font-size:14px; color:${nameColor}; margin-bottom:5px;">${icon} [ ${opts.pointName} ]</div>`;
+        // 🔴 Margin များကို အနည်းဆုံးသို့ လျှော့ချထားသည်
+        html += `<div style="font-weight:bold; font-size:12px; color:${nameColor}; margin-bottom:2px;">${icon} [ ${opts.pointName} ]</div>`;
     }
+    
     if (coords.showLocal) {
-        html += `<b style="font-size:12px; color:#d97706;">[${coords.datumLabel}]</b><br><b style="font-size:14px; color:#b91c1c;">N: ${coords.localN.toFixed(3)}<br>E: ${coords.localE.toFixed(3)}<br>Z: ${zVal.toFixed(3)}</b>`;
+        // 🔴 Font Size များကို ၁၁/၁၂ သို့ သေးထားသည်
+        html += `<b style="font-size:11px; color:#d97706;">[${coords.datumLabel}]</b><br><b style="font-size:12px; color:#b91c1c; display:block; margin:2px 0;">N: ${coords.localN.toFixed(3)}<br>E: ${coords.localE.toFixed(3)}<br>Z: ${zVal.toFixed(3)}</b>`;
     } else {
-        html += `<b style="font-size:11px; color:#ef4444; background:#fee2e2; padding:3px; border-radius:4px; display:block; margin-bottom:5px;">⚠️ Out of Local Bounds</b>`;
-        html += `<b style="font-size:14px; color:#b91c1c;">Z: ${zVal.toFixed(3)}</b>`;
+        html += `<b style="font-size:10px; color:#ef4444; background:#fee2e2; padding:2px; border-radius:3px; display:block; margin-bottom:2px;">⚠️ Out of Bounds</b>`;
+        html += `<b style="font-size:12px; color:#b91c1c;">Z: ${zVal.toFixed(3)}</b>`;
     }
-    html += `<hr style="margin:5px 0; border:0.5px solid #ccc;">`;
-    html += `<b style="font-size:12px; color:#1e3a8a;">Lat: ${lat.toFixed(7)}<br>Lon: ${lon.toFixed(7)}</b>`;
-    if (opts.buttonsHtml) html += opts.buttonsHtml;
+    
+    // 🔴 မျဉ်း (<hr>) ကို ဖြုတ်ပြီး နေရာလွတ် အနည်းငယ်သာ ခြားထားသည်
+    html += `<div style="margin-top:4px;"></div>`;
+    html += `<b style="font-size:10px; color:#1e3a8a;">Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}</b>`;
+    
+    // 🔴 Button အရွယ်အစားကို ပိုမို သေးငယ်ကျစ်လျစ်စေရန် Style ပြင်ထားသည်
+    if (opts.buttonsHtml) {
+        // မူလက ပါလာသော button ၏ inline-style များကို overwrite လုပ်ရန် div ဖြင့် ခံထားသည်
+        html += `<div style="margin-top:5px; display:flex; justify-content:center;">`;
+        let modBtn = opts.buttonsHtml.replace(/padding:[^;]+;/g, 'padding: 6px 12px;').replace(/font-size:[^;]+;/g, 'font-size: 11px;').replace(/margin-top:[^;]+;/g, 'margin-top: 0;');
+        html += modBtn;
+        html += `</div>`;
+    }
     html += `</div>`;
     return html;
 };
-
 function getSnapPoint(lat, lon, zoomLevel) {
     if (!window.rawDxfEntities || window.rawDxfEntities.length === 0) return { lat, lon, snapped: false };
     let snapRadiusMeters = zoomLevel >= 20 ? 1.5 : (zoomLevel >= 18 ? 3 : 8);

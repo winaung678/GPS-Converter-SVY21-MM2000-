@@ -1152,7 +1152,6 @@ window.loadEccCSV = function(event) {
             let line = lines[i].trim();
             if (!line) continue;
             
-            // Header စာကြောင်းများ (ဥပမာ- Point, N, E စသည်) ကို ကျော်ဖတ်မည်
             if (line.toUpperCase().includes("PILE") || line.toUpperCase().includes("DESIGN")) continue;
 
             let cols = line.split(',');
@@ -1161,19 +1160,21 @@ window.loadEccCSV = function(event) {
             let pNo = cols[0].trim();
             let dN = parseFloat(cols[1]);
             let dE = parseFloat(cols[2]);
-            let dDia = parseFloat(cols[3]) || 600; // မပါခဲ့လျှင် 600mm ဟု ယူဆမည်
+            let dDia = parseFloat(cols[3]) || 600; 
 
             if (isNaN(dN) || isNaN(dE)) { errorCount++; continue; }
 
             let aN = 0, aE = 0, aRad = 0, method = "direct";
             let diffN = 0, diffE = 0, eccMM = 0;
+            
+            // 🔴 အသစ်ပြင်ဆင်ချက်: 3 Points အတွက် မူလအမှတ်များကို သေချာသိမ်းရန် Variable များ
+            let n1 = 0, e1 = 0, n2 = 0, e2 = 0, n3 = 0, e3 = 0;
 
-            // 🔴 3 Points Method (Column ၁၀ ခု ရှိလျှင်)
             if (cols.length >= 10 && !isNaN(parseFloat(cols[8]))) {
                 method = "3points";
-                let n1 = parseFloat(cols[4]), e1 = parseFloat(cols[5]);
-                let n2 = parseFloat(cols[6]), e2 = parseFloat(cols[7]);
-                let n3 = parseFloat(cols[8]), e3 = parseFloat(cols[9]);
+                n1 = parseFloat(cols[4]); e1 = parseFloat(cols[5]);
+                n2 = parseFloat(cols[6]); e2 = parseFloat(cols[7]);
+                n3 = parseFloat(cols[8]); e3 = parseFloat(cols[9]);
 
                 if (isNaN(n1) || isNaN(n2) || isNaN(n3)) { errorCount++; continue; }
 
@@ -1184,7 +1185,6 @@ window.loadEccCSV = function(event) {
                 aE = center.e; 
                 aRad = center.r;
             } 
-            // 🔴 Direct Method (Column ၆ ခုသာ ရှိလျှင်)
             else {
                 method = "direct";
                 aN = parseFloat(cols[4]);
@@ -1194,32 +1194,30 @@ window.loadEccCSV = function(event) {
                 if (isNaN(aN) || isNaN(aE)) { errorCount++; continue; }
             }
 
-            // Calculation
             diffN = aN - dN; 
             diffE = aE - dE; 
             eccMM = Math.sqrt((diffN * diffN) + (diffE * diffE)) * 1000;
 
-            // Array ထဲသို့ ပေါင်းထည့်မည် (addEccToRecord ပုံစံအတိုင်း)
+            // 🔴 3 Points များကိုပါ Array ထဲ ထည့်သိမ်းပေးလိုက်သဖြင့် နောက်ပိုင်း Edit ပြန်လုပ်၍ ရသွားပါပြီ
             window.eccRecords.push({
                 pNo: pNo, dN: dN, dE: dE, dDia: dDia, 
                 aN: aN, aE: aE, aRad: aRad, 
                 diffN: diffN * 1000, diffE: diffE * 1000, eccMM: eccMM, 
-                method: method
+                method: method,
+                n1: n1, e1: e1, n2: n2, e2: e2, n3: n3, e3: e3
             });
             successCount++;
         }
 
-        // ဇယား (UI) ကို Update လုပ်မည်
         updateEccRecordUI();
         
         if (successCount > 0) {
             alert(`✅ Successfully loaded and calculated ${successCount} piles from CSV!\n(Skipped/Errors: ${errorCount})`);
-            // UI Box လေးကို အလိုအလျောက် ပေါ်လာစေရန်
             document.getElementById('ecc_records_panel').classList.remove('hidden');
         } else {
             alert(`❌ No valid pile data found in CSV.\nPlease check the format:\n[1-Point]: PileNo, Design_N, Design_E, Dia_mm, Actual_N, Actual_E\n[3-Points]: PileNo, Design_N, Design_E, Dia_mm, Pt1_N, Pt1_E, Pt2_N, Pt2_E, Pt3_N, Pt3_E`);
         }
     };
     reader.readAsText(file);
-    event.target.value = ''; // Input file ကို reset လုပ်မည်
+    event.target.value = ''; 
 };
