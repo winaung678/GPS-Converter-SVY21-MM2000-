@@ -362,13 +362,25 @@ window.initMap = function() {
 
         popupContent += `<b style="font-size:12px; color:#1e3a8a;">Lat: ${finalLat.toFixed(7)}<br>Lon: ${finalLon.toFixed(7)}</b>`;
 
+        // 🔴 Map ပေါ်သို့ ထောက်လိုက်သောအခါ မည်သည့် App ဖွင့်ထားသလဲပေါ်မူတည်၍ ခလုတ်များ ခွဲပြခြင်း
         if (window.activeApp === 3 && typeof window.setOutFromMapClick === 'function') {
-            popupContent += `<br><button class="so-popup-btn" style="background:#dc2626; margin-top:8px;" onclick="setOutFromMapClick(${finalLat}, ${finalLon})">🎯 Set Out Here</button>`;
+            // Set Out ဖွင့်ထားလျှင်
+            popupContent += `<div style="margin-top:5px; display:flex; justify-content:center;">`;
+            popupContent += `<button class="so-popup-btn" style="background:#dc2626; padding:6px 12px; font-size:11px;" onclick="setOutFromMapClick(${finalLat}, ${finalLon})">🎯 Set Out Here</button>`;
+            popupContent += `</div>`;
+        } 
+        else if (window.activeApp === 4 && typeof window.addMapPointToArea === 'function') {
+            // Area Calculator ဖွင့်ထားလျှင် 🔴 (New)
+            popupContent += `<div style="margin-top:5px; display:flex; justify-content:center;">`;
+            popupContent += `<button class="so-popup-btn" style="background:#10b981; padding:6px 12px; font-size:11px;" onclick="addMapPointToArea(${finalLat}, ${finalLon})">➕ Add to Area</button>`;
+            popupContent += `</div>`;
         }
+
         popupContent += `</div>`;
         L.popup().setLatLng([finalLat, finalLon]).setContent(popupContent).openOn(window.leafletMap);
     });
 };
+// map_engine.js ၏ အဆုံး
 
 window.toggleAutoCenter = function() {
     window.isAutoCenter = !window.isAutoCenter;

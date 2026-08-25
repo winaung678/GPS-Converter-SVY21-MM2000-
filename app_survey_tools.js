@@ -179,8 +179,57 @@ window.updateSetOut = function() {
 
 window.toggleCheckboxArea = function(idx, isChecked) { let indexPos = window.orderedAreaPoints.indexOf(idx); if (isChecked && indexPos === -1) window.orderedAreaPoints.push(idx); else if (!isChecked && indexPos !== -1) window.orderedAreaPoints.splice(indexPos, 1); window.updateAreaOrderUI(); window.plotPointsOnMap(); };
 window.updateAreaOrderUI = function() { let orderTextSpan = document.getElementById('area_order_text'); if (!orderTextSpan) return; if (window.orderedAreaPoints.length === 0) { orderTextSpan.innerHTML = "None"; orderTextSpan.style.color = "#ef4444"; } else { let textArray = window.orderedAreaPoints.map((idx, step) => `<b>${step+1}.</b> ${window.setOutPoints[idx].p}`); orderTextSpan.innerHTML = textArray.join(" ➔ "); orderTextSpan.style.color = "#059669"; } };
-window.populateAreaPoints = function() { let listDiv = document.getElementById('area_point_list'); if (!listDiv) return; listDiv.innerHTML = ''; if (window.setOutPoints.length === 0) { listDiv.innerHTML = '<p style="text-align:center; opacity:0.5; font-size:12px; margin: 10px 0;">No Set Out points available. Load CSV first.</p>'; return; } window.setOutPoints.forEach((pt, index) => { let item = document.createElement('div'); item.className = 'area-pt-item'; let isChecked = window.orderedAreaPoints.includes(index) ? 'checked' : ''; item.innerHTML = `<input type="checkbox" id="chk_pt_${index}" value="${index}" ${isChecked} onchange="window.toggleCheckboxArea(${index}, this.checked)"><label for="chk_pt_${index}" style="cursor:pointer; flex:1;">[${pt.p}] - Lat: ${pt.lat.toFixed(5)}, Lon: ${pt.lon.toFixed(5)}</label>`; listDiv.appendChild(item); }); };
+// 🔴 Area List ကို ပုံဖော်ခြင်း (Delete ခလုတ် အသစ်ပါဝင်သည်)
+window.populateAreaPoints = function() {
+    let listDiv = document.getElementById('area_point_list');
+    if (!listDiv) return;
+    listDiv.innerHTML = '';
+    
+    if (window.setOutPoints.length === 0) {
+        listDiv.innerHTML = '<p style="text-align:center; opacity:0.5; font-size:12px; margin: 10px 0;">No points available.</p>';
+        return;
+    }
+    
+    window.setOutPoints.forEach((pt, index) => {
+        let item = document.createElement('div');
+        item.className = 'area-pt-item';
+        item.style.display = 'flex';
+        item.style.justifyContent = 'space-between';
+        item.style.alignItems = 'center';
+        item.style.marginBottom = '6px';
+        item.style.background = 'var(--res-bg)';
+        item.style.padding = '5px 8px';
+        item.style.borderRadius = '5px';
+        item.style.border = '1px solid var(--input-border)';
 
+        let isChecked = window.orderedAreaPoints.includes(index) ? 'checked' : '';
+        item.innerHTML = `
+            <div style="flex:1; display:flex; align-items:center; gap:8px;">
+                <input type="checkbox" id="chk_pt_${index}" value="${index}" ${isChecked} onchange="window.toggleCheckboxArea(${index}, this.checked)">
+                <label for="chk_pt_${index}" style="cursor:pointer; font-size:12px; font-weight:bold; color:var(--primary);">[${pt.p}]</label>
+            </div>
+            <button class="top-btn" style="background:#ef4444; color:white; padding:4px 10px; font-size:11px; border-radius:4px;" onclick="deleteSinglePoint(${index})">🗑️ Delete</button>
+        `;
+        listDiv.appendChild(item);
+    });
+};
+
+// 🔴 အမှတ် တစ်ခုချင်းစီကို ဖျက်ရန် Function အသစ်
+window.deleteSinglePoint = function(idx) {
+    if(!confirm(`Delete point [${window.setOutPoints[idx].p}]?`)) return;
+    
+    // မှတ်တမ်းထဲမှ ဖျက်မည်
+    window.setOutPoints.splice(idx, 1);
+    if (typeof savePointsToStorage === 'function') savePointsToStorage();
+    if (typeof updateTargetDropdown === 'function') updateTargetDropdown();
+    
+    // Index များ ရွေ့သွားသဖြင့် Area ရွေးချယ်ထားမှုများကို Reset ချပြီး ပြန်ဆွဲမည်
+    window.orderedAreaPoints = []; 
+    window.clearAreaResultOnly();
+    window.populateAreaPoints();
+    window.updateAreaOrderUI();
+    window.plotPointsOnMap();
+};
 window.calculateAreaFromSelection = function() {
     if (window.orderedAreaPoints.length < 3) return alert("⚠️ Please select at least 3 points in order!");
     let selectedPointsForCalc = []; let latlngsForMap = [];
@@ -1220,4 +1269,31 @@ window.loadEccCSV = function(event) {
     };
     reader.readAsText(file);
     event.target.value = ''; 
+};
+
+// 🔴 မြေပုံပေါ်မှ အမှတ်အသစ်ကို Area ထဲသို့ တိုက်ရိုက် ထည့်သွင်းခြင်း
+window.addMapPointToArea = function(lat, lon) {
+    // အမှတ်အသစ်အတွက် နာမည်ပေးမည် (ဥပမာ- Map-1, Map-2)
+    let newName = `Map-${window.setOutPoints.length + 1}`;
+    
+    // Set Out Points Array ထဲသို့ အမှတ်အသစ်အဖြစ် အရင်သွင်းမည် (Area တွက်ရာတွင် လိုအပ်သောကြောင့်)
+    window.setOutPoints.push({
+        p: newName, 
+        lat: parseFloat(lat), 
+        lon: parseFloat(lon), 
+        z: 0, 
+        d: "From Map Tap"
+    });
+    
+    savePointsToStorage(); 
+    window.populateAreaPoints(); // List ကို အသစ်ပြန်ခေါ်မည်
+    
+    // နောက်ဆုံး ဝင်လာသည့် အမှတ် (အခုလေးတင် ထည့်လိုက်သည့်အမှတ်) ၏ Index ကို ယူ၍ Area အစီအစဉ်ထဲသို့ ထည့်မည်
+    let latestIndex = window.setOutPoints.length - 1;
+    window.addPointToArea(latestIndex);
+    
+    // အမှတ် ၃ မှတ် ပြည့်သွားပါက Area ကို အလိုအလျောက် တွက်ချက်ပေးမည်
+    if (window.orderedAreaPoints.length >= 3) {
+        window.calculateAreaFromSelection();
+    }
 };
