@@ -21,6 +21,10 @@
         }
     </script>
 <script src="https://unpkg.com/dxf-parser/dist/dxf-parser.js"></script>
+<script src="https://unpkg.com/dxf-parser/dist/dxf-parser.js"></script>
+    <!-- 🔴 အသစ်ထည့်ရန်: လုံးဝ Error ကင်းသော 3D Triangulation Library -->
+    <script src="https://unpkg.com/delaunator@5.0.0/delaunator.min.js"></script>
+    <link rel="stylesheet" href="style.css">
     <!-- 🔴 အသစ်ထည့်ရန်: Camera မှ စာဖတ်ရန် OCR AI Library -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <link rel="stylesheet" href="style.css">
@@ -376,6 +380,10 @@
 <button class="btn-action" style="background:#f59e0b; color:#fff; border:none; padding:18px; font-size:16px; font-weight:bold; border-radius:12px; display:flex; align-items:center; gap:10px; box-shadow:0 4px 6px rgba(0,0,0,0.1);" onclick="openCogoTool('ecc')">
         <span style="font-size:24px;">🏗️</span> <span>Pile Eccentricity</span>
     </button>
+
+<button class="btn-action" style="background:#2563eb; color:#fff; border:none; padding:18px; font-size:16px; font-weight:bold; border-radius:12px; display:flex; align-items:center; gap:10px; box-shadow:0 4px 6px rgba(0,0,0,0.1);" onclick="openCogoTool('topo')">
+        <span style="font-size:24px;">⛰️</span> <span>Topo Surface & Contour</span>
+    </button>
                 </div>
             </div>
         </div>
@@ -665,7 +673,154 @@
         <button class="btn-action" style="background:#ef4444; width:100%; padding:12px; font-size:13px;" onclick="clearAllEccData()">🗑️ Clear All Data</button>
     </div>
 </div>
-                    </div>
+
+<!-- ========================================== -->
+<!-- 6. TOPO SURFACE & CONTOUR TOOL -->
+<!-- ========================================== -->
+<div id="cogo_topo_tool" class="hidden">
+    
+    <!-- 1. Coordinate System Selection -->
+    <label class="v2-label" style="margin-top:0; color:#1e40af; font-weight:bold;">1. Data Coordinate System</label>
+    <select id="topo_datum" class="v2-input" style="margin-bottom:5px;" onchange="if(typeof toggleTopoUI === 'function') toggleTopoUI()">
+        <option value="SVY21">🇸🇬 SVY21 (Local N, E)</option>
+        <option value="MM47">🇲🇲 MM2000 (Zone 47)</option>
+        <option value="MM46">🇲🇲 MM2000 (Zone 46)</option>
+        <option value="WGS_UTM47">🌍 WGS84 UTM (Zone 47)</option>
+        <option value="WGS_UTM46">🌍 WGS84 UTM (Zone 46)</option>
+        <option value="GLOBAL_UTM">🌍 Global UTM (Custom Zone)</option>
+        <option value="LOCAL" selected>📐 Local Grid (User Coordinate)</option>
+    </select>
+    
+    <div id="topo_custom_utm" style="display:none; gap:5px; margin-bottom:5px;">
+        <input type="text" inputmode="text" id="topo_custom_zone" class="v2-input" placeholder="Zone (1-60)" style="flex:1; margin-top:0;">
+        <select id="topo_custom_hemi" class="v2-input" style="flex:1; margin-top:0;"><option value="N">North (N)</option><option value="S">South (S)</option></select>
+    </div>
+    
+    <p id="topo_local_warn" style="font-size:11px; color:#d97706; margin-top:0; margin-bottom:10px;">* Local Grid uses a blank map background.</p>
+
+    <!-- 2. Contour Settings -->
+    <div style="background:#f1f5f9; padding:10px; border-radius:8px; border:1px solid #cbd5e1; margin-bottom:10px;">
+        <label class="v2-label" style="margin-top:0; color:#059669; font-weight:bold;">2. Contour Settings</label>
+        
+        <!-- 🔴 အသစ်ပြင်ဆင်ချက်: အကွက် (၄) ခုကို တစ်တန်းတည်းထားပြီး နေရာကျစ်လျစ်အောင် ပြုလုပ်ခြင်း -->
+        <div style="display:flex; gap:5px; margin-bottom:10px;">
+            <div style="flex:1;">
+                <label style="font-size:10px; color:var(--text); white-space:nowrap;">Major (m)</label>
+                <input type="text" id="topo_major_int" class="v2-input" value="1.0" style="margin-bottom:0; padding:6px 4px; font-size:12px; text-align:center;">
+            </div>
+            <div style="flex:1;">
+                <label style="font-size:10px; color:var(--text); white-space:nowrap;">Minor (m)</label>
+                <input type="text" id="topo_minor_int" class="v2-input" value="0.2" style="margin-bottom:0; padding:6px 4px; font-size:12px; text-align:center;">
+            </div>
+            <div style="flex:1;">
+                <label style="font-size:10px; color:var(--text); white-space:nowrap;">Label Spc</label>
+                <input type="text" id="topo_label_space" class="v2-input" value="15.0" style="margin-bottom:0; padding:6px 4px; font-size:12px; text-align:center;">
+            </div>
+            <div style="flex:1;">
+                <label style="font-size:10px; color:var(--text); white-space:nowrap;">Txt Hgt</label>
+                <input type="text" id="topo_text_height" class="v2-input" value="0.1" style="margin-bottom:0; padding:6px 4px; font-size:12px; text-align:center;">
+            </div>
+        </div>
+
+        <!-- Color Picker -->
+        <div style="display:flex; gap:10px; margin-bottom:10px;">
+            <div style="flex:1;">
+                <label style="font-size:11px; color:var(--text);">Major Color</label>
+                <input type="color" id="topo_major_color" class="v2-input" value="#f59e0b" style="padding:0; height:35px; width:100%; border:1px solid #ccc; cursor:pointer;" oninput="if(typeof updateContourStyle === 'function') updateContourStyle()">
+            </div>
+            <div style="flex:1;">
+                <label style="font-size:11px; color:var(--text);">Minor Color</label>
+                <input type="color" id="topo_minor_color" class="v2-input" value="#b45309" style="padding:0; height:35px; width:100%; border:1px solid #ccc; cursor:pointer;" oninput="if(typeof updateContourStyle === 'function') updateContourStyle()">
+            </div>
+        </div>
+
+        <!-- Opacity Slider -->
+        <div style="display:flex; flex-direction:column; gap:5px; margin-bottom:10px;">
+            <label style="font-size:11px; color:var(--text); display:flex; justify-content:space-between;">
+                <span>Contour Visibility (Opacity)</span>
+                <span id="opacity_val_txt" style="font-weight:bold; color:#059669;">100%</span>
+            </label>
+            <input type="range" id="topo_opacity" min="0.1" max="1" step="0.05" value="1" style="width:100%;" oninput="document.getElementById('opacity_val_txt').innerText = Math.round(this.value * 100) + '%'; if(typeof updateContourStyle === 'function') updateContourStyle();">
+        </div>
+
+        <!-- Smoothness Slider -->
+        <div style="display:flex; flex-direction:column; gap:5px;">
+            <label style="font-size:11px; color:var(--text); display:flex; justify-content:space-between;">
+                <span>Contour Smoothness</span>
+                <span id="smooth_val_txt" style="font-weight:bold; color:#2563eb;">Level: 1</span>
+            </label>
+            <input type="range" id="topo_smooth_level" min="0" max="4" value="1" step="1" style="width:100%;" oninput="document.getElementById('smooth_val_txt').innerText = 'Level: ' + this.value">
+        </div>
+    </div>
+
+    <!-- 3. Boundary Settings -->
+    <div style="background:var(--res-bg); padding:10px; border-radius:8px; border:1px solid var(--input-border); margin-bottom:10px;">
+        <label class="v2-label" style="margin-top:0; font-weight:bold; color:#ef4444;">3. Surface Boundary</label>
+        
+        <select id="topo_bdy_method" class="v2-input" style="margin-bottom:5px;" onchange="if(typeof toggleTopoBoundary === 'function') toggleTopoBoundary()">
+            <option value="auto">🪄 Auto Boundary (Convex Hull)</option>
+            <option value="max_edge">📏 Max Edge Length</option>
+            <option value="manual">✏️ Manual Draw on Map</option>
+        </select>
+
+        <!-- Max Edge Box -->
+        <div id="bdy_max_edge_div" class="hidden" style="display:flex; align-items:center; gap:10px;">
+            <label style="font-size:12px;">Max Length (m):</label>
+            <input type="text" id="topo_max_edge" class="v2-input" value="30" style="flex:1; margin:0;">
+        </div>
+
+        <!-- Manual Draw Box -->
+        <div id="bdy_manual_div" class="hidden">
+            <p style="font-size:11px; color:var(--label-text); margin:5px 0;">Load CSV first, then tap points on the map to draw boundary.</p>
+            <div style="display:flex; gap:5px;">
+                <button id="btn_draw_bdy" class="btn-action" style="background:#f59e0b; flex:2; font-size:12px; padding:10px;" onclick="if(typeof toggleBoundaryDrawMode === 'function') toggleBoundaryDrawMode()">✏️ Start Drawing</button>
+                <button class="btn-action" style="background:#8b5cf6; flex:1; font-size:12px; padding:10px;" onclick="if(typeof undoManualBoundary === 'function') undoManualBoundary()">↩️ Undo</button>
+                <button class="btn-action" style="background:#ef4444; flex:1; font-size:12px; padding:10px;" onclick="if(typeof clearManualBoundary === 'function') clearManualBoundary()">🗑️ Clear</button>
+            </div>
+        </div>
+    </div>
+
+<!-- 4. အသစ်ထပ်ဖြည့်ထားသော Map Layout Settings -->
+    <div style="background:#e0f2fe; padding:10px; border-radius:8px; border:1px solid #bae6fd; margin-bottom:10px;">
+        <label class="v2-label" style="margin-top:0; color:#0369a1; font-weight:bold;">4. Map Layout (For DXF Export)</label>
+        
+        <div style="display:flex; gap:10px; margin-bottom:5px;">
+            <div style="flex:2;">
+                <label style="font-size:11px; color:var(--text);">Map Title</label>
+                <input type="text" id="topo_map_title" class="v2-input" placeholder="e.g. YE VILLAGE AREA" value="TOPOGRAPHIC MAP" style="margin-bottom:0;">
+            </div>
+            <div style="flex:1;">
+                <label style="font-size:11px; color:var(--text);">Grid Interval (m)</label>
+                <input type="number" id="topo_grid_interval" class="v2-input" value="50" style="margin-bottom:0;">
+            </div>
+        </div>
+    </div>
+
+   <!-- 5. Load CSV & Generate -->
+    <!-- 🔴 အသစ်ထည့်ထားသော CSV Format ရွေးချယ်ရန် နေရာ -->
+    <label class="v2-label" style="margin-top:0; color:#1e40af; font-weight:bold;">5. CSV File Format</label>
+    <select id="topo_csv_format" class="v2-input" style="margin-bottom:10px;">
+        <option value="PNEZD">Point, Northing, Easting, Z, Code (PNEZD)</option>
+        <option value="PENZD">Point, Easting, Northing, Z, Code (PENZD)</option>
+    </select>
+
+    <input type="file" id="topo_csv_file" accept=".csv" style="display:none;" onchange="if(typeof loadTopoCSV === 'function') loadTopoCSV(event)">
+    <div style="display:flex; gap:5px; margin-bottom:10px;">
+        <button class="btn-action" style="background:#3b82f6; flex:1; padding:15px; font-size:14px;" onclick="document.getElementById('topo_csv_file').click()">📂 Load CSV Data</button>
+        <button class="btn-action" style="background:#10b981; flex:1; padding:15px; font-size:14px;" onclick="if(typeof processTopoSurface === 'function') processTopoSurface()">⚙️ Generate Topo</button>
+    </div>
+
+<!-- 🔴 အသစ်ထပ်ဖြည့်ရန်: CSV Status ပြမည့်နေရာ -->
+    <div id="topo_status" style="margin-top:10px; font-size:13px; font-weight:bold; text-align:center; display:none;"></div>
+
+    <!-- 🔴 အသစ်ထပ်ဖြည့်ရန်: Topo ထုတ်ပြီးရင် ပေါ်လာမည့် Export Box -->
+    <div id="topo_export_box" class="hidden" style="margin-top:15px; padding-top:15px; border-top:2px dashed #cbd5e1;">
+        <div style="display:flex; gap:5px;">
+            <button class="btn-action" style="background:#ca8a04; flex:1; padding:12px; font-size:13px;" onclick="if(typeof exportTopoDXF === 'function') exportTopoDXF()">🗺️ Export DXF</button>
+            <button class="btn-action" style="background:#ef4444; flex:1; padding:12px; font-size:13px;" onclick="if(typeof clearTopoData === 'function') clearTopoData()">🗑️ Clear Data</button>
+        </div>
+    </div>
+                   </div>
                 </div>
             </div>
         </div>
@@ -756,6 +911,8 @@
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_dxf_texts" checked onchange="toggleDxfLayers()"> 🔠 Text</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_so_pts" checked onchange="toggleDxfLayers()"> 🎯 SO Pts</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_so_texts" checked onchange="toggleDxfLayers()"> 🔠 SO Text</label>
+                    <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_topo_pts" checked onchange="if(typeof toggleTopoLayers==='function') toggleTopoLayers()"> ⛰️ Topo Pts</label>
+                    <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_topo_contours" checked onchange="if(typeof toggleTopoLayers==='function') toggleTopoLayers()"> 〰️ Contours</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer; width:100%; border-top:1px dashed #ccc; padding-top:6px;"><input type="checkbox" id="tgl_dxf_dark" onchange="reRenderDXFColors()"> 🌙 Use Dark Colors for DXF</label>
                 </div>
                 <div class="map-wrapper" id="map_container">
