@@ -257,3 +257,167 @@ function calcCircleCenterFrom3Points(n1, e1, n2, e2, n3, e3) {
 
     return { n: cn, e: ce, r: r };
 }
+
+// ==========================================
+// --- TIN SURFACE & CONTOUR ALGORITHMS (DELAUNATOR) ---
+// ==========================================
+
+// 1. Delaunay Triangulation (Using Fast Delaunator Library)
+function generateDelaunayTriangulation(points) {
+    if (points.length < 3 || typeof Delaunator === 'undefined') return [];
+
+    // Array ဖော်မတ်ပြောင်းခြင်း ([E, N] ပုံစံဖြင့် Delaunator သို့ ပို့မည်)
+    let coords = points.map(p => [p.e, p.n]);
+    
+    // Delaunator ဖြင့် တွက်ချက်ခြင်း (စက္ကန့်ပိုင်းသာ ကြာမည်)
+    let delaunay = Delaunator.from(coords);
+    let triangles = [];
+
+    // ထွက်လာသည့် Triangles များကို App က နားလည်သော ပုံစံသို့ ပြန်ပြောင်းခြင်း
+    for (let i = 0; i < delaunay.triangles.length; i += 3) {
+        let p1Idx = delaunay.triangles[i];
+        let p2Idx = delaunay.triangles[i + 1];
+        let p3Idx = delaunay.triangles[i + 2];
+
+        triangles.push({
+            p1: points[p1Idx],
+            p2: points[p2Idx],
+            p3: points[p3Idx]
+        });
+    }
+
+    return triangles;
+}
+
+// ==========================================
+// --- ADVANCED CONTOUR GENERATION & SMOOTHING (GRAPH-BASED) ---
+// ==========================================
+
+function generateContours(points, triangles, minorInt, majorInt) {
+    let polylines = [];
+    let minZ = Math.min(...points.map(p => p.z));
+    let maxZ = Math.max(...points.map(p => p.z));
+
+    if (maxZ - minZ < minorInt) return []; 
+
+    let eps = 1e-5; 
+    let startZ = Math.ceil((minZ + eps) / minorInt) * minorInt;
+    
+    for (let z = startZ; z <= maxZ; z += minorInt) {
+        let isMajor = (Math.abs(Math.round(z * 1000) % Math.round(majorInt * 1000)) === 0);
+
+        let rawSegments = [];
+
+        triangles.forEach(t => {
+            let pts = [t.p1, t.p2, t.p3];
+            let intersections = [];
+
+            for (let i = 0; i < 3; i++) {
+                let pA = pts[i]; let pB = pts[(i + 1) % 3];
+                if ((pA.z <= z && pB.z > z) || (pB.z <= z && pA.z > z)) {
+                    let fraction = (z - pA.z) / (pB.z - pA.z);
+                    intersections.push({ n: pA.n + fraction * (pB.n - pA.n), e: pA.e + fraction * (pB.e - pA.e) });
+                } else if (Math.abs(pA.z - z) < eps) {
+                    intersections.push({ n: pA.n, e: pA.e });
+                }
+            }
+
+            let uniqueInts = [];
+            intersections.forEach(pt => {
+                let isDup = uniqueInts.some(u => Math.abs(u.e - pt.e) < eps && Math.abs(u.n - pt.n) < eps);
+                if (!isDup) uniqueInts.push(pt);
+            });
+
+            if (uniqueInts.length === 2) {
+                rawSegments.push({ p1: uniqueInts[0], p2: uniqueInts[1] });
+            }
+        });
+
+        if (rawSegments.length === 0) continue;
+
+        let nodes = [];
+        let getOrAddNode = (pt) => {
+            for (let i = 0; i < nodes.length; i++) {
+                if (Math.hypot(nodes[i].e - pt.e, nodes[i].n - pt.n) < 0.001) return i;
+            }
+            nodes.push({ e: pt.e, n: pt.n, edges: [] });
+            return nodes.length - 1;
+        };
+
+        rawSegments.forEach(seg => {
+            let id1 = getOrAddNode(seg.p1);
+            let id2 = getOrAddNode(seg.p2);
+            if (id1 !== id2) {
+                if (!nodes[id1].edges.includes(id2)) nodes[id1].edges.push(id2);
+                if (!nodes[id2].edges.includes(id1)) nodes[id2].edges.push(id1);
+            }
+        });
+
+        let visited = new Array(nodes.length).fill(false);
+
+        for (let i = 0; i < nodes.length; i++) {
+            if (visited[i] || nodes[i].edges.length === 0) continue;
+
+            let startNode = i;
+            for (let j = 0; j < nodes.length; j++) {
+                if (!visited[j] && nodes[j].edges.length === 1) {
+                    startNode = j; break;
+                }
+            }
+
+            let currentPoly = [];
+            let curr = startNode;
+            let lastNode = curr; 
+            
+            while (curr !== undefined) {
+                visited[curr] = true;
+                currentPoly.push({ e: nodes[curr].e, n: nodes[curr].n });
+                lastNode = curr; // လက်ရှိရောက်နေသည့် အမှတ်ကို မှတ်ထားမည်
+
+                let nextNode = undefined;
+                for (let adj of nodes[curr].edges) {
+                    if (!visited[adj]) {
+                        nextNode = adj;
+                        break;
+                    }
+                }
+                curr = nextNode;
+            }
+
+            // 🔴 အသစ်ပြင်ဆင်ချက်: Closed Loop (အဝိုင်းဖြစ်နေသလား) စစ်ဆေးခြင်း
+            if (currentPoly.length > 2) {
+                // နောက်ဆုံးရောက်သွားသည့်အမှတ် (lastNode) ၏ လမ်းကြောင်းများထဲတွင် အစမှတ် (startNode) ရှိနေလျှင် အဝိုင်းဖြစ်သည်
+                if (nodes[lastNode].edges.includes(startNode)) {
+                    // အဝိုင်းပိတ်သွားစေရန် အစမှတ်ကို နောက်ဆုံးတွင် တစ်ကြိမ် ထပ်ထည့်ပေးမည်
+                    currentPoly.push({ e: nodes[startNode].e, n: nodes[startNode].n });
+                }
+            }
+
+            if (currentPoly.length > 1) {
+                polylines.push({ points: currentPoly, z: z, isMajor: isMajor });
+            }
+        }
+    }
+
+    let smoothInput = document.getElementById('topo_smooth_level');
+    let smoothLevel = smoothInput ? parseInt(smoothInput.value) : 0;
+    
+    if (smoothLevel > 0) {
+        polylines.forEach(poly => {
+            if (poly.points.length <= 2) return;
+            for (let iter = 0; iter < smoothLevel; iter++) {
+                let smoothed = [];
+                smoothed.push(poly.points[0]); 
+                for (let i = 0; i < poly.points.length - 1; i++) {
+                    let p0 = poly.points[i]; let p1 = poly.points[i + 1];
+                    smoothed.push({ e: 0.75 * p0.e + 0.25 * p1.e, n: 0.75 * p0.n + 0.25 * p1.n });
+                    smoothed.push({ e: 0.25 * p0.e + 0.75 * p1.e, n: 0.25 * p0.n + 0.75 * p1.n });
+                }
+                smoothed.push(poly.points[poly.points.length - 1]); 
+                poly.points = smoothed;
+            }
+        });
+    }
+
+    return polylines; 
+}

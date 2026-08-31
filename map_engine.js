@@ -226,11 +226,29 @@ window.getDatumCoordsForLatLon = function(finalLat, finalLon) {
         let cogoDatumVal = document.getElementById('cogo_datum') ? document.getElementById('cogo_datum').value : "WGS_LL";
         let dxfDatumVal = document.getElementById('dxf_datum') ? document.getElementById('dxf_datum').value : "WGS_LL";
         let datum = "WGS_LL";
-        if (window.activeApp === 3) datum = soDatumVal;
-        else if (window.activeApp === 4) datum = cogoDatumVal;
-        else if (window.activeApp === 6) datum = dxfDatumVal;
+        
+        if (window.activeApp === 3) {
+            datum = soDatumVal;
+        } else if (window.activeApp === 4) {
+            // 🔴 အသစ်ပြင်ဆင်ချက်: Topo Tool ဖွင့်ထားရင် Topo ရဲ့ Dropdown ကိုဖတ်မည်
+            let topoTool = document.getElementById('cogo_topo_tool');
+            if (topoTool && !topoTool.classList.contains('hidden')) {
+                datum = document.getElementById('topo_datum') ? document.getElementById('topo_datum').value : "WGS_LL";
+            } else {
+                datum = cogoDatumVal; // Area tool အတွက်
+            }
+        } else if (window.activeApp === 6) {
+            datum = dxfDatumVal;
+        }
 
-        if (datum === "SVY21") {
+        // 🔴 အသစ်ပြင်ဆင်ချက်: Local Grid ဖြစ်နေပါက ယာယီ Lat/Lon အစား Local N, E အမှန်ကို ပြန်တွက်ထုတ်ပေးခြင်း
+        if (datum === "LOCAL") {
+            localN = (finalLat * 100000) + (window.localOffsetN || 0);
+            localE = (finalLon * 100000) + (window.localOffsetE || 0);
+            datumLabel = "LOCAL GRID"; 
+            showLocal = true;
+        } 
+        else if (datum === "SVY21") {
             if (finalLat >= 1.0 && finalLat <= 2.0 && finalLon >= 103.0 && finalLon <= 104.5) {
                 let pW = calc_v2_fwd(finalLat, finalLon); localN = pW.N; localE = pW.E; datumLabel = "SVY21"; showLocal = true;
             }
@@ -245,8 +263,20 @@ window.getDatumCoordsForLatLon = function(finalLat, finalLon) {
             let pW = m_project(finalLat, finalLon, autoDetectedZone, m_WGS);
             localN = pW.n; localE = pW.e; datumLabel = `UTM Z${autoDetectedZone}`; showLocal = true;
         } else if (datum === "GLOBAL_UTM") {
-            let zInput = (window.activeApp === 6) ? document.getElementById('dxf_custom_zone') : (window.activeApp === 4 ? document.getElementById('cogo_custom_zone') : document.getElementById('so_custom_zone'));
-            let hInput = (window.activeApp === 6) ? document.getElementById('dxf_custom_hemi') : (window.activeApp === 4 ? document.getElementById('cogo_custom_hemi') : document.getElementById('so_custom_hemi'));
+            let zInput = null, hInput = null;
+            if (window.activeApp === 6) { 
+                zInput = document.getElementById('dxf_custom_zone'); hInput = document.getElementById('dxf_custom_hemi'); 
+            } else if (window.activeApp === 4) {
+                let topoTool = document.getElementById('cogo_topo_tool');
+                if (topoTool && !topoTool.classList.contains('hidden')) {
+                    zInput = document.getElementById('topo_custom_zone'); hInput = document.getElementById('topo_custom_hemi');
+                } else {
+                    zInput = document.getElementById('cogo_custom_zone'); hInput = document.getElementById('cogo_custom_hemi');
+                }
+            } else if (window.activeApp === 3) { 
+                zInput = document.getElementById('so_custom_zone'); hInput = document.getElementById('so_custom_hemi'); 
+            }
+            
             let customZone = (zInput && zInput.value) ? parseInt(zInput.value) : autoDetectedZone;
             let hemi = hInput ? hInput.value : (finalLat >= 0 ? 'N' : 'S');
             let pW = m_project(finalLat, finalLon, customZone, m_WGS);
@@ -263,23 +293,37 @@ window.buildSavedPointPopup = function(lat, lon, opts) {
     let icon = opts.icon || '📍';
     let nameColor = opts.nameColor || '#f59e0b';
 
-    let html = `<div style="text-align:center; padding: 5px;">`;
+    // 🔴 Padding များကို လျှော့ချထားသည်
+    let html = `<div style="text-align:center; padding: 2px;">`;
+    
     if (opts.pointName) {
-        html += `<div style="font-weight:bold; font-size:14px; color:${nameColor}; margin-bottom:5px;">${icon} [ ${opts.pointName} ]</div>`;
+        // 🔴 Margin များကို အနည်းဆုံးသို့ လျှော့ချထားသည်
+        html += `<div style="font-weight:bold; font-size:12px; color:${nameColor}; margin-bottom:2px;">${icon} [ ${opts.pointName} ]</div>`;
     }
+    
     if (coords.showLocal) {
-        html += `<b style="font-size:12px; color:#d97706;">[${coords.datumLabel}]</b><br><b style="font-size:14px; color:#b91c1c;">N: ${coords.localN.toFixed(3)}<br>E: ${coords.localE.toFixed(3)}<br>Z: ${zVal.toFixed(3)}</b>`;
+        // 🔴 Font Size များကို ၁၁/၁၂ သို့ သေးထားသည်
+        html += `<b style="font-size:11px; color:#d97706;">[${coords.datumLabel}]</b><br><b style="font-size:12px; color:#b91c1c; display:block; margin:2px 0;">N: ${coords.localN.toFixed(3)}<br>E: ${coords.localE.toFixed(3)}<br>Z: ${zVal.toFixed(3)}</b>`;
     } else {
-        html += `<b style="font-size:11px; color:#ef4444; background:#fee2e2; padding:3px; border-radius:4px; display:block; margin-bottom:5px;">⚠️ Out of Local Bounds</b>`;
-        html += `<b style="font-size:14px; color:#b91c1c;">Z: ${zVal.toFixed(3)}</b>`;
+        html += `<b style="font-size:10px; color:#ef4444; background:#fee2e2; padding:2px; border-radius:3px; display:block; margin-bottom:2px;">⚠️ Out of Bounds</b>`;
+        html += `<b style="font-size:12px; color:#b91c1c;">Z: ${zVal.toFixed(3)}</b>`;
     }
-    html += `<hr style="margin:5px 0; border:0.5px solid #ccc;">`;
-    html += `<b style="font-size:12px; color:#1e3a8a;">Lat: ${lat.toFixed(7)}<br>Lon: ${lon.toFixed(7)}</b>`;
-    if (opts.buttonsHtml) html += opts.buttonsHtml;
+    
+    // 🔴 မျဉ်း (<hr>) ကို ဖြုတ်ပြီး နေရာလွတ် အနည်းငယ်သာ ခြားထားသည်
+    html += `<div style="margin-top:4px;"></div>`;
+    html += `<b style="font-size:10px; color:#1e3a8a;">Lat: ${lat.toFixed(6)}<br>Lon: ${lon.toFixed(6)}</b>`;
+    
+    // 🔴 Button အရွယ်အစားကို ပိုမို သေးငယ်ကျစ်လျစ်စေရန် Style ပြင်ထားသည်
+    if (opts.buttonsHtml) {
+        // မူလက ပါလာသော button ၏ inline-style များကို overwrite လုပ်ရန် div ဖြင့် ခံထားသည်
+        html += `<div style="margin-top:5px; display:flex; justify-content:center;">`;
+        let modBtn = opts.buttonsHtml.replace(/padding:[^;]+;/g, 'padding: 6px 12px;').replace(/font-size:[^;]+;/g, 'font-size: 11px;').replace(/margin-top:[^;]+;/g, 'margin-top: 0;');
+        html += modBtn;
+        html += `</div>`;
+    }
     html += `</div>`;
     return html;
 };
-
 function getSnapPoint(lat, lon, zoomLevel) {
     if (!window.rawDxfEntities || window.rawDxfEntities.length === 0) return { lat, lon, snapped: false };
     let snapRadiusMeters = zoomLevel >= 20 ? 1.5 : (zoomLevel >= 18 ? 3 : 8);
@@ -348,13 +392,26 @@ window.initMap = function() {
 
         popupContent += `<b style="font-size:12px; color:#1e3a8a;">Lat: ${finalLat.toFixed(7)}<br>Lon: ${finalLon.toFixed(7)}</b>`;
 
+        // 🔴 Map ပေါ်သို့ ထောက်လိုက်သောအခါ မည်သည့် App ဖွင့်ထားသလဲပေါ်မူတည်၍ ခလုတ်များ ခွဲပြခြင်း
         if (window.activeApp === 3 && typeof window.setOutFromMapClick === 'function') {
-            popupContent += `<br><button class="so-popup-btn" style="background:#dc2626; margin-top:8px;" onclick="setOutFromMapClick(${finalLat}, ${finalLon})">🎯 Set Out Here</button>`;
+            // Set Out ဖွင့်ထားလျှင်
+            popupContent += `<div style="margin-top:5px; display:flex; justify-content:center;">`;
+            popupContent += `<button class="so-popup-btn" style="background:#dc2626; padding:6px 12px; font-size:11px;" onclick="setOutFromMapClick(${finalLat}, ${finalLon})">🎯 Set Out Here</button>`;
+            popupContent += `</div>`;
+        } 
+       // Area Tool မှလွဲ၍ Topo နှင့် အခြား Tool များတွင် မပေါ်စေရန် Condition ကို တင်းကြပ်လိုက်သည်
+        else if (window.activeApp === 4 && typeof window.addMapPointToArea === 'function' && !document.getElementById('cogo_area_tool').classList.contains('hidden')) {
+            // Area Calculator ဖွင့်ထားလျှင်သာ ပေါ်မည်
+            popupContent += `<div style="margin-top:5px; display:flex; justify-content:center;">`;
+            popupContent += `<button class="so-popup-btn" style="background:#10b981; padding:6px 12px; font-size:11px;" onclick="addMapPointToArea(${finalLat}, ${finalLon})">➕ Add to Area</button>`;
+            popupContent += `</div>`;
         }
+
         popupContent += `</div>`;
         L.popup().setLatLng([finalLat, finalLon]).setContent(popupContent).openOn(window.leafletMap);
     });
 };
+// map_engine.js ၏ အဆုံး
 
 window.toggleAutoCenter = function() {
     window.isAutoCenter = !window.isAutoCenter;
@@ -696,6 +753,20 @@ window.refreshMapPointLayers = function(n) {
     window.leafletMap.invalidateSize({ animate: false });
 
     if (typeof window.toggleDxfLayers === 'function') window.toggleDxfLayers();
+
+    // 🔴 အသစ်ဖြည့်စွက်ချက် - App ပြောင်းလိုက်တိုင်း Topo Tool ရဲ့ Local Grid ဖွင့်မထားရင် မြေပုံကို ပုံမှန်ပြန်ထားရန်
+    let topoTool = document.getElementById('cogo_topo_tool');
+    let datum = document.getElementById('topo_datum') ? document.getElementById('topo_datum').value : "WGS_LL";
+    let isTopoLocalActive = (n === 4 && topoTool && !topoTool.classList.contains('hidden') && datum === 'LOCAL');
+    
+    if (!isTopoLocalActive) {
+        document.getElementById('map_view').style.background = '#ddd'; 
+        let layerCtrl = document.querySelector('.leaflet-control-layers');
+        if (layerCtrl) layerCtrl.style.display = 'block';
+        window.leafletMap.eachLayer(function (layer) {
+            if (layer instanceof L.TileLayer) { layer.setOpacity(1); }
+        });
+    }
 
     if (n === 3 || n === 4 || n === 6) {
         if (window.recordedLayerGroup && window.leafletMap.hasLayer(window.recordedLayerGroup)) {

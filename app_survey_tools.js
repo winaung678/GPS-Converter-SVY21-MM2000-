@@ -179,8 +179,57 @@ window.updateSetOut = function() {
 
 window.toggleCheckboxArea = function(idx, isChecked) { let indexPos = window.orderedAreaPoints.indexOf(idx); if (isChecked && indexPos === -1) window.orderedAreaPoints.push(idx); else if (!isChecked && indexPos !== -1) window.orderedAreaPoints.splice(indexPos, 1); window.updateAreaOrderUI(); window.plotPointsOnMap(); };
 window.updateAreaOrderUI = function() { let orderTextSpan = document.getElementById('area_order_text'); if (!orderTextSpan) return; if (window.orderedAreaPoints.length === 0) { orderTextSpan.innerHTML = "None"; orderTextSpan.style.color = "#ef4444"; } else { let textArray = window.orderedAreaPoints.map((idx, step) => `<b>${step+1}.</b> ${window.setOutPoints[idx].p}`); orderTextSpan.innerHTML = textArray.join(" ➔ "); orderTextSpan.style.color = "#059669"; } };
-window.populateAreaPoints = function() { let listDiv = document.getElementById('area_point_list'); if (!listDiv) return; listDiv.innerHTML = ''; if (window.setOutPoints.length === 0) { listDiv.innerHTML = '<p style="text-align:center; opacity:0.5; font-size:12px; margin: 10px 0;">No Set Out points available. Load CSV first.</p>'; return; } window.setOutPoints.forEach((pt, index) => { let item = document.createElement('div'); item.className = 'area-pt-item'; let isChecked = window.orderedAreaPoints.includes(index) ? 'checked' : ''; item.innerHTML = `<input type="checkbox" id="chk_pt_${index}" value="${index}" ${isChecked} onchange="window.toggleCheckboxArea(${index}, this.checked)"><label for="chk_pt_${index}" style="cursor:pointer; flex:1;">[${pt.p}] - Lat: ${pt.lat.toFixed(5)}, Lon: ${pt.lon.toFixed(5)}</label>`; listDiv.appendChild(item); }); };
+// 🔴 Area List ကို ပုံဖော်ခြင်း (Delete ခလုတ် အသစ်ပါဝင်သည်)
+window.populateAreaPoints = function() {
+    let listDiv = document.getElementById('area_point_list');
+    if (!listDiv) return;
+    listDiv.innerHTML = '';
+    
+    if (window.setOutPoints.length === 0) {
+        listDiv.innerHTML = '<p style="text-align:center; opacity:0.5; font-size:12px; margin: 10px 0;">No points available.</p>';
+        return;
+    }
+    
+    window.setOutPoints.forEach((pt, index) => {
+        let item = document.createElement('div');
+        item.className = 'area-pt-item';
+        item.style.display = 'flex';
+        item.style.justifyContent = 'space-between';
+        item.style.alignItems = 'center';
+        item.style.marginBottom = '6px';
+        item.style.background = 'var(--res-bg)';
+        item.style.padding = '5px 8px';
+        item.style.borderRadius = '5px';
+        item.style.border = '1px solid var(--input-border)';
 
+        let isChecked = window.orderedAreaPoints.includes(index) ? 'checked' : '';
+        item.innerHTML = `
+            <div style="flex:1; display:flex; align-items:center; gap:8px;">
+                <input type="checkbox" id="chk_pt_${index}" value="${index}" ${isChecked} onchange="window.toggleCheckboxArea(${index}, this.checked)">
+                <label for="chk_pt_${index}" style="cursor:pointer; font-size:12px; font-weight:bold; color:var(--primary);">[${pt.p}]</label>
+            </div>
+            <button class="top-btn" style="background:#ef4444; color:white; padding:4px 10px; font-size:11px; border-radius:4px;" onclick="deleteSinglePoint(${index})">🗑️ Delete</button>
+        `;
+        listDiv.appendChild(item);
+    });
+};
+
+// 🔴 အမှတ် တစ်ခုချင်းစီကို ဖျက်ရန် Function အသစ်
+window.deleteSinglePoint = function(idx) {
+    if(!confirm(`Delete point [${window.setOutPoints[idx].p}]?`)) return;
+    
+    // မှတ်တမ်းထဲမှ ဖျက်မည်
+    window.setOutPoints.splice(idx, 1);
+    if (typeof savePointsToStorage === 'function') savePointsToStorage();
+    if (typeof updateTargetDropdown === 'function') updateTargetDropdown();
+    
+    // Index များ ရွေ့သွားသဖြင့် Area ရွေးချယ်ထားမှုများကို Reset ချပြီး ပြန်ဆွဲမည်
+    window.orderedAreaPoints = []; 
+    window.clearAreaResultOnly();
+    window.populateAreaPoints();
+    window.updateAreaOrderUI();
+    window.plotPointsOnMap();
+};
 window.calculateAreaFromSelection = function() {
     if (window.orderedAreaPoints.length < 3) return alert("⚠️ Please select at least 3 points in order!");
     let selectedPointsForCalc = []; let latlngsForMap = [];
@@ -273,6 +322,7 @@ window.openCogoTool = function(toolName) {
     document.getElementById('cogo_grad_tool').classList.add('hidden');
     document.getElementById('cogo_trv_tool').classList.add('hidden'); // 🔴 Added
     document.getElementById('cogo_ecc_tool').classList.add('hidden');
+    document.getElementById('cogo_topo_tool').classList.add('hidden');
 
     let titleEl = document.getElementById('cogo_tool_title');
     let mapContainer = document.getElementById('shared_map_view');
@@ -314,8 +364,23 @@ window.openCogoTool = function(toolName) {
         titleEl.style.color = '#f59e0b';
         mapContainer.classList.add('hidden');
         gpsBtn.classList.add('hidden');
+    } else if (toolName === 'topo') {
+        document.getElementById('cogo_topo_tool').classList.remove('hidden');
+        titleEl.innerText = '⛰️ Topo Surface & Contour';
+        titleEl.style.color = '#2563eb';
+        gpsBtn.classList.add('hidden');
+        if (typeof toggleTopoUI === 'function') toggleTopoUI();
+        
+        // 🔴 Topo Data သွင်းထားပြီးသား ဆိုပါက မြေပုံကို ချက်ချင်း ပြန်ဖော်ပြပေးမည်
+        if (window.topoPoints && window.topoPoints.length > 0) {
+            mapContainer.classList.remove('hidden');
+            if (window.leafletMap) {
+                setTimeout(() => { window.leafletMap.invalidateSize(); }, 300);
+            }
+        } else {
+            mapContainer.classList.add('hidden');
+        }
     }
-
     history.pushState({page: 4, subTool: toolName}, "Cogo Tool", "");
 };
 window.closeCogoTool = function() {
@@ -332,6 +397,17 @@ window.closeCogoTool = function() {
     // ၄။ Area Tool ကနေ ထွက်လာတဲ့အချိန် GPS ပွင့်နေခဲ့ရင် အလိုအလျောက် ပြန်ပိတ်ပေးပါမည်
     if (window.isNativeGPSActive) {
         window.toggleGlobalGPS();
+    }
+
+    // 🔴 ၅။ အသစ်ဖြည့်စွက်ချက် - Topo Local Grid ကနေ ထွက်လာရင် Map ကို ပုံမှန်ပြန်ဖြစ်စေရန်
+    let mapView = document.getElementById('map_view');
+    if (mapView) mapView.style.background = '#ddd'; 
+    let layerCtrl = document.querySelector('.leaflet-control-layers');
+    if (layerCtrl) layerCtrl.style.display = 'block';
+    if (window.leafletMap) {
+        window.leafletMap.eachLayer(function (layer) {
+            if (layer instanceof L.TileLayer) { layer.setOpacity(1); } // Map ပုံမှန်ပြန်ပေါ်စေရန်
+        });
     }
 };
 
@@ -1152,7 +1228,6 @@ window.loadEccCSV = function(event) {
             let line = lines[i].trim();
             if (!line) continue;
             
-            // Header စာကြောင်းများ (ဥပမာ- Point, N, E စသည်) ကို ကျော်ဖတ်မည်
             if (line.toUpperCase().includes("PILE") || line.toUpperCase().includes("DESIGN")) continue;
 
             let cols = line.split(',');
@@ -1161,19 +1236,21 @@ window.loadEccCSV = function(event) {
             let pNo = cols[0].trim();
             let dN = parseFloat(cols[1]);
             let dE = parseFloat(cols[2]);
-            let dDia = parseFloat(cols[3]) || 600; // မပါခဲ့လျှင် 600mm ဟု ယူဆမည်
+            let dDia = parseFloat(cols[3]) || 600; 
 
             if (isNaN(dN) || isNaN(dE)) { errorCount++; continue; }
 
             let aN = 0, aE = 0, aRad = 0, method = "direct";
             let diffN = 0, diffE = 0, eccMM = 0;
+            
+            // 🔴 အသစ်ပြင်ဆင်ချက်: 3 Points အတွက် မူလအမှတ်များကို သေချာသိမ်းရန် Variable များ
+            let n1 = 0, e1 = 0, n2 = 0, e2 = 0, n3 = 0, e3 = 0;
 
-            // 🔴 3 Points Method (Column ၁၀ ခု ရှိလျှင်)
             if (cols.length >= 10 && !isNaN(parseFloat(cols[8]))) {
                 method = "3points";
-                let n1 = parseFloat(cols[4]), e1 = parseFloat(cols[5]);
-                let n2 = parseFloat(cols[6]), e2 = parseFloat(cols[7]);
-                let n3 = parseFloat(cols[8]), e3 = parseFloat(cols[9]);
+                n1 = parseFloat(cols[4]); e1 = parseFloat(cols[5]);
+                n2 = parseFloat(cols[6]); e2 = parseFloat(cols[7]);
+                n3 = parseFloat(cols[8]); e3 = parseFloat(cols[9]);
 
                 if (isNaN(n1) || isNaN(n2) || isNaN(n3)) { errorCount++; continue; }
 
@@ -1184,7 +1261,6 @@ window.loadEccCSV = function(event) {
                 aE = center.e; 
                 aRad = center.r;
             } 
-            // 🔴 Direct Method (Column ၆ ခုသာ ရှိလျှင်)
             else {
                 method = "direct";
                 aN = parseFloat(cols[4]);
@@ -1194,32 +1270,705 @@ window.loadEccCSV = function(event) {
                 if (isNaN(aN) || isNaN(aE)) { errorCount++; continue; }
             }
 
-            // Calculation
             diffN = aN - dN; 
             diffE = aE - dE; 
             eccMM = Math.sqrt((diffN * diffN) + (diffE * diffE)) * 1000;
 
-            // Array ထဲသို့ ပေါင်းထည့်မည် (addEccToRecord ပုံစံအတိုင်း)
+            // 🔴 3 Points များကိုပါ Array ထဲ ထည့်သိမ်းပေးလိုက်သဖြင့် နောက်ပိုင်း Edit ပြန်လုပ်၍ ရသွားပါပြီ
             window.eccRecords.push({
                 pNo: pNo, dN: dN, dE: dE, dDia: dDia, 
                 aN: aN, aE: aE, aRad: aRad, 
                 diffN: diffN * 1000, diffE: diffE * 1000, eccMM: eccMM, 
-                method: method
+                method: method,
+                n1: n1, e1: e1, n2: n2, e2: e2, n3: n3, e3: e3
             });
             successCount++;
         }
 
-        // ဇယား (UI) ကို Update လုပ်မည်
         updateEccRecordUI();
         
         if (successCount > 0) {
             alert(`✅ Successfully loaded and calculated ${successCount} piles from CSV!\n(Skipped/Errors: ${errorCount})`);
-            // UI Box လေးကို အလိုအလျောက် ပေါ်လာစေရန်
             document.getElementById('ecc_records_panel').classList.remove('hidden');
         } else {
             alert(`❌ No valid pile data found in CSV.\nPlease check the format:\n[1-Point]: PileNo, Design_N, Design_E, Dia_mm, Actual_N, Actual_E\n[3-Points]: PileNo, Design_N, Design_E, Dia_mm, Pt1_N, Pt1_E, Pt2_N, Pt2_E, Pt3_N, Pt3_E`);
         }
     };
     reader.readAsText(file);
-    event.target.value = ''; // Input file ကို reset လုပ်မည်
+    event.target.value = ''; 
+};
+
+// 🔴 မြေပုံပေါ်မှ အမှတ်အသစ်ကို Area ထဲသို့ တိုက်ရိုက် ထည့်သွင်းခြင်း
+window.addMapPointToArea = function(lat, lon) {
+    // အမှတ်အသစ်အတွက် နာမည်ပေးမည် (ဥပမာ- Map-1, Map-2)
+    let newName = `Map-${window.setOutPoints.length + 1}`;
+    
+    // Set Out Points Array ထဲသို့ အမှတ်အသစ်အဖြစ် အရင်သွင်းမည် (Area တွက်ရာတွင် လိုအပ်သောကြောင့်)
+    window.setOutPoints.push({
+        p: newName, 
+        lat: parseFloat(lat), 
+        lon: parseFloat(lon), 
+        z: 0, 
+        d: "From Map Tap"
+    });
+    
+    savePointsToStorage(); 
+    window.populateAreaPoints(); // List ကို အသစ်ပြန်ခေါ်မည်
+    
+    // နောက်ဆုံး ဝင်လာသည့် အမှတ် (အခုလေးတင် ထည့်လိုက်သည့်အမှတ်) ၏ Index ကို ယူ၍ Area အစီအစဉ်ထဲသို့ ထည့်မည်
+    let latestIndex = window.setOutPoints.length - 1;
+    window.addPointToArea(latestIndex);
+    
+    // အမှတ် ၃ မှတ် ပြည့်သွားပါက Area ကို အလိုအလျောက် တွက်ချက်ပေးမည်
+    if (window.orderedAreaPoints.length >= 3) {
+        window.calculateAreaFromSelection();
+    }
+};
+
+// ==========================================
+// --- TOPO SURFACE & CONTOURS LOGIC ---
+// ==========================================
+
+window.topoPoints = []; 
+window.topoTriangles = []; 
+window.topoContours = []; 
+window.topoBoundaryPolygon = []; 
+
+window.isDrawingBoundary = false;
+window.topoPointsLayer = null; 
+window.topoBdyLayer = null; 
+
+window.toggleTopoUI = function() {
+    let datum = document.getElementById('topo_datum').value;
+    let warnText = document.getElementById('topo_local_warn');
+    let customUtmDiv = document.getElementById('topo_custom_utm');
+
+    if (datum === 'LOCAL') {
+        if(warnText) warnText.style.display = 'block';
+    } else {
+        if(warnText) warnText.style.display = 'none';
+    }
+
+    if (datum === 'GLOBAL_UTM') {
+        if(customUtmDiv) customUtmDiv.style.display = 'flex';
+    } else {
+        if(customUtmDiv) customUtmDiv.style.display = 'none';
+    }
+};
+
+window.toggleTopoBoundary = function() {
+    let method = document.getElementById('topo_bdy_method').value;
+    document.getElementById('bdy_max_edge_div').classList.add('hidden');
+    document.getElementById('bdy_manual_div').classList.add('hidden');
+
+    if (method === 'max_edge') document.getElementById('bdy_max_edge_div').classList.remove('hidden');
+    else if (method === 'manual') document.getElementById('bdy_manual_div').classList.remove('hidden');
+
+    if (window.isDrawingBoundary && method !== 'manual') {
+        window.toggleBoundaryDrawMode(); 
+    }
+};
+
+window.loadTopoCSV = function(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    let statBox = document.getElementById('topo_status');
+    statBox.style.display = 'block'; statBox.style.color = '#d97706';
+    statBox.innerText = `⏳ Loading Data...`;
+
+    // 🔴 User ရွေးချယ်ထားသော Format ကို ဖတ်ယူခြင်း (PNEZD သို့မဟုတ် PENZD)
+    let formatSel = document.getElementById('topo_csv_format');
+    let isPENZD = (formatSel && formatSel.value === 'PENZD');
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        window.topoPoints = [];
+        window.clearManualBoundary(true);
+
+        let lines = e.target.result.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            // Header စာကြောင်းများ ပါလာခဲ့လျှင် ကျော်သွားရန်
+            if (!line || line.toUpperCase().includes("POINT") || line.toUpperCase().includes("NAME") || line.toUpperCase().includes("EAST")) continue;
+            
+            let cols = line.split(',');
+            if (cols.length < 4) continue;
+
+            let pName = cols[0].trim();
+            let n, e_val;
+
+            // 🔴 Format ပေါ်မူတည်၍ N နှင့် E ကော်လံ နေရာကို လဲ၍ ဖတ်ခြင်း
+            if (isPENZD) {
+                e_val = parseFloat(cols[1]); // ဒုတိယကော်လံက Easting
+                n = parseFloat(cols[2]);     // တတိယကော်လံက Northing
+            } else {
+                n = parseFloat(cols[1]);     // ဒုတိယကော်လံက Northing
+                e_val = parseFloat(cols[2]); // တတိယကော်လံက Easting
+            }
+            
+            let z = parseFloat(cols[3]);
+            let code_val = cols.length > 4 ? cols[4].trim() : "";
+
+            if (!isNaN(n) && !isNaN(e_val) && !isNaN(z)) {
+                window.topoPoints.push({ p: pName, n: n, e: e_val, z: z, d: code_val });
+            }
+        }
+
+        if (window.topoPoints.length < 3) {
+            statBox.style.color = '#ef4444'; statBox.innerText = `❌ Not enough points! Minimum 3 required.`;
+            return;
+        }
+
+        statBox.style.color = '#10b981';
+        statBox.innerText = `✅ Loaded ${window.topoPoints.length} points (${isPENZD ? 'PENZD' : 'PNEZD'}).`;
+        
+        showTopoPointsOnMapOnly(); 
+    };
+    reader.readAsText(file);
+    event.target.value = '';
+};
+
+function showTopoPointsOnMapOnly() {
+    let mapDiv = document.getElementById('shared_map_view');
+    if(mapDiv) mapDiv.classList.remove('hidden');
+
+    if (!window.leafletMap) window.initMap();
+    setTimeout(() => { window.leafletMap.invalidateSize(); }, 300);
+
+    let datum = document.getElementById('topo_datum').value;
+
+    if (datum === 'LOCAL' && window.topoPoints.length > 0) {
+        window.localOffsetN = window.topoPoints[0].n;
+        window.localOffsetE = window.topoPoints[0].e;
+    }
+
+    if (datum === 'LOCAL') {
+        document.getElementById('map_view').style.background = '#0f172a'; 
+        document.querySelector('.leaflet-control-layers').style.display = 'none'; 
+        window.leafletMap.eachLayer(function (layer) {
+            if (layer instanceof L.TileLayer) { layer.setOpacity(0); }
+        });
+    } else {
+        document.getElementById('map_view').style.background = '#ddd'; 
+        document.querySelector('.leaflet-control-layers').style.display = 'block';
+        window.leafletMap.eachLayer(function (layer) {
+            if (layer instanceof L.TileLayer) { layer.setOpacity(1); }
+        });
+    }
+
+    if (window.topoPointsLayer) window.leafletMap.removeLayer(window.topoPointsLayer);
+    if (window.topoLayerGroup) window.leafletMap.removeLayer(window.topoLayerGroup); 
+    
+    window.topoPointsLayer = L.layerGroup().addTo(window.leafletMap);
+
+    let bounds = [];
+    window.topoPoints.forEach(pt => {
+        let lat = pt.n, lon = pt.e; 
+
+        if (datum === 'LOCAL') {
+            lat = (pt.n - window.localOffsetN) / 100000;
+            lon = (pt.e - window.localOffsetE) / 100000;
+        }
+        else if (datum === "SVY21") { 
+            let r = calc_v2_rev(pt.e, pt.n); lat = r.lat; lon = r.lon; 
+        }
+        else if (datum.startsWith("MM")) {
+            let zone = parseInt(datum.slice(-2)); let r = m_inverse(pt.e, pt.n, zone, m_EVE); 
+            let x = m_llh2xyz(r.lat, r.lon, 0, m_EVE); let w = m_xyz2llh(x.x-m_DX, x.y-m_DY, x.z-m_DZ, m_WGS);
+            lat = w.lat; lon = w.lon;
+        }
+        else if (datum.startsWith("WGS_UTM")) { 
+            let zone = parseInt(datum.slice(-2)); 
+            let i = m_inverse(pt.e, pt.n, zone, m_WGS); lat = i.lat; lon = i.lon; 
+        }
+        else if (datum === "GLOBAL_UTM") {
+            let zInput = document.getElementById('topo_custom_zone'); 
+            let hInput = document.getElementById('topo_custom_hemi');
+            let zone = (zInput && zInput.value) ? parseInt(zInput.value) : 47; 
+            let hemi = hInput ? hInput.value : 'N'; 
+            let calcN = pt.n; if (hemi === 'S') calcN -= 10000000; 
+            let i_w = m_inverse(pt.e, calcN, zone, m_WGS); lat = i_w.lat; lon = i_w.lon;
+        }
+
+        if (!isNaN(lat) && !isNaN(lon)) {
+            let marker = L.circleMarker([lat, lon], { 
+                radius: 4, color: 'transparent', weight: 20, fillColor: '#3b82f6', fillOpacity: 1 
+            });
+            
+            marker.bindTooltip(`${pt.p}<br>Z: ${pt.z.toFixed(3)}`, { direction: 'top', className: 'pt-tooltip' });
+            
+            marker.on('click', function(e) {
+                if (window.activeApp === 4 && window.isDrawingBoundary) {
+                    L.DomEvent.stopPropagation(e);
+                    window.topoBoundaryPolygon.push({ n: pt.n, e: pt.e, lat: lat, lon: lon });
+                    updateBoundaryDrawUI();
+                }
+            });
+
+            window.topoPointsLayer.addLayer(marker);
+            bounds.push([lat, lon]);
+        }
+    });
+
+    if (bounds.length > 0) window.leafletMap.fitBounds(L.latLngBounds(bounds), {padding: [30, 30], maxZoom: 22});
+}
+
+window.toggleBoundaryDrawMode = function() {
+    if (window.topoPoints.length === 0) return alert("Please Load CSV Points first!");
+
+    window.isDrawingBoundary = !window.isDrawingBoundary;
+    let btn = document.getElementById('btn_draw_bdy');
+    if (window.isDrawingBoundary) {
+        btn.innerText = "🛑 Finish Boundary";
+        btn.style.background = "#ef4444";
+        alert("Click on the points on the map to draw your boundary line.");
+    } else {
+        btn.innerText = "✏️ Start Drawing";
+        btn.style.background = "#f59e0b";
+        updateBoundaryDrawUI(true); 
+    }
+};
+
+window.undoManualBoundary = function() {
+    if (window.topoBoundaryPolygon && window.topoBoundaryPolygon.length > 0) {
+        window.topoBoundaryPolygon.pop(); 
+        updateBoundaryDrawUI(); 
+    } else {
+        alert("No points to undo.");
+    }
+};
+
+window.clearManualBoundary = function(skipAlert) {
+    window.topoBoundaryPolygon = [];
+    if (window.topoBdyLayer) {
+        window.leafletMap.removeLayer(window.topoBdyLayer);
+        window.topoBdyLayer = null;
+    }
+    if (!skipAlert && window.isDrawingBoundary) window.toggleBoundaryDrawMode();
+};
+
+function updateBoundaryDrawUI(isClosed = false) {
+    if (!window.leafletMap) return;
+    if (window.topoBdyLayer) window.leafletMap.removeLayer(window.topoBdyLayer);
+
+    if (window.topoBoundaryPolygon.length > 0) {
+        let latlngs = window.topoBoundaryPolygon.map(pt => [pt.lat, pt.lon]);
+        if (isClosed && latlngs.length > 2) latlngs.push(latlngs[0]); 
+
+        window.topoBdyLayer = L.polyline(latlngs, { color: '#ef4444', weight: 3, dashArray: '5, 5' }).addTo(window.leafletMap);
+    }
+}
+
+function isPointInBoundary(n, e, bdyPoints) {
+    if (bdyPoints.length < 3) return true; 
+    let isInside = false;
+    for (let i = 0, j = bdyPoints.length - 1; i < bdyPoints.length; j = i++) {
+        let pi = bdyPoints[i]; let pj = bdyPoints[j];
+        if (((pi.n > n) !== (pj.n > n)) && (e < (pj.e - pi.e) * (n - pi.n) / (pj.n - pi.n) + pi.e)) {
+            isInside = !isInside;
+        }
+    }
+    return isInside;
+}
+
+window.processTopoSurface = function() {
+    if (window.topoPoints.length < 3) return alert("Please load CSV first!");
+
+    let statBox = document.getElementById('topo_status');
+    statBox.style.display = 'block'; statBox.style.color = '#d97706';
+    statBox.innerText = `⏳ Calculating Surface...`;
+
+    // 1. တြိဂံများ အားလုံးကို အရင်တည်ဆောက်မည်
+    window.topoTriangles = generateDelaunayTriangulation(window.topoPoints);
+
+    let bdyMethod = document.getElementById('topo_bdy_method').value;
+
+    // 🔴 2. အသစ်ပြင်ဆင်ချက်: တြိဂံ (Triangles) များကို Boundary ဖြင့် စစ်ထုတ်ခြင်း
+    if (bdyMethod === 'max_edge') {
+        let maxEdge = parseFloat(document.getElementById('topo_max_edge').value) || 30;
+        window.topoTriangles = window.topoTriangles.filter(t => {
+            let d1 = Math.hypot(t.p1.e - t.p2.e, t.p1.n - t.p2.n);
+            let d2 = Math.hypot(t.p2.e - t.p3.e, t.p2.n - t.p3.n);
+            let d3 = Math.hypot(t.p3.e - t.p1.e, t.p3.n - t.p1.n);
+            return (d1 <= maxEdge && d2 <= maxEdge && d3 <= maxEdge);
+        });
+    } 
+    else if (bdyMethod === 'manual' && window.topoBoundaryPolygon.length > 2) {
+        // Manual Draw ဆိုပါက တြိဂံ၏ အလယ်ဗဟို (Centroid) သည် Boundary အတွင်း ရှိ/မရှိ စစ်ဆေးမည်
+        window.topoTriangles = window.topoTriangles.filter(t => {
+            let centerE = (t.p1.e + t.p2.e + t.p3.e) / 3;
+            let centerN = (t.p1.n + t.p2.n + t.p3.n) / 3;
+            return isPointInBoundary(centerN, centerE, window.topoBoundaryPolygon);
+        });
+    }
+    // 'auto' ဆိုလျှင် မည်သည့်အရာမှ မစစ်ထုတ်ဘဲ အားလုံးကို ယူမည်
+
+    // 🔴 3. Contour များကို "စစ်ထုတ်ပြီးသား တြိဂံများ" မှသာ ဆွဲမည် (ဖြတ်ထုတ်စရာ မလိုတော့ပါ)
+    let majorInt = parseFloat(document.getElementById('topo_major_int').value) || 1.0;
+    let minorInt = parseFloat(document.getElementById('topo_minor_int').value) || 0.2;
+    
+    window.topoContours = generateContours(window.topoPoints, window.topoTriangles, minorInt, majorInt);
+
+    statBox.style.color = '#10b981';
+    statBox.innerText = `✅ Success! Surface Generated.`;
+    document.getElementById('topo_export_box').classList.remove('hidden');
+
+    showContoursOnMap();
+};
+
+function showContoursOnMap() {
+    if (!window.leafletMap) return;
+
+    if (window.topoLayerGroup) window.leafletMap.removeLayer(window.topoLayerGroup);
+    window.topoLayerGroup = L.layerGroup().addTo(window.leafletMap);
+
+    let datum = document.getElementById('topo_datum').value;
+
+    let getLatLng = (n, e) => {
+        let lat = n, lon = e; 
+        
+        if (datum === 'LOCAL') {
+            lat = (n - window.localOffsetN) / 100000;
+            lon = (e - window.localOffsetE) / 100000;
+        }
+        else if (datum === "SVY21") { 
+            let r = calc_v2_rev(e, n); lat = r.lat; lon = r.lon; 
+        }
+        else if (datum.startsWith("MM")) {
+            let zone = parseInt(datum.slice(-2)); let r = m_inverse(e, n, zone, m_EVE); 
+            let x = m_llh2xyz(r.lat, r.lon, 0, m_EVE); let w = m_xyz2llh(x.x-m_DX, x.y-m_DY, x.z-m_DZ, m_WGS);
+            lat = w.lat; lon = w.lon;
+        }
+        else if (datum.startsWith("WGS_UTM")) { 
+            let zone = parseInt(datum.slice(-2)); 
+            let i = m_inverse(e, n, zone, m_WGS); lat = i.lat; lon = i.lon; 
+        }
+        else if (datum === "GLOBAL_UTM") {
+            let zInput = document.getElementById('topo_custom_zone'); 
+            let hInput = document.getElementById('topo_custom_hemi');
+            let zone = (zInput && zInput.value) ? parseInt(zInput.value) : 47; 
+            let hemi = hInput ? hInput.value : 'N'; 
+            let calcN = n; if (hemi === 'S') calcN -= 10000000; 
+            let i_w = m_inverse(e, calcN, zone, m_WGS); lat = i_w.lat; lon = i_w.lon;
+        }
+        return [lat, lon];
+    };
+
+    window.topoContours.forEach(poly => {
+        if (poly.points.length < 2) return;
+        let latlngs = [];
+        poly.points.forEach(pt => {
+            let ll = getLatLng(pt.n, pt.e);
+            if (!isNaN(ll[0])) latlngs.push(ll);
+        });
+
+       if (latlngs.length > 1) {
+            // 🔴 Color နှင့် Opacity ကို Input ကနေ လှမ်းယူခြင်း
+            let majorColorInp = document.getElementById('topo_major_color');
+            let minorColorInp = document.getElementById('topo_minor_color');
+            let opacInp = document.getElementById('topo_opacity');
+            
+            let mColor = majorColorInp ? majorColorInp.value : '#f59e0b';
+            let minColor = minorColorInp ? minorColorInp.value : '#b45309';
+            let opac = opacInp ? parseFloat(opacInp.value) : 1.0;
+
+            let mapPoly = L.polyline(latlngs, { 
+                color: poly.isMajor ? mColor : minColor, 
+                weight: poly.isMajor ? 3 : 1,
+                opacity: opac, 
+                isMajorRef: poly.isMajor // နောက်ပိုင်း အရောင်ပြန်ပြောင်းရန် မှတ်သားထားခြင်း
+            });
+            
+            if (poly.isMajor) {
+                mapPoly.bindTooltip(`Z: ${poly.z.toFixed(2)}`, { sticky: true });
+            }
+            window.topoLayerGroup.addLayer(mapPoly);
+        }
+    });
+}
+
+// 🔴 အသစ်ထည့်ထားသော Function (Color နှင့် Opacity ကို Real-time ပြောင်းပေးခြင်း)
+window.updateContourStyle = function() {
+    if (!window.topoLayerGroup || !window.leafletMap) return;
+
+    let majorColorInp = document.getElementById('topo_major_color');
+    let minorColorInp = document.getElementById('topo_minor_color');
+    let opacInp = document.getElementById('topo_opacity');
+
+    if (!majorColorInp || !minorColorInp || !opacInp) return;
+
+    let mColor = majorColorInp.value;
+    let minColor = minorColorInp.value;
+    let opac = parseFloat(opacInp.value);
+
+    // Map ပေါ်မှာရှိတဲ့ မျဉ်းတွေ အားလုံးကို လိုက်ရှာပြီး အရောင်နဲ့ Opacity ချိန်းပေးခြင်း
+    window.topoLayerGroup.eachLayer(function(layer) {
+        if (layer instanceof L.Polyline) {
+            // Label / Text မဟုတ်ဘဲ Polyline ဖြစ်မှသာ ပြောင်းမည်
+            if (layer.options.isMajorRef !== undefined) {
+                layer.setStyle({
+                    color: layer.options.isMajorRef ? mColor : minColor,
+                    opacity: opac
+                });
+            }
+        }
+    });
+};
+
+// ==========================================
+// 🔴 UPDATED: TOPO DXF EXPORT (WITH GRID, TITLE & NORTH ARROW)
+// ==========================================
+window.exportTopoDXF = function() {
+    if (window.topoContours.length === 0 && window.topoPoints.length === 0) return alert("No Topo data generated!");
+
+    let dxf = "0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n0\nENDSEC\n";
+    dxf += "0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLAYER\n70\n11\n"; 
+    
+    // မူလ Layers များ
+    dxf += "0\nLAYER\n2\nTOPO_POINTS\n70\n0\n62\n7\n6\nCONTINUOUS\n"; 
+    dxf += "0\nLAYER\n2\nTOPO_MAJOR_CONTOUR\n70\n0\n62\n2\n6\nCONTINUOUS\n"; 
+    dxf += "0\nLAYER\n2\nTOPO_MINOR_CONTOUR\n70\n0\n62\n8\n6\nCONTINUOUS\n"; 
+    dxf += "0\nLAYER\n2\nTOPO_LABELS\n70\n0\n62\n7\n6\nCONTINUOUS\n"; 
+    dxf += "0\nLAYER\n2\nTOPO_BOUNDARY\n70\n0\n62\n1\n6\nCONTINUOUS\n"; 
+    dxf += "0\nLAYER\n2\nTOPO_POINT_NO\n70\n0\n62\n1\n6\nCONTINUOUS\n"; 
+    dxf += "0\nLAYER\n2\nTOPO_POINT_CODES\n70\n0\n62\n3\n6\nCONTINUOUS\n"; 
+    
+    // 🔴 အသစ်ထည့်ထားသော Layers များ (Grid, Title, North)
+    dxf += "0\nLAYER\n2\nGRID_LINES\n70\n0\n62\n8\n6\nCONTINUOUS\n"; // အရောင် 8 = မီးခိုးရောင်
+    dxf += "0\nLAYER\n2\nGRID_TEXT\n70\n0\n62\n7\n6\nCONTINUOUS\n"; // အရောင် 7 = အဖြူ/အမည်း
+    dxf += "0\nLAYER\n2\nMAP_TITLE\n70\n0\n62\n7\n6\nCONTINUOUS\n"; 
+    dxf += "0\nLAYER\n2\nNORTH_ARROW\n70\n0\n62\n7\n6\nCONTINUOUS\n"; 
+    
+    dxf += "0\nENDTAB\n0\nENDSEC\n";
+    dxf += "0\nSECTION\n2\nENTITIES\n";
+
+    let labelSpacing = parseFloat(document.getElementById('topo_label_space').value) || 15.0; 
+    let txtH = parseFloat(document.getElementById('topo_text_height').value) || 0.5; 
+    let yOffset = txtH * 0.7; 
+
+    // 🔴 1. Point များ၏ အနည်းဆုံး၊ အများဆုံး (Bounding Box) ကို ရှာခြင်း
+    let minE = Infinity, maxE = -Infinity, minN = Infinity, maxN = -Infinity;
+
+    window.topoPoints.forEach(pt => {
+        if (pt.e < minE) minE = pt.e; if (pt.e > maxE) maxE = pt.e;
+        if (pt.n < minN) minN = pt.n; if (pt.n > maxN) maxN = pt.n;
+
+        let txtE = pt.e + (txtH * 0.3); 
+        let currentTxtH = txtH * 0.5; 
+
+        dxf += `0\nPOINT\n8\nTOPO_POINTS\n10\n${pt.e.toFixed(3)}\n20\n${pt.n.toFixed(3)}\n30\n${pt.z.toFixed(3)}\n`;
+        if (pt.p && pt.p.trim() !== "") {
+            let ptY = pt.n + yOffset; 
+            dxf += `0\nTEXT\n8\nTOPO_POINT_NO\n10\n${txtE.toFixed(3)}\n20\n${ptY.toFixed(3)}\n30\n${pt.z.toFixed(3)}\n40\n${currentTxtH}\n1\n${pt.p}\n`;
+        }
+        dxf += `0\nTEXT\n8\nTOPO_POINTS\n10\n${txtE.toFixed(3)}\n20\n${pt.n.toFixed(3)}\n30\n${pt.z.toFixed(3)}\n40\n${currentTxtH}\n1\n${pt.z.toFixed(3)}\n`;
+        if (pt.d && pt.d.trim() !== "") {
+            let codeY = pt.n - yOffset;
+            dxf += `0\nTEXT\n8\nTOPO_POINT_CODES\n10\n${txtE.toFixed(3)}\n20\n${codeY.toFixed(3)}\n30\n${pt.z.toFixed(3)}\n40\n${currentTxtH}\n1\n${pt.d}\n`;
+        }
+    });
+
+    // 🔴 2. Contours များ ရေးဆွဲခြင်း
+    window.topoContours.forEach(poly => {
+        let layer = poly.isMajor ? "TOPO_MAJOR_CONTOUR" : "TOPO_MINOR_CONTOUR";
+        dxf += `0\nPOLYLINE\n8\n${layer}\n66\n1\n70\n8\n10\n0.0\n20\n0.0\n30\n${poly.z.toFixed(3)}\n`;
+        poly.points.forEach(pt => {
+            dxf += `0\nVERTEX\n8\n${layer}\n70\n32\n10\n${pt.e.toFixed(3)}\n20\n${pt.n.toFixed(3)}\n30\n${poly.z.toFixed(3)}\n`; 
+        });
+        dxf += `0\nSEQEND\n8\n${layer}\n`;
+
+        if (poly.isMajor && poly.points.length >= 2) {
+            let currentDist = 0;
+            let nextLabelDist = labelSpacing / 2; 
+
+            for (let i = 0; i < poly.points.length - 1; i++) {
+                let p1 = poly.points[i]; let p2 = poly.points[i+1];
+                let segLen = Math.hypot(p2.e - p1.e, p2.n - p1.n); 
+
+                if (currentDist + segLen >= nextLabelDist) {
+                    let fraction = (nextLabelDist - currentDist) / segLen;
+                    let labelE = p1.e + fraction * (p2.e - p1.e);
+                    let labelN = p1.n + fraction * (p2.n - p1.n);
+                    let angleRad = Math.atan2(p2.n - p1.n, p2.e - p1.e);
+                    let angleDeg = angleRad * (180 / Math.PI);
+                    if (angleDeg > 90 || angleDeg <= -90) angleDeg += 180;
+
+                    dxf += `0\nTEXT\n8\nTOPO_LABELS\n10\n${labelE.toFixed(3)}\n20\n${labelN.toFixed(3)}\n30\n${poly.z.toFixed(3)}\n40\n${txtH}\n1\n${poly.z.toFixed(3)}\n50\n${angleDeg.toFixed(3)}\n72\n1\n11\n${labelE.toFixed(3)}\n21\n${labelN.toFixed(3)}\n31\n${poly.z.toFixed(3)}\n73\n2\n`;
+                    nextLabelDist += labelSpacing; 
+                }
+                currentDist += segLen;
+            }
+        }
+    });
+
+    if (window.topoBoundaryPolygon && window.topoBoundaryPolygon.length > 2) {
+        dxf += `0\nPOLYLINE\n8\nTOPO_BOUNDARY\n66\n1\n70\n9\n10\n0.0\n20\n0.0\n30\n0.0\n`; 
+        window.topoBoundaryPolygon.forEach(pt => { dxf += `0\nVERTEX\n8\nTOPO_BOUNDARY\n70\n32\n10\n${pt.e.toFixed(3)}\n20\n${pt.n.toFixed(3)}\n30\n0.0\n`; });
+        dxf += `0\nSEQEND\n8\nTOPO_BOUNDARY\n`;
+    }
+
+    // ==========================================
+    // 🔴 3. GRID LINES, TEXT, TITLE & NORTH ARROW
+    // ==========================================
+    if (window.topoPoints.length > 0) {
+        let gridIntervalInp = document.getElementById('topo_grid_interval');
+        let titleInp = document.getElementById('topo_map_title');
+        
+        let interval = gridIntervalInp ? (parseFloat(gridIntervalInp.value) || 50) : 50;
+        let mapTitle = titleInp ? (titleInp.value.trim() || "TOPOGRAPHIC MAP") : "TOPOGRAPHIC MAP";
+
+        // မြေပုံကို Grid အတွင်း လှလှပပဝင်ဆံ့စေရန် ဘေးပတ်လည်ကို Interval တစ်ခုစာ ချဲ့လိုက်မည်
+        let gridMinE = minE - interval;
+        let gridMaxE = maxE + interval;
+        let gridMinN = minN - interval;
+        let gridMaxN = maxN + interval;
+
+        // Grid အတိအကျ စတင်မည့် နေရာကို Interval ဖြင့်စား၍ တွက်ချက်ခြင်း
+        let startE = Math.ceil(gridMinE / interval) * interval;
+        let startN = Math.ceil(gridMinN / interval) * interval;
+
+        let gridTxtH = txtH * 3.5; // Grid စာလုံးအမြင့် (Topo point စာလုံးထက် ၃ဆခွဲ ပိုကြီးမည်)
+
+        // 3.1 Draw Grid Lines & Easting / Northing Values
+        // (A) ဒေါင်လိုက်မျဉ်းများ (Vertical Lines - Easting)
+        for (let e = startE; e <= gridMaxE; e += interval) {
+            dxf += `0\nLINE\n8\nGRID_LINES\n10\n${e}\n20\n${gridMinN}\n30\n0.0\n11\n${e}\n21\n${gridMaxN}\n31\n0.0\n`;
+            // အပေါ်ဆုံး နှင့် အောက်ဆုံးတွင် E တန်ဖိုး ရေးခြင်း
+            dxf += `0\nTEXT\n8\nGRID_TEXT\n10\n${e}\n20\n${gridMaxN + (gridTxtH)}\n30\n0.0\n40\n${gridTxtH}\n1\nE ${e.toFixed(3)}\n72\n1\n11\n${e}\n21\n${gridMaxN + (gridTxtH)}\n31\n0.0\n73\n1\n`;
+            dxf += `0\nTEXT\n8\nGRID_TEXT\n10\n${e}\n20\n${gridMinN - (gridTxtH)}\n30\n0.0\n40\n${gridTxtH}\n1\nE ${e.toFixed(3)}\n72\n1\n11\n${e}\n21\n${gridMinN - (gridTxtH)}\n31\n0.0\n73\n3\n`;
+        }
+
+        // (B) အလျားလိုက်မျဉ်းများ (Horizontal Lines - Northing)
+        for (let n = startN; n <= gridMaxN; n += interval) {
+            dxf += `0\nLINE\n8\nGRID_LINES\n10\n${gridMinE}\n20\n${n}\n30\n0.0\n11\n${gridMaxE}\n21\n${n}\n31\n0.0\n`;
+            // ဘယ်ဘက် နှင့် ညာဘက်တွင် N တန်ဖိုး ရေးခြင်း
+            dxf += `0\nTEXT\n8\nGRID_TEXT\n10\n${gridMinE - (gridTxtH)}\n20\n${n}\n30\n0.0\n40\n${gridTxtH}\n1\nN ${n.toFixed(3)}\n72\n2\n11\n${gridMinE - (gridTxtH)}\n21\n${n}\n31\n0.0\n73\n2\n`;
+            dxf += `0\nTEXT\n8\nGRID_TEXT\n10\n${gridMaxE + (gridTxtH)}\n20\n${n}\n30\n0.0\n40\n${gridTxtH}\n1\nN ${n.toFixed(3)}\n72\n0\n11\n${gridMaxE + (gridTxtH)}\n21\n${n}\n31\n0.0\n73\n2\n`;
+        }
+
+        // 3.2 Draw Grid Border Box (Grid အစွန်ဆုံးဘောင်ကို ထူထူလေး ဆွဲခြင်း)
+        dxf += `0\nPOLYLINE\n8\nGRID_LINES\n66\n1\n70\n1\n10\n0.0\n20\n0.0\n30\n0.0\n`; 
+        dxf += `0\nVERTEX\n8\nGRID_LINES\n70\n32\n10\n${gridMinE}\n20\n${gridMinN}\n30\n0.0\n`;
+        dxf += `0\nVERTEX\n8\nGRID_LINES\n70\n32\n10\n${gridMaxE}\n20\n${gridMinN}\n30\n0.0\n`;
+        dxf += `0\nVERTEX\n8\nGRID_LINES\n70\n32\n10\n${gridMaxE}\n20\n${gridMaxN}\n30\n0.0\n`;
+        dxf += `0\nVERTEX\n8\nGRID_LINES\n70\n32\n10\n${gridMinE}\n20\n${gridMaxN}\n30\n0.0\n`;
+        dxf += `0\nSEQEND\n8\nGRID_LINES\n`;
+
+        // 3.3 Draw Map Title (အပေါ်ဘက် အလယ်တည့်တည့်)
+        let titleE = (gridMinE + gridMaxE) / 2;
+        let titleN = gridMaxN + (gridTxtH * 4); // Grid ရဲ့ အပေါ်နည်းနည်း ခွာမည်
+        let titleTxtH = gridTxtH * 2.5; // Title စာလုံးအကြီးဆုံး
+        
+        dxf += `0\nTEXT\n8\nMAP_TITLE\n10\n${titleE}\n20\n${titleN}\n30\n0.0\n40\n${titleTxtH}\n1\n${mapTitle}\n72\n1\n11\n${titleE}\n21\n${titleN}\n31\n0.0\n73\n1\n`;
+
+       // 3.4 Draw North Arrow (Professional Arrow with Solid Fill & Circle)
+        let mapWidth = gridMaxE - gridMinE;
+        let mapHeight = gridMaxN - gridMinN;
+        // မြေပုံအရွယ်အစားပေါ်မူတည်ပြီး Arrow size ချိန်ညှိခြင်း (အများဆုံး ၅၀ မီတာ)
+        let nSize = Math.min(Math.max(mapHeight * 0.08, interval * 0.4), 50); 
+        
+        let arrBaseE = gridMaxE + (gridTxtH * 8); // Grid အပြင်ဘက် ညာဘက်နား
+        let arrBaseN = gridMaxN - (nSize * 1.5);
+        
+        let arrTipE = arrBaseE;
+        let arrTipN = arrBaseN + nSize;
+
+        let arrWidth = nSize * 0.25; // မြားခေါင်း အကျယ်
+        
+        let arrLeftE = arrBaseE - arrWidth;
+        let arrLeftN = arrBaseN + (nSize * 0.3);
+
+        let arrRightE = arrBaseE + arrWidth;
+        let arrRightN = arrBaseN + (nSize * 0.3);
+
+        let arrCenterN = arrBaseN + (nSize * 0.3); // မြားခေါင်းရဲ့ အလယ်ဗဟို (V-shape ဖြစ်အောင်)
+
+        // (A) Arrow Vertical Line (အလယ်မျဉ်း)
+        dxf += `0\nLINE\n8\nNORTH_ARROW\n10\n${arrBaseE}\n20\n${arrBaseN}\n30\n0.0\n11\n${arrTipE}\n21\n${arrTipN}\n31\n0.0\n`;
+        
+        // (B) ညာဘက် မြားခေါင်းတစ်ခြမ်းကို အမည်းရောင် (Solid Fill) အပြည့်ခြယ်ခြင်း
+        dxf += `0\nSOLID\n8\nNORTH_ARROW\n10\n${arrTipE}\n20\n${arrTipN}\n30\n0.0\n11\n${arrRightE}\n21\n${arrRightN}\n31\n0.0\n12\n${arrBaseE}\n22\n${arrCenterN}\n32\n0.0\n13\n${arrBaseE}\n23\n${arrCenterN}\n33\n0.0\n`;
+
+        // (C) ဘယ်ဘက် မြားခေါင်းတစ်ခြမ်းကို Line (ဘောင်) သာ ဆွဲခြင်း
+        dxf += `0\nLINE\n8\nNORTH_ARROW\n10\n${arrTipE}\n20\n${arrTipN}\n30\n0.0\n11\n${arrLeftE}\n21\n${arrLeftN}\n31\n0.0\n`;
+        dxf += `0\nLINE\n8\nNORTH_ARROW\n10\n${arrLeftE}\n20\n${arrLeftN}\n30\n0.0\n11\n${arrBaseE}\n21\n${arrCenterN}\n31\n0.0\n`;
+
+        // (D) အောက်ခြေဗဟိုမှာ အဝိုင်းလေး (Circle) ထည့်ခြင်း
+        let circleRadius = nSize * 0.1;
+        dxf += `0\nCIRCLE\n8\nNORTH_ARROW\n10\n${arrBaseE}\n20\n${arrBaseN}\n30\n0.0\n40\n${circleRadius}\n`;
+
+        // (E) Crosshair လေး (အဝိုင်းအောက်ခြေက အလျားလိုက်မျဉ်း)
+        dxf += `0\nLINE\n8\nNORTH_ARROW\n10\n${arrBaseE - circleRadius * 1.5}\n20\n${arrBaseN}\n30\n0.0\n11\n${arrBaseE + circleRadius * 1.5}\n21\n${arrBaseN}\n31\n0.0\n`;
+
+        // (F) "N" စာလုံးကို မြားခေါင်းအပေါ်မှာ ရေးခြင်း
+        dxf += `0\nTEXT\n8\nNORTH_ARROW\n10\n${arrTipE}\n20\n${arrTipN + (gridTxtH * 0.8)}\n30\n0.0\n40\n${gridTxtH * 1.5}\n1\nN\n72\n1\n11\n${arrTipE}\n21\n${arrTipN + (gridTxtH * 0.8)}\n31\n0.0\n73\n1\n`;
+    }
+
+    dxf += "0\nENDSEC\n0\nEOF\n";
+
+    let fileName = `3D_Topo_Map_With_Grid_${new Date().getTime()}.dxf`;
+    let mimeType = 'application/dxf';
+
+    if (typeof triggerDownloadWithAd === 'function') {
+        triggerDownloadWithAd(dxf, fileName, mimeType);
+    } else {
+        if (window.AndroidNative && window.AndroidNative.downloadConvertedCSV) {
+            window.AndroidNative.downloadConvertedCSV(dxf, fileName);
+        } else {
+            let blob = new Blob([dxf], { type: mimeType });
+            let url = URL.createObjectURL(blob); let a = document.createElement("a");
+            a.href = url; a.download = fileName; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        }
+    }
+};
+window.toggleTopoLayers = function() {
+    if (!window.leafletMap) return;
+
+    if (window.topoPointsLayer) {
+        let chkPts = document.getElementById('tgl_topo_pts');
+        if (chkPts && chkPts.checked) {
+            if (!window.leafletMap.hasLayer(window.topoPointsLayer)) {
+                window.leafletMap.addLayer(window.topoPointsLayer);
+            }
+        } else {
+            window.leafletMap.removeLayer(window.topoPointsLayer);
+        }
+    }
+
+    if (window.topoLayerGroup) {
+        let chkContour = document.getElementById('tgl_topo_contours');
+        if (chkContour && chkContour.checked) {
+            if (!window.leafletMap.hasLayer(window.topoLayerGroup)) {
+                window.leafletMap.addLayer(window.topoLayerGroup);
+            }
+        } else {
+            window.leafletMap.removeLayer(window.topoLayerGroup);
+        }
+    }
+};
+
+// 🔴 Topo Data နှင့် Map တစ်ခုလုံးကို ရှင်းလင်းမည့် Function
+window.clearTopoData = function() {
+    if (!confirm("Are you sure you want to clear all Topo data and map?")) return;
+    
+    // Data များကို ဖျက်ခြင်း
+    window.topoPoints = [];
+    window.topoTriangles = [];
+    window.topoContours = [];
+    
+    // Map ပေါ်မှ မျဉ်းများကို ဖျက်ခြင်း
+    if (window.topoPointsLayer) window.leafletMap.removeLayer(window.topoPointsLayer);
+    if (window.topoLayerGroup) window.leafletMap.removeLayer(window.topoLayerGroup);
+    window.clearManualBoundary(true);
+    
+    // UI ကို မူလအတိုင်း ပြန်ထားခြင်း
+    document.getElementById('topo_export_box').classList.add('hidden');
+    let statBox = document.getElementById('topo_status');
+    statBox.style.display = 'none';
+    statBox.innerText = '';
+    
+    // မြေပုံကို ဖျောက်ထားလိုက်မည်
+    let mapDiv = document.getElementById('shared_map_view');
+    if (mapDiv) mapDiv.classList.add('hidden');
 };
