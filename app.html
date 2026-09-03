@@ -21,7 +21,6 @@
         }
     </script>
 <script src="https://unpkg.com/dxf-parser/dist/dxf-parser.js"></script>
-<script src="https://unpkg.com/dxf-parser/dist/dxf-parser.js"></script>
     <!-- 🔴 အသစ်ထည့်ရန်: လုံးဝ Error ကင်းသော 3D Triangulation Library -->
     <script src="https://unpkg.com/delaunator@5.0.0/delaunator.min.js"></script>
     <link rel="stylesheet" href="style.css">
@@ -30,12 +29,15 @@
     <link rel="stylesheet" href="style.css">
    <script>
   // 🔴 ပိုမိုသေချာသော လမ်းကြောင်းလွှဲ Logic (Sub-folder ကော Cache ပါ ကျော်ဖြတ်နိုင်ရန်)
-  if (window.location.hostname !== "gpsconverter.site" && window.location.hostname !== "localhost") {
+ // if (window.location.hostname !== "gpsconverter.site" && window.location.hostname !== "localhost") {
     // လက်ရှိ ဝင်ထားတဲ့ Domain က gpsconverter.site မဟုတ်ရင် (github.io ဖြစ်နေရင်) Custom Domain ဆီ အတင်းလွှဲမည်
-   window.location.replace("https://gpsconverter.site/");
-  }
+  // window.location.replace("https://gpsconverter.site/");
+ // }
 </script>
+<!-- 🔴 3D Surface Rendering အတွက် Plotly.js -->
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
 </head>
+
 <body id="master-ui">
 <div class="container-box">
 
@@ -275,11 +277,11 @@
                     <div style="display:flex; gap:10px;">
                         <div style="flex:1;">
                             <label class="v2-label">UTM Zone (1-60)</label>
-                            <input type="text" inputmode="text" id="g_zone" class="v2-input" placeholder="e.g. 47" disabled>
+                            <input type="text" inputmode="text" id="g_zone" class="v2-input" placeholder="e.g. 47">
                         </div>
                         <div style="flex:1;">
                             <label class="v2-label">Hemisphere</label>
-                            <select id="g_hemi" class="v2-input" disabled><option value="N">North (N)</option><option value="S">South (S)</option></select>
+                            <select id="g_hemi" class="v2-input"><option value="N">North (N)</option><option value="S">South (S)</option></select>
                         </div>
                     </div>
                     <div class="btn-group"><button class="btn-action" style="background:#0f766e;" onclick="g_run()">Convert</button><button class="btn-map" onclick="g_map()">Map 📍</button><button class="btn-reset" onclick="g_reset()">Reset</button></div>
@@ -771,11 +773,17 @@
 
         <!-- Manual Draw Box -->
         <div id="bdy_manual_div" class="hidden">
-            <p style="font-size:11px; color:var(--label-text); margin:5px 0;">Load CSV first, then tap points on the map to draw boundary.</p>
-            <div style="display:flex; gap:5px;">
-                <button id="btn_draw_bdy" class="btn-action" style="background:#f59e0b; flex:2; font-size:12px; padding:10px;" onclick="if(typeof toggleBoundaryDrawMode === 'function') toggleBoundaryDrawMode()">✏️ Start Drawing</button>
-                <button class="btn-action" style="background:#8b5cf6; flex:1; font-size:12px; padding:10px;" onclick="if(typeof undoManualBoundary === 'function') undoManualBoundary()">↩️ Undo</button>
-                <button class="btn-action" style="background:#ef4444; flex:1; font-size:12px; padding:10px;" onclick="if(typeof clearManualBoundary === 'function') clearManualBoundary()">🗑️ Clear</button>
+            <p style="font-size:11px; color:var(--label-text); margin:5px 0;">Load CSV first, then tap points on the map.</p>
+            <div style="display:flex; gap:5px; margin-bottom: 5px;">
+                <button id="btn_draw_bdy" class="btn-action" style="background:#f59e0b; flex:2; font-size:12px; padding:8px;" onclick="if(typeof toggleBoundaryDrawMode === 'function') toggleBoundaryDrawMode()">✏️ Outer Boundary</button>
+                <button class="btn-action" style="background:#8b5cf6; flex:1; font-size:12px; padding:8px;" onclick="if(typeof undoManualBoundary === 'function') undoManualBoundary()">↩️ Undo</button>
+                <button class="btn-action" style="background:#ef4444; flex:1; font-size:12px; padding:8px;" onclick="if(typeof clearManualBoundary === 'function') clearManualBoundary()">🗑️ Clear</button>
+            </div>
+            <!-- 🔴 Exclude Area (Breakline) အတွက် နေရာ (Undo ပါ ထည့်ထားသည်) -->
+            <div style="display:flex; gap:5px; border-top: 1px dashed var(--input-border); padding-top: 5px;">
+                <button id="btn_draw_exclude" class="btn-action" style="background:#0284c7; flex:2; font-size:12px; padding:8px;" onclick="if(typeof toggleExcludeDrawMode === 'function') toggleExcludeDrawMode()">🚫 Exclude Area</button>
+                <button class="btn-action" style="background:#8b5cf6; flex:1; font-size:12px; padding:8px;" onclick="if(typeof undoExcludeBoundary === 'function') undoExcludeBoundary()">↩️ Undo</button>
+                <button class="btn-action" style="background:#ef4444; flex:1; font-size:12px; padding:8px;" onclick="if(typeof clearExcludeBoundaries === 'function') clearExcludeBoundaries()">🗑️ Clear</button>
             </div>
         </div>
     </div>
@@ -813,12 +821,37 @@
 <!-- 🔴 အသစ်ထပ်ဖြည့်ရန်: CSV Status ပြမည့်နေရာ -->
     <div id="topo_status" style="margin-top:10px; font-size:13px; font-weight:bold; text-align:center; display:none;"></div>
 
-    <!-- 🔴 အသစ်ထပ်ဖြည့်ရန်: Topo ထုတ်ပြီးရင် ပေါ်လာမည့် Export Box -->
+    <!-- 🔴 Topo ထုတ်ပြီးရင် ပေါ်လာမည့် Export Box -->
     <div id="topo_export_box" class="hidden" style="margin-top:15px; padding-top:15px; border-top:2px dashed #cbd5e1;">
-        <div style="display:flex; gap:5px;">
-            <button class="btn-action" style="background:#ca8a04; flex:1; padding:12px; font-size:13px;" onclick="if(typeof exportTopoDXF === 'function') exportTopoDXF()">🗺️ Export DXF</button>
-            <button class="btn-action" style="background:#ef4444; flex:1; padding:12px; font-size:13px;" onclick="if(typeof clearTopoData === 'function') clearTopoData()">🗑️ Clear Data</button>
+        <div style="display:flex; gap:5px; margin-bottom: 5px;">
+            <button class="btn-action" style="background:#0284c7; flex:1; padding:12px; font-size:13px;" onclick="if(typeof view3DSurface === 'function') view3DSurface()">🏔️ View 3D Map</button>
+            <button class="btn-action" style="background:#10b981; flex:1; padding:12px; font-size:13px;" onclick="if(typeof export3DTinDXF === 'function') export3DTinDXF()">🔺 Export 3D DXF</button>
         </div>
+        <div style="display:flex; gap:5px; margin-bottom: 5px;">
+            <button class="btn-action" style="background:#ca8a04; flex:1; padding:12px; font-size:13px;" onclick="if(typeof exportTopoDXF === 'function') exportTopoDXF()">🗺️ Export 2D DXF</button>
+            <!-- 🔴 အသစ်ထည့်ထားသော 3D KML ခလုတ် -->
+            <button class="btn-action" style="background:#8b5cf6; flex:1; padding:12px; font-size:13px;" onclick="if(typeof exportTopo3DKML === 'function') exportTopo3DKML()">🌍 Export 3D KML</button>
+        </div>
+        <div style="display:flex; gap:5px;">
+            <button class="btn-action" style="background:#ef4444; width:100%; padding:12px; font-size:13px;" onclick="if(typeof clearTopoData === 'function') clearTopoData()">🗑️ Clear Data</button>
+        </div>
+    </div>
+
+    <!-- 🔴 3D Viewer ပေါ်လာမည့် Popup Modal အခွံ -->
+    <div id="topo3dModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:99999; justify-content:center; align-items:center; flex-direction: column;">
+        <div style="width:100%; display:flex; justify-content:space-between; padding:10px 20px; background:#0f172a; align-items:center;">
+            <h3 style="color:#38bdf8; margin:0; font-size:16px;">🏔️ 3D TIN Surface View</h3>
+            <button onclick="document.getElementById('topo3dModal').style.display='none'" style="background:#ef4444; color:white; border:none; padding:8px 15px; border-radius:5px; font-weight:bold; cursor:pointer;">Close ❌</button>
+        </div>
+        
+        <!-- 🔴 အသစ်ထည့်ထားသော Z-Scale Slider နေရာ -->
+        <div style="width:100%; background:#1e293b; padding:10px 20px; display:flex; align-items:center; gap:15px; border-bottom:1px solid #334155;">
+            <label style="color:#94a3b8; font-size:13px; font-weight:bold; white-space:nowrap;">Z-Scale: <span id="z_scale_val" style="color:#38bdf8;">0.5x</span></label>
+            <!-- Range က 0.1 (ပြားပြားလေး) ကနေ 2.0 (အရမ်းမြင့်သော) အထိ ထားပေးထားပါတယ် -->
+            <input type="range" id="topo_z_scale" min="0.1" max="2.0" step="0.1" value="0.5" style="flex:1; cursor:pointer;" oninput="update3DScale(this.value)">
+        </div>
+
+        <div id="plotly_3d_div" style="width:100%; flex:1; background:#1e293b;"></div>
     </div>
                    </div>
                 </div>
@@ -913,6 +946,8 @@
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_so_texts" checked onchange="toggleDxfLayers()"> 🔠 SO Text</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_topo_pts" checked onchange="if(typeof toggleTopoLayers==='function') toggleTopoLayers()"> ⛰️ Topo Pts</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_topo_contours" checked onchange="if(typeof toggleTopoLayers==='function') toggleTopoLayers()"> 〰️ Contours</label>
+                    <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_topo_tin" onchange="if(typeof toggleTopoLayers==='function') toggleTopoLayers()"> 🔺 TIN Surface</label>
+                    <label style="font-size:12px; font-weight:bold; cursor:pointer; color:#2563eb;"><input type="checkbox" id="tgl_utm_zones" onchange="if(typeof toggleUTMZones==='function') toggleUTMZones()"> 🌐 UTM Zones</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer; width:100%; border-top:1px dashed #ccc; padding-top:6px;"><input type="checkbox" id="tgl_dxf_dark" onchange="reRenderDXFColors()"> 🌙 Use Dark Colors for DXF</label>
                 </div>
                 <div class="map-wrapper" id="map_container">
@@ -978,6 +1013,22 @@
                     <option value="2">WGS84 LL (Lat, Lon) → Local NE</option>
                     <option value="3">WGS84 NE (PNEZD) → Local NE & LL</option>
                 </select>
+        <!-- CSV အတွက် သီးသန့် Zone/Hemi ရွေးမည့်နေရာ -->
+<div id="csv_zone_settings" style="display:none; gap:8px; margin-bottom:10px;">
+    
+    <!-- Zone Box (ရှေ့မှာ စာသားပါဝင်သည်) -->
+    <div style="flex:1; display:flex; align-items:center; border:1px solid var(--input-border); border-radius:6px; overflow:hidden; background:var(--card-bg);">
+        <div style="padding: 0 10px; font-size:12px; font-weight:bold; color:var(--text); background:rgba(0,0,0,0.05); height:100%; display:flex; align-items:center; border-right:1px solid var(--input-border);">Zone</div>
+        <input type="number" id="csv_zone_inp" class="v2-input" value="47" style="border:none; border-radius:0; margin:0; flex:1; box-shadow:none; background:transparent;">
+    </div>
+
+    <!-- Hemisphere Dropdown -->
+    <select id="csv_hemi_inp" class="v2-input" style="flex:1; margin:0; display:none;">
+        <option value="N">Hemi: North (N)</option>
+        <option value="S">Hemi: South (S)</option>
+    </select>
+    
+</div>
                 <input type="file" id="csv_file" accept=".csv" style="display:none;" onchange="handleCSVFile(event)">
                 <div style="display:flex; gap:5px; margin-top:5px;">
                     <button class="csv-upload-btn" style="flex:3; margin-top:0;" onclick="document.getElementById('csv_file').click()">📂 Select CSV File</button>
@@ -1031,6 +1082,7 @@
 <script src="app_survey_tools.js"></script>
 <script src="app_camera.js"></script>
 <script src="app_logic.js"></script>
+<script src="app_topo_3d.js"></script>
 <script src="https://pl29905456.effectivecpmnetwork.com/7f/6e/47/7f6e47086726dcc7791f39e47405f88d.js"></script>
 </body>
 </html>
