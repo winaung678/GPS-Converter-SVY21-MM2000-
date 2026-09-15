@@ -96,7 +96,8 @@ window.triggerClearRecords = function() {
 };
 
 window.handleCSVFile = function(event) { const file = event.target.files[0]; if (!file) return; let statBox = document.getElementById('csv_status'); let dlBtn = document.getElementById('csv_download_btn'); if(statBox) { statBox.style.display = 'block'; statBox.innerHTML = `⏳ Processing <b>${file.name}</b>...`; } if(dlBtn) { dlBtn.style.display = 'none'; } const reader = new FileReader(); reader.onload = function(e) { processCSVText(e.target.result, file.name, parseInt(document.getElementById('csv_mode').value)); }; reader.onerror = function() { if(statBox) statBox.innerHTML = "❌ Failed to read CSV file."; }; reader.readAsText(file); };
-function processCSVText(csvText, originalFileName, mode) { let lines = csvText.split('\n'); let outCSV = "Point,Local_N,Local_E,WGS_Lat,WGS_Lon,WGS_UTM_N,WGS_UTM_E,Z,Description\n"; let successCount = 0; let dName = (window.activeApp === 1) ? "SVY21" : (window.activeApp === 2) ? "MM2000" : "Global UTM"; let globalUserZone = parseInt(document.getElementById('g_zone')?.value) || 47; let globalUserHemi = document.getElementById('g_hemi')?.value || 'N'; for (let i = 0; i < lines.length; i++) { let line = lines[i].trim(); if (!line) continue; let cols = line.split(','); let p = cols[0].trim(); let val1 = parseFloat(cols[1]); let val2 = parseFloat(cols[2]); if (isNaN(val1) || isNaN(val2)) continue; let z = parseFloat(cols[3]) || 0.000; let d = cols.length > 4 ? cols.slice(4).join(',').trim() : ""; let lN = 0, lE = 0, wLa = 0, wLo = 0, wN = 0, wE = 0; if (window.activeApp === 1) { if (mode === 1) { lN = val1; lE = val2; let r = calc_v2_rev(lE, lN); wLa = r.lat; wLo = r.lon; let pW = m_project(wLa, wLo, 48, m_WGS); wE = pW.e; wN = pW.n; } else if (mode === 2) { wLa = val1; wLo = val2; let r = calc_v2_fwd(wLa, wLo); lN = r.N; lE = r.E; let pW = m_project(wLa, wLo, Math.floor((wLo+180)/6)+1, m_WGS); wE = pW.e; wN = pW.n; } else if (mode === 3) { wN = val1; wE = val2; let i = m_inverse(wE, wN, 48, m_WGS); wLa = i.lat; wLo = i.lon; let r = calc_v2_fwd(wLa, wLo); lN = r.N; lE = r.E; } } else if (window.activeApp === 2) { let z_utm = parseInt(document.getElementById('m_zone').value) || 47; if (mode === 1) { lE = val2; lN = val1; let i_m = m_inverse(lE, lN, z_utm, m_EVE); let mLa = i_m.lat; let mLo = i_m.lon; let x = m_llh2xyz(mLa, mLo, 0, m_EVE); let wL = m_xyz2llh(x.x-m_DX, x.y-m_DY, x.z-m_DZ, m_WGS); wLa = wL.lat; wLo = wL.lon; let pW = m_project(wLa, wLo, z_utm, m_WGS); wE = pW.e; wN = pW.n; } else if (mode === 2) { wLa = val1; wLo = val2; let pW = m_project(wLa, wLo, z_utm, m_WGS); wE = pW.e; wN = pW.n; let x = m_llh2xyz(wLa, wLo, 0, m_WGS); let mL = m_xyz2llh(x.x+m_DX, x.y+m_DY, x.z+m_DZ, m_EVE); let pM = m_project(mL.lat, mL.lon, z_utm, m_EVE); lE = pM.e; lN = pM.n; } else if (mode === 3) { wN = val1; wE = val2; let i_w = m_inverse(wE, wN, z_utm, m_WGS); wLa = i_w.lat; wLo = i_w.lon; let x = m_llh2xyz(wLa, wLo, 0, m_WGS); let mL = m_xyz2llh(x.x+m_DX, x.y+m_DY, x.z+m_DZ, m_EVE); let pM = m_project(mL.lat, mL.lon, z_utm, m_EVE); lE = pM.e; lN = pM.n; } } else if (window.activeApp === 5) { if (mode === 1 || mode === 3) { lE = val2; lN = val1; wE = lE; wN = lN; let calcN = wN; if (globalUserHemi === 'S') calcN -= 10000000; let i_w = m_inverse(wE, calcN, globalUserZone, m_WGS); wLa = i_w.lat; wLo = i_w.lon; } else if (mode === 2) { wLa = val1; wLo = val2; let autoZone = Math.floor((wLo + 180) / 6) + 1; let autoHemi = wLa >= 0 ? 'N' : 'S'; let pW = m_project(wLa, wLo, autoZone, m_WGS); wE = pW.e; wN = pW.n; if (autoHemi === 'S') wN += 10000000; lE = wE; lN = wN; } } outCSV += `${p},${lN.toFixed(3)},${lE.toFixed(3)},${wLa.toFixed(8)},${wLo.toFixed(8)},${wN.toFixed(3)},${wE.toFixed(3)},${z.toFixed(3)},${d}\n`; successCount++; } let statBox = document.getElementById('csv_status'); if(successCount > 0) { window.finalCSVOutput = outCSV; if(statBox) statBox.innerHTML = `✅ Successfully converted <b>${successCount}</b> points! (${dName})`; let dlBtn = document.getElementById('csv_download_btn'); if(dlBtn) dlBtn.style.display = 'block'; } else { if(statBox) statBox.innerHTML = `⚠️ No valid points found. Check your PNEZD format.`; } document.getElementById('csv_file').value = ""; }
+function processCSVText(csvText, originalFileName, mode) { let lines = csvText.split('\n'); let outCSV = "Point,Local_N,Local_E,WGS_Lat,WGS_Lon,WGS_UTM_N,WGS_UTM_E,Z,Description\n"; let successCount = 0; let dName = (window.activeApp === 1) ? "SVY21" : (window.activeApp === 2) ? "MM2000" : "Global UTM"; let csvUserZone = parseInt(document.getElementById('csv_zone_inp')?.value) || 47;
+    let csvUserHemi = document.getElementById('csv_hemi_inp')?.value || 'N'; for (let i = 0; i < lines.length; i++) { let line = lines[i].trim(); if (!line) continue; let cols = line.split(','); let p = cols[0].trim(); let val1 = parseFloat(cols[1]); let val2 = parseFloat(cols[2]); if (isNaN(val1) || isNaN(val2)) continue; let z = parseFloat(cols[3]) || 0.000; let d = cols.length > 4 ? cols.slice(4).join(',').trim() : ""; let lN = 0, lE = 0, wLa = 0, wLo = 0, wN = 0, wE = 0; if (window.activeApp === 1) { if (mode === 1) { lN = val1; lE = val2; let r = calc_v2_rev(lE, lN); wLa = r.lat; wLo = r.lon; let pW = m_project(wLa, wLo, 48, m_WGS); wE = pW.e; wN = pW.n; } else if (mode === 2) { wLa = val1; wLo = val2; let r = calc_v2_fwd(wLa, wLo); lN = r.N; lE = r.E; let pW = m_project(wLa, wLo, Math.floor((wLo+180)/6)+1, m_WGS); wE = pW.e; wN = pW.n; } else if (mode === 3) { wN = val1; wE = val2; let i = m_inverse(wE, wN, 48, m_WGS); wLa = i.lat; wLo = i.lon; let r = calc_v2_fwd(wLa, wLo); lN = r.N; lE = r.E; } } else if (window.activeApp === 2) { let z_utm = csvUserZone; if (mode === 1) { lE = val2; lN = val1; let i_m = m_inverse(lE, lN, z_utm, m_EVE); let mLa = i_m.lat; let mLo = i_m.lon; let x = m_llh2xyz(mLa, mLo, 0, m_EVE); let wL = m_xyz2llh(x.x-m_DX, x.y-m_DY, x.z-m_DZ, m_WGS); wLa = wL.lat; wLo = wL.lon; let pW = m_project(wLa, wLo, z_utm, m_WGS); wE = pW.e; wN = pW.n; } else if (mode === 2) { wLa = val1; wLo = val2; let pW = m_project(wLa, wLo, z_utm, m_WGS); wE = pW.e; wN = pW.n; let x = m_llh2xyz(wLa, wLo, 0, m_WGS); let mL = m_xyz2llh(x.x+m_DX, x.y+m_DY, x.z+m_DZ, m_EVE); let pM = m_project(mL.lat, mL.lon, z_utm, m_EVE); lE = pM.e; lN = pM.n; } else if (mode === 3) { wN = val1; wE = val2; let i_w = m_inverse(wE, wN, z_utm, m_WGS); wLa = i_w.lat; wLo = i_w.lon; let x = m_llh2xyz(wLa, wLo, 0, m_WGS); let mL = m_xyz2llh(x.x+m_DX, x.y+m_DY, x.z+m_DZ, m_EVE); let pM = m_project(mL.lat, mL.lon, z_utm, m_EVE); lE = pM.e; lN = pM.n; } } else if (window.activeApp === 5) { if (mode === 1 || mode === 3) { lE = val2; lN = val1; wE = lE; wN = lN; let calcN = wN; if (csvUserHemi === 'S') calcN -= 10000000; let i_w = m_inverse(wE, calcN, csvUserZone, m_WGS); wLa = i_w.lat; wLo = i_w.lon; } else if (mode === 2) { wLa = val1; wLo = val2; let autoZone = Math.floor((wLo + 180) / 6) + 1; let autoHemi = wLa >= 0 ? 'N' : 'S'; let pW = m_project(wLa, wLo, autoZone, m_WGS); wE = pW.e; wN = pW.n; if (autoHemi === 'S') wN += 10000000; lE = wE; lN = wN; } } outCSV += `${p},${lN.toFixed(3)},${lE.toFixed(3)},${wLa.toFixed(8)},${wLo.toFixed(8)},${wN.toFixed(3)},${wE.toFixed(3)},${z.toFixed(3)},${d}\n`; successCount++; } let statBox = document.getElementById('csv_status'); if(successCount > 0) { window.finalCSVOutput = outCSV; if(statBox) statBox.innerHTML = `✅ Successfully converted <b>${successCount}</b> points! (${dName})`; let dlBtn = document.getElementById('csv_download_btn'); if(dlBtn) dlBtn.style.display = 'block'; } else { if(statBox) statBox.innerHTML = `⚠️ No valid points found. Check your PNEZD format.`; } document.getElementById('csv_file').value = ""; }
 window.downloadCSV = function() { if (!window.finalCSVOutput) return; let dName = (window.activeApp === 1) ? "SVY21" : (window.activeApp === 2) ? "MM2000" : "Global_UTM"; let fileName = `Converted_${dName}_Points.csv`; if (window.AndroidNative && window.AndroidNative.downloadConvertedCSV) { window.AndroidNative.downloadConvertedCSV(window.finalCSVOutput, fileName); } else { let blob = new Blob([window.finalCSVOutput], { type: 'text/csv;charset=utf-8;' }); let url = URL.createObjectURL(blob); let link = document.createElement("a"); link.setAttribute("href", url); link.setAttribute("download", fileName); document.body.appendChild(link); link.click(); document.body.removeChild(link); } };
 window.clearCSVFile = function() { let csvFileInput = document.getElementById('csv_file'); if(csvFileInput) csvFileInput.value = ""; let statusBox = document.getElementById('csv_status'); if(statusBox) statusBox.style.display = 'none'; let dlBtn = document.getElementById('csv_download_btn'); if(dlBtn) dlBtn.style.display = 'none'; window.finalCSVOutput = ""; };
 
@@ -1333,6 +1334,10 @@ window.topoPoints = [];
 window.topoTriangles = []; 
 window.topoContours = []; 
 window.topoBoundaryPolygon = []; 
+window.topoBoundaryPolygon = []; 
+window.topoExcludePolygons = []; // ရေကန် အများကြီးဆွဲလို့ရအောင် Array အကြီး
+window.currentExcludePolygon = []; // လက်ရှိဆွဲနေတဲ့ ရေကန်
+window.isDrawingExclude = false;
 
 window.isDrawingBoundary = false;
 window.topoPointsLayer = null; 
@@ -1498,11 +1503,19 @@ function showTopoPointsOnMapOnly() {
             
             marker.bindTooltip(`${pt.p}<br>Z: ${pt.z.toFixed(3)}`, { direction: 'top', className: 'pt-tooltip' });
             
-            marker.on('click', function(e) {
-                if (window.activeApp === 4 && window.isDrawingBoundary) {
-                    L.DomEvent.stopPropagation(e);
-                    window.topoBoundaryPolygon.push({ n: pt.n, e: pt.e, lat: lat, lon: lon });
-                    updateBoundaryDrawUI();
+           marker.on('click', function(e) {
+                if (window.activeApp === 4) {
+                    if (window.isDrawingBoundary) {
+                        L.DomEvent.stopPropagation(e);
+                        window.topoBoundaryPolygon.push({ n: pt.n, e: pt.e, lat: lat, lon: lon });
+                        updateBoundaryDrawUI();
+                    } 
+                    // 🔴 Exclude Area အတွက် အသစ်ထပ်တိုးထားသည်
+                    else if (window.isDrawingExclude) {
+                        L.DomEvent.stopPropagation(e);
+                        window.currentExcludePolygon.push({ n: pt.n, e: pt.e, lat: lat, lon: lon });
+                        updateBoundaryDrawUI();
+                    }
                 }
             });
 
@@ -1514,17 +1527,66 @@ function showTopoPointsOnMapOnly() {
     if (bounds.length > 0) window.leafletMap.fitBounds(L.latLngBounds(bounds), {padding: [30, 30], maxZoom: 22});
 }
 
+// --- Exclude Boundary (Holes) Functions ---
+window.toggleExcludeDrawMode = function() {
+    if (window.topoPoints.length === 0) return alert("Please Load CSV Points first!");
+
+    // Outer Draw ဖွင့်ထားရင် ပိတ်မယ်
+    if (window.isDrawingBoundary) window.toggleBoundaryDrawMode();
+
+    window.isDrawingExclude = !window.isDrawingExclude;
+    let btn = document.getElementById('btn_draw_exclude');
+    
+    if (window.isDrawingExclude) {
+        btn.innerText = "✅ Finish Exclude Area";
+        btn.style.background = "#16a34a"; // အစိမ်းရောင်ပြောင်းသွားမယ်
+        window.currentExcludePolygon = []; // စဆွဲဖို့ အလွတ်လုပ်မယ်
+        alert("Tap points to draw an Exclude Area (e.g., Pond). Click 'Finish' when done.");
+    } else {
+        btn.innerText = "🚫 Draw Exclude Area (Hole)";
+        btn.style.background = "#0284c7";
+        // ဆွဲပြီးသွားလို့ ပိတ်လိုက်ရင် သိမ်းထားလိုက်မယ်
+        if (window.currentExcludePolygon.length > 2) {
+            window.topoExcludePolygons.push([...window.currentExcludePolygon]);
+        }
+        window.currentExcludePolygon = [];
+        updateBoundaryDrawUI(true); 
+    }
+};
+
+window.clearExcludeBoundaries = function() {
+    window.topoExcludePolygons = [];
+    window.currentExcludePolygon = [];
+    if (window.isDrawingExclude) window.toggleExcludeDrawMode();
+    updateBoundaryDrawUI(true);
+};
+
+window.undoExcludeBoundary = function() {
+    // လက်ရှိ ဆွဲလက်စ ရေကန်အမှတ်တွေ ရှိနေရင် နောက်ဆုံးတစ်ခုကို ဖျက်မယ်
+    if (window.currentExcludePolygon && window.currentExcludePolygon.length > 0) {
+        window.currentExcludePolygon.pop(); 
+        updateBoundaryDrawUI(); // မြေပုံပေါ်က မျဉ်းကို Update ပြန်လုပ်မယ်
+    } else {
+        alert("No points to undo in the current exclude area.");
+    }
+};
+
 window.toggleBoundaryDrawMode = function() {
     if (window.topoPoints.length === 0) return alert("Please Load CSV Points first!");
 
+    // 🔴 အသစ်ဖြည့်စွက်ချက်: Exclude (ရေကန်) ဆွဲတာ ဖွင့်ထားရင် အလိုလို ပြန်ပိတ်ပေးမယ် (မငြိအောင်လို့)
+    if (window.isDrawingExclude) window.toggleExcludeDrawMode();
+
     window.isDrawingBoundary = !window.isDrawingBoundary;
     let btn = document.getElementById('btn_draw_bdy');
+    
     if (window.isDrawingBoundary) {
-        btn.innerText = "🛑 Finish Boundary";
+        btn.innerText = "🛑 Finish Outer";
         btn.style.background = "#ef4444";
-        alert("Click on the points on the map to draw your boundary line.");
+        alert("Click on the points on the map to draw your outer boundary line.");
     } else {
-        btn.innerText = "✏️ Start Drawing";
+        // 🔴 စာသား ပြန်မှန်သွားအောင် ပြင်ထားသည်
+        btn.innerText = "✏️ Outer Boundary"; 
         btn.style.background = "#f59e0b";
         updateBoundaryDrawUI(true); 
     }
@@ -1552,11 +1614,27 @@ function updateBoundaryDrawUI(isClosed = false) {
     if (!window.leafletMap) return;
     if (window.topoBdyLayer) window.leafletMap.removeLayer(window.topoBdyLayer);
 
+    let layers = [];
+
+    // Outer Boundary (အနီရောင်မျဉ်း)
     if (window.topoBoundaryPolygon.length > 0) {
         let latlngs = window.topoBoundaryPolygon.map(pt => [pt.lat, pt.lon]);
         if (isClosed && latlngs.length > 2) latlngs.push(latlngs[0]); 
+        layers.push(L.polyline(latlngs, { color: '#ef4444', weight: 3, dashArray: '5, 5' }));
+    }
 
-        window.topoBdyLayer = L.polyline(latlngs, { color: '#ef4444', weight: 3, dashArray: '5, 5' }).addTo(window.leafletMap);
+    // Exclude Boundaries (အပြာရောင်မျဉ်း / Holes တွေ အကုန်ဆွဲပြမယ်)
+    let allExcludes = [...window.topoExcludePolygons];
+    if (window.currentExcludePolygon.length > 0) allExcludes.push(window.currentExcludePolygon);
+
+    allExcludes.forEach(hole => {
+        let h_latlngs = hole.map(pt => [pt.lat, pt.lon]);
+        if (h_latlngs.length > 2) h_latlngs.push(h_latlngs[0]); // ပိတ်သွားအောင်ဆွဲမယ်
+        layers.push(L.polygon(h_latlngs, { color: '#0284c7', weight: 2, fillColor: '#0ea5e9', fillOpacity: 0.2, dashArray: '4, 4' }));
+    });
+
+    if (layers.length > 0) {
+        window.topoBdyLayer = L.layerGroup(layers).addTo(window.leafletMap);
     }
 }
 
@@ -1602,6 +1680,27 @@ window.processTopoSurface = function() {
             return isPointInBoundary(centerN, centerE, window.topoBoundaryPolygon);
         });
     }
+
+// 🔴 အသစ်ပြင်ဆင်ချက်: Exclude Area (Breaklines / Holes) များကို ဖယ်ထုတ်ခြင်း
+    if (window.topoExcludePolygons.length > 0) {
+        window.topoTriangles = window.topoTriangles.filter(t => {
+            // တြိဂံ၏ အလယ်ဗဟိုကို ရှာမယ်
+            let centerE = (t.p1.e + t.p2.e + t.p3.e) / 3;
+            let centerN = (t.p1.n + t.p2.n + t.p3.n) / 3;
+            
+            let isInsideHole = false;
+            // ရေကန် (Exclude Polygon) တစ်ခုချင်းစီနဲ့ လိုက်တိုက်စစ်မယ်
+            for (let i = 0; i < window.topoExcludePolygons.length; i++) {
+                if (isPointInBoundary(centerN, centerE, window.topoExcludePolygons[i])) {
+                    isInsideHole = true; 
+                    break;
+                }
+            }
+            // ရေကန်ထဲမှာ 'မရှိတဲ့' (!isInsideHole) တြိဂံတွေကိုပဲ ချန်ထားမယ်
+            return !isInsideHole; 
+        });
+    }
+
     // 'auto' ဆိုလျှင် မည်သည့်အရာမှ မစစ်ထုတ်ဘဲ အားလုံးကို ယူမည်
 
     // 🔴 3. Contour များကို "စစ်ထုတ်ပြီးသား တြိဂံများ" မှသာ ဆွဲမည် (ဖြတ်ထုတ်စရာ မလိုတော့ပါ)
@@ -1615,6 +1714,7 @@ window.processTopoSurface = function() {
     document.getElementById('topo_export_box').classList.remove('hidden');
 
     showContoursOnMap();
+    showTinOnMap(); // 🔴 TIN Surface ကို မြေပုံပေါ်ဆွဲတင်ရန် ခေါ်မည်
 };
 
 function showContoursOnMap() {
@@ -1715,6 +1815,70 @@ window.updateContourStyle = function() {
         }
     });
 };
+
+// 🔴 အသစ်ထည့်ထားသော Function (TIN Triangles များကို မြေပုံပေါ်ဆွဲရန်)
+function showTinOnMap() {
+    if (!window.leafletMap) return;
+
+    if (window.topoTinLayer) window.leafletMap.removeLayer(window.topoTinLayer);
+    window.topoTinLayer = L.layerGroup(); // Map ပေါ် ချက်ချင်းမတင်သေးပါ၊ Checkbox အခြေအနေစစ်ပြီးမှ တင်ပါမည်
+
+    let datum = document.getElementById('topo_datum').value;
+
+    // Coordinate ပြောင်းတဲ့ Helper (Contour က ဟာနဲ့ အတူတူပါပဲ)
+    let getLatLng = (n, e) => {
+        let lat = n, lon = e; 
+        if (datum === 'LOCAL') {
+            lat = (n - window.localOffsetN) / 100000;
+            lon = (e - window.localOffsetE) / 100000;
+        }
+        else if (datum === "SVY21") { 
+            let r = calc_v2_rev(e, n); lat = r.lat; lon = r.lon; 
+        }
+        else if (datum.startsWith("MM")) {
+            let zone = parseInt(datum.slice(-2)); let r = m_inverse(e, n, zone, m_EVE); 
+            let x = m_llh2xyz(r.lat, r.lon, 0, m_EVE); let w = m_xyz2llh(x.x-m_DX, x.y-m_DY, x.z-m_DZ, m_WGS);
+            lat = w.lat; lon = w.lon;
+        }
+        else if (datum.startsWith("WGS_UTM")) { 
+            let zone = parseInt(datum.slice(-2)); 
+            let i = m_inverse(e, n, zone, m_WGS); lat = i.lat; lon = i.lon; 
+        }
+        else if (datum === "GLOBAL_UTM") {
+            let zInput = document.getElementById('topo_custom_zone'); 
+            let hInput = document.getElementById('topo_custom_hemi');
+            let zone = (zInput && zInput.value) ? parseInt(zInput.value) : 47; 
+            let hemi = hInput ? hInput.value : 'N'; 
+            let calcN = n; if (hemi === 'S') calcN -= 10000000; 
+            let i_w = m_inverse(e, calcN, zone, m_WGS); lat = i_w.lat; lon = i_w.lon;
+        }
+        return [lat, lon];
+    };
+
+    // Filter လုပ်ပြီးသား တြိဂံတွေ အားလုံးကို လိုက်ဆွဲမည်
+    window.topoTriangles.forEach(t => {
+        let ll1 = getLatLng(t.p1.n, t.p1.e);
+        let ll2 = getLatLng(t.p2.n, t.p2.e);
+        let ll3 = getLatLng(t.p3.n, t.p3.e);
+
+        if (!isNaN(ll1[0]) && !isNaN(ll2[0]) && !isNaN(ll3[0])) {
+            let mapPoly = L.polygon([ll1, ll2, ll3], {
+                color: '#64748b', // အနားသတ်မျဉ်းအရောင် (Muted Blue/Grey)
+                weight: 1,        // မျဉ်းအပါးလေး
+                fillColor: '#94a3b8', 
+                fillOpacity: 0.1, // အထဲက အရောင်ကို အကြည်ရောင် ခပ်ပါးပါးလေးပဲထားမည်
+                interactive: false // Click နှိပ်လို့မရအောင် ပိတ်ထားမည် (Points တွေကို နှိပ်လို့ရအောင်လို့)
+            });
+            window.topoTinLayer.addLayer(mapPoly);
+        }
+    });
+
+    // 🔴 Checkbox အမှန်ခြစ် ခြစ်ထားရင်သာ မြေပုံပေါ် တင်ပေးမည်
+    let chkTin = document.getElementById('tgl_topo_tin');
+    if (chkTin && chkTin.checked) {
+        window.topoTinLayer.addTo(window.leafletMap);
+    }
+}
 
 // ==========================================
 // 🔴 UPDATED: TOPO DXF EXPORT (WITH GRID, TITLE & NORTH ARROW)
@@ -1946,6 +2110,18 @@ window.toggleTopoLayers = function() {
             window.leafletMap.removeLayer(window.topoLayerGroup);
         }
     }
+
+    // 🔴 TIN Surface Layer အဖွင့်အပိတ် (အသစ်ထည့်ထားသည်)
+    if (window.topoTinLayer) {
+        let chkTin = document.getElementById('tgl_topo_tin');
+        if (chkTin && chkTin.checked) {
+            if (!window.leafletMap.hasLayer(window.topoTinLayer)) {
+                window.leafletMap.addLayer(window.topoTinLayer);
+            }
+        } else {
+            window.leafletMap.removeLayer(window.topoTinLayer);
+        }
+    }
 };
 
 // 🔴 Topo Data နှင့် Map တစ်ခုလုံးကို ရှင်းလင်းမည့် Function
@@ -1956,10 +2132,12 @@ window.clearTopoData = function() {
     window.topoPoints = [];
     window.topoTriangles = [];
     window.topoContours = [];
+    window.topoExcludePolygons = [];
     
     // Map ပေါ်မှ မျဉ်းများကို ဖျက်ခြင်း
     if (window.topoPointsLayer) window.leafletMap.removeLayer(window.topoPointsLayer);
     if (window.topoLayerGroup) window.leafletMap.removeLayer(window.topoLayerGroup);
+    if (window.topoTinLayer) window.leafletMap.removeLayer(window.topoTinLayer); // 🔴 TIN Layer ပါ ရှင်းပစ်မည်
     window.clearManualBoundary(true);
     
     // UI ကို မူလအတိုင်း ပြန်ထားခြင်း

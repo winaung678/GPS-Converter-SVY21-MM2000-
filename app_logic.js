@@ -74,6 +74,8 @@ window.onload = function() {
             if (event.webkitCompassHeading) window.onCompassUpdate(event.webkitCompassHeading); // iOS
         }, true);
     }
+// Browser ၏ Ghost Event ကို ကာကွယ်ရန် Initial State ကပ်ခြင်း
+    history.replaceState({page: 0}, "Dashboard", "");
 };
 
 function attachPasteFilterToInputs() {
@@ -163,6 +165,21 @@ window.switchApp = function(n) {
     if (n === 3 || n === 6) { window.isTopoMode = false; menuBtn.classList.add('hidden'); document.getElementById('shared_map_view').classList.remove('hidden'); let mapDiv = document.getElementById('map_view'); if (n === 6) { mapDiv.classList.add('map-full-height'); } else { mapDiv.classList.remove('map-full-height'); } }
     else if (n === 4) { window.isTopoMode = false; menuBtn.classList.add('hidden'); document.getElementById('shared_map_view').classList.add('hidden'); document.getElementById('map_view').classList.remove('map-full-height'); if (typeof window.closeCogoTool === "function") window.closeCogoTool(); }
     else if (n === 7) { document.getElementById('shared_map_view').classList.add('hidden'); window.isTopoMode = false; menuBtn.classList.add('hidden'); }
+
+// 🔴 CSV Zone Box များကို လိုအပ်တဲ့ App မှာပဲ ဖော်ပြရန်
+    let csvZoneSet = document.getElementById('csv_zone_settings');
+    let csvHemiInp = document.getElementById('csv_hemi_inp');
+    if (csvZoneSet) {
+        if (n === 2) { // MM2000
+            csvZoneSet.style.display = 'flex';
+            csvHemiInp.style.display = 'none'; // MM2000 က North အမြဲဖြစ်လို့ Hemi မလိုပါ
+        } else if (n === 5) { // Global UTM
+            csvZoneSet.style.display = 'flex';
+            csvHemiInp.style.display = 'block'; // Global မို့လို့ North/South ရွေးခွင့်ပေးမယ်
+        } else { // SVY21 (n === 1)
+            csvZoneSet.style.display = 'none'; // SVY က Zone မလိုပါ
+        }
+    }
 
     let csvSelect = document.getElementById('csv_mode');
     if(csvSelect) { if (n === 5) { csvSelect.options[0].text = `UTM (PNEZD) → WGS84 (Lat, Lon)`; csvSelect.options[1].text = `WGS84 (Lat, Lon) → UTM (PNEZD)`; csvSelect.options[2].style.display = 'none'; if (csvSelect.value === "3") csvSelect.value = "1"; } else { let dName = (n === 1) ? "SVY21" : "MM2000"; csvSelect.options[0].text = `${dName} (Local NE) → WGS84 LL & NE`; csvSelect.options[1].text = `WGS84 LL (Lat, Lon) → ${dName} NE`; csvSelect.options[2].text = `WGS84 NE → ${dName} Local NE`; csvSelect.options[2].style.display = 'block'; } }
@@ -337,6 +354,9 @@ window.openPlayStore = function() {
 };
 
 window.addEventListener("popstate", function(e) {
+    // 🔴 ဤစာကြောင်းသည် Ghost Event (State မပါဘဲ Auto ပြန်ထွက်ခြင်း) ကို တားဆီးပေးပါမည်
+    if (!e.state) return; 
+
     let modals = document.querySelectorAll('.modal');
     let modalClosed = false;
     modals.forEach(m => {

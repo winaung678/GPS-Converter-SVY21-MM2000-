@@ -838,3 +838,87 @@ window.plotPointsOnMap = function() {
     }
     processChunk();
 };
+
+// ==========================================
+// --- UTM ZONE GRID (ALL 60 ZONES) ---
+// ==========================================
+
+window.utmZonesLayer = null;
+
+window.drawUTMZones = function() {
+    if (!window.leafletMap) return;
+    
+    // Layer အဟောင်းရှိရင် အရင်ဖျက်မယ်
+    if (window.utmZonesLayer) {
+        window.leafletMap.removeLayer(window.utmZonesLayer);
+    }
+    
+    window.utmZonesLayer = L.layerGroup();
+    let isDarkMode = document.getElementById('master-ui').classList.contains('dark-mode');
+    let lineColor = isDarkMode ? '#60a5fa' : '#2563eb'; // အပြာရောင်
+    
+    // 1. Longitude မျဉ်းများကို 6 ဒီဂရီ ခြားတိုင်း ဆွဲမည် (Zone 1 to 60)
+    for (let lon = -180; lon <= 180; lon += 6) {
+        // မြောက်ဘက် 84 ကနေ တောင်ဘက် 80 အထိ မျဉ်းဆွဲမည် (UTM သတ်မှတ်ချက်အရ)
+        let line = L.polyline([[84, lon], [-80, lon]], {
+            color: lineColor,
+            weight: 1.5,
+            dashArray: '5, 5', // မျဉ်းပြတ်
+            opacity: 0.6,
+            interactive: false
+        });
+        window.utmZonesLayer.addLayer(line);
+    }
+
+    // 2. Zone နာမည် စာသား (Label) များကို နေရာချမည်
+    for (let zone = 1; zone <= 60; zone++) {
+        let centerLon = -180 + (zone * 6) - 3; // Zone တစ်ခုစီရဲ့ အလယ်ဗဟို Longitude
+        
+        // မြေပုံပေါ်မှာ စာသားတွေ နေရာအနှံ့ ပေါ်နေအောင် လတ္တီကျု အဆင့်ဆင့် ခွဲရေးမည်
+        let latIntervals = [-60, -40, -20, 0, 20, 40, 60, 80];
+        
+        latIntervals.forEach(lat => {
+            let labelIcon = L.divIcon({
+                className: 'utm-zone-label',
+                html: `<div style="color:${lineColor}; font-weight:bold; font-size:14px; text-shadow: 1px 1px 2px white, -1px -1px 2px white;">Zone ${zone}</div>`,
+                iconSize: [60, 20],
+                iconAnchor: [30, 10]
+            });
+            
+            let marker = L.marker([lat, centerLon], {
+                icon: labelIcon,
+                interactive: false
+            });
+            window.utmZonesLayer.addLayer(marker);
+        });
+    }
+};
+
+window.toggleUTMZones = function() {
+    if (!window.leafletMap) return;
+    let chk = document.getElementById('tgl_utm_zones');
+    
+    if (chk && chk.checked) {
+        if (!window.utmZonesLayer) {
+            window.drawUTMZones(); // ပထမဆုံးအကြိမ် ဖွင့်ရင် ဆွဲမယ်
+        }
+        if (!window.leafletMap.hasLayer(window.utmZonesLayer)) {
+            window.leafletMap.addLayer(window.utmZonesLayer);
+        }
+    } else {
+        if (window.utmZonesLayer && window.leafletMap.hasLayer(window.utmZonesLayer)) {
+            window.leafletMap.removeLayer(window.utmZonesLayer);
+        }
+    }
+};
+
+// Dark Mode ပြောင်းတဲ့အခါ Zone မျဉ်းအရောင်ပါ လိုက်ပြောင်းအောင် ချိတ်ဆက်ခြင်း
+let originalToggleDarkMode = window.toggleDarkMode;
+window.toggleDarkMode = function() {
+    if (typeof originalToggleDarkMode === 'function') originalToggleDarkMode();
+    if (window.utmZonesLayer) {
+        window.drawUTMZones(); // မျဉ်းတွေပြန်ဆွဲမယ်
+        let chk = document.getElementById('tgl_utm_zones');
+        if (chk && chk.checked) window.leafletMap.addLayer(window.utmZonesLayer);
+    }
+};

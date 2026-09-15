@@ -56,26 +56,64 @@ window.m_run = function() {
     document.getElementById('m_out').innerHTML = out;
 };
 
-window.g_toggleUI = function() { let m = document.getElementById('g_mode').value; let n = (m === 'UTM2LL'); document.getElementById('g_ll_div').className = n ? 'hidden' : ''; document.getElementById('g_ne_div').className = n ? '' : 'hidden'; document.getElementById('g_zone').disabled = !n; document.getElementById('g_hemi').disabled = !n; };
+window.g_toggleUI = function() { 
+    let m = document.getElementById('g_mode').value; 
+    let n = (m === 'UTM2LL'); 
+    document.getElementById('g_ll_div').className = n ? 'hidden' : ''; 
+    document.getElementById('g_ne_div').className = n ? '' : 'hidden'; 
+};
 
-window.g_sync = function(p, t) { let v = document.getElementById('g_'+p+'_dd'); if(t === 'dd') { let n = parseFloat(v.value); if(isNaN(n)) return; let a = Math.abs(n), d = Math.floor(a), m = Math.floor((a-d)*60), s = ((a-d-m/60)*3600).toFixed(4); document.getElementById('g_'+p+'_d').value = n < 0 ? -d : d; document.getElementById('g_'+p+'_m').value = m; document.getElementById('g_'+p+'_s').value = s; } else { let d = parseFloat(document.getElementById('g_'+p+'_d').value) || 0; let m = parseFloat(document.getElementById('g_'+p+'_m').value) || 0; let s = parseFloat(document.getElementById('g_'+p+'_s').value) || 0; let sn = (d < 0 || document.getElementById('g_'+p+'_d').value.includes('-')) ? -1 : 1; v.value = (sn * (Math.abs(d) + Math.abs(m)/60 + Math.abs(s)/3600)).toFixed(9); } };
+window.g_sync = function(p, t) { 
+    let v = document.getElementById('g_'+p+'_dd'); 
+    if(t === 'dd') { 
+        let n = parseFloat(v.value); if(isNaN(n)) return; 
+        let a = Math.abs(n), d = Math.floor(a), m = Math.floor((a-d)*60), s = ((a-d-m/60)*3600).toFixed(4); 
+        document.getElementById('g_'+p+'_d').value = n < 0 ? -d : d; 
+        document.getElementById('g_'+p+'_m').value = m; document.getElementById('g_'+p+'_s').value = s; 
+    } else { 
+        let d = parseFloat(document.getElementById('g_'+p+'_d').value) || 0; 
+        let m = parseFloat(document.getElementById('g_'+p+'_m').value) || 0; 
+        let s = parseFloat(document.getElementById('g_'+p+'_s').value) || 0; 
+        let sn = (d < 0 || document.getElementById('g_'+p+'_d').value.includes('-')) ? -1 : 1; 
+        v.value = (sn * (Math.abs(d) + Math.abs(m)/60 + Math.abs(s)/3600)).toFixed(9); 
+    } 
+    if (p === 'lon') {
+        let lonVal = parseFloat(v.value);
+        if (!isNaN(lonVal)) document.getElementById('g_zone').value = Math.floor((lonVal + 180) / 6) + 1;
+    }
+    if (p === 'lat') {
+        let latVal = parseFloat(v.value);
+        if (!isNaN(latVal)) document.getElementById('g_hemi').value = latVal >= 0 ? 'N' : 'S';
+    }
+};
 
 window.g_run = function() {
     let m = document.getElementById('g_mode').value, lat, lon, n, e, zone, hemi;
+    
+    zone = parseInt(document.getElementById('g_zone').value);
+    hemi = document.getElementById('g_hemi').value;
+    
     if(m === 'LL2UTM') {
-        lat = parseFloat(document.getElementById('g_lat_dd').value); lon = parseFloat(document.getElementById('g_lon_dd').value);
+        lat = parseFloat(document.getElementById('g_lat_dd').value); 
+        lon = parseFloat(document.getElementById('g_lon_dd').value);
         if(isNaN(lat) || isNaN(lon)) return;
-        zone = Math.floor((lon + 180) / 6) + 1; hemi = lat >= 0 ? 'N' : 'S';
-        document.getElementById('g_zone').value = zone; document.getElementById('g_hemi').value = hemi;
+        
+        if (isNaN(zone)) {
+            zone = Math.floor((lon + 180) / 6) + 1;
+            document.getElementById('g_zone').value = zone;
+        }
+        
         let pW = m_project(lat, lon, zone, m_WGS); e = pW.e; n = pW.n;
         if (hemi === 'S') n += 10000000;
     } else {
-        e = parseFloat(document.getElementById('g_inp_e').value); n = parseFloat(document.getElementById('g_inp_n').value);
-        zone = parseInt(document.getElementById('g_zone').value); hemi = document.getElementById('g_hemi').value;
+        e = parseFloat(document.getElementById('g_inp_e').value); 
+        n = parseFloat(document.getElementById('g_inp_n').value);
         if(isNaN(e) || isNaN(n) || isNaN(zone)) return;
+        
         let calcN = n; if (hemi === 'S') calcN -= 10000000;
         let iW = m_inverse(e, calcN, zone, m_WGS); lat = iW.lat; lon = iW.lon;
     }
+    
     window.g_map_lat = lat; window.g_map_lon = lon; window.latest_lat = lat; window.latest_lon = lon; window.latest_wgs_N = n; window.latest_wgs_E = e; window.latest_local_N = n; window.latest_local_E = e;
     if(!window.isNativeGPSActive) { window.latest_Z = 0; fetchGeoidDataFromNative(lat, lon); }
     let geoidLabel = window.currentGeoidN ? `Geoid (N): ${window.currentGeoidN.toFixed(3)} m (${window.currentGeoidModel})` : `Geoid (N): N/A`;

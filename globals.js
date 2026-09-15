@@ -44,6 +44,7 @@ window.pointsLayerGroup = null;
 window.distanceLine = null;
 window.areaPolygonLayer = null;
 window.recordedLayerGroup = null; // 🔴 Topo Points များကို Map ပေါ်တင်ရန် Layer
+window.topoTinLayer = null; // 🔴 TIN Surface ဆွဲရန် Layer အသစ်
 
 // User Location & Status
 window.currentLat = 0; window.currentLon = 0;
