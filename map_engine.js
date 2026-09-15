@@ -230,12 +230,12 @@ window.getDatumCoordsForLatLon = function(finalLat, finalLon) {
         if (window.activeApp === 3) {
             datum = soDatumVal;
         } else if (window.activeApp === 4) {
-            // 🔴 အသစ်ပြင်ဆင်ချက်: Topo Tool ဖွင့်ထားရင် Topo ရဲ့ Dropdown ကိုဖတ်မည်
             let topoTool = document.getElementById('cogo_topo_tool');
-            if (topoTool && !topoTool.classList.contains('hidden')) {
+            let volTool = document.getElementById('cogo_vol_tool');
+            if ((topoTool && !topoTool.classList.contains('hidden')) || (volTool && !volTool.classList.contains('hidden'))) {
                 datum = document.getElementById('topo_datum') ? document.getElementById('topo_datum').value : "WGS_LL";
             } else {
-                datum = cogoDatumVal; // Area tool အတွက်
+                datum = cogoDatumVal; 
             }
         } else if (window.activeApp === 6) {
             datum = dxfDatumVal;
@@ -266,9 +266,11 @@ window.getDatumCoordsForLatLon = function(finalLat, finalLon) {
             let zInput = null, hInput = null;
             if (window.activeApp === 6) { 
                 zInput = document.getElementById('dxf_custom_zone'); hInput = document.getElementById('dxf_custom_hemi'); 
-            } else if (window.activeApp === 4) {
+
+          } else if (window.activeApp === 4) {
                 let topoTool = document.getElementById('cogo_topo_tool');
-                if (topoTool && !topoTool.classList.contains('hidden')) {
+                let volTool = document.getElementById('cogo_vol_tool');
+                if ((topoTool && !topoTool.classList.contains('hidden')) || (volTool && !volTool.classList.contains('hidden'))) {
                     zInput = document.getElementById('topo_custom_zone'); hInput = document.getElementById('topo_custom_hemi');
                 } else {
                     zInput = document.getElementById('cogo_custom_zone'); hInput = document.getElementById('cogo_custom_hemi');
@@ -399,6 +401,17 @@ window.initMap = function() {
             popupContent += `<button class="so-popup-btn" style="background:#dc2626; padding:6px 12px; font-size:11px;" onclick="setOutFromMapClick(${finalLat}, ${finalLon})">🎯 Set Out Here</button>`;
             popupContent += `</div>`;
         } 
+
+         if (window.isMeasuring) {
+            addMeasurePoint(finalLat, finalLon, snapResult);
+            return;
+        }
+
+        // 🔴 ထပ်ဖြည့်ရမည့် အပိုင်း (Volume Draw Mode ဖြစ်နေလျှင် Standard Popup ကို မပြပါနှင့်)
+        if (window.activeApp === 4 && window.isVolDrawing) {
+            return; 
+        }
+
        // Area Tool မှလွဲ၍ Topo နှင့် အခြား Tool များတွင် မပေါ်စေရန် Condition ကို တင်းကြပ်လိုက်သည်
         else if (window.activeApp === 4 && typeof window.addMapPointToArea === 'function' && !document.getElementById('cogo_area_tool').classList.contains('hidden')) {
             // Area Calculator ဖွင့်ထားလျှင်သာ ပေါ်မည်
@@ -556,26 +569,57 @@ L.CanvasTextLayer = L.Layer.extend({
     initialize: function (texts, options) { this._texts = texts; L.setOptions(this, options); },
     onAdd: function (map) {
         this._map = map;
-        if (!this._canvas) { this._canvas = L.DomUtil.create('canvas', 'leaflet-zoom-animated'); this._canvas.style.position = 'absolute'; this._canvas.style.left = '0'; this._canvas.style.top = '0'; this._canvas.style.pointerEvents = 'none'; this._ctx = this._canvas.getContext('2d'); }
-        map._panes.overlayPane.appendChild(this._canvas); map.on('move', this._reset, this); map.on('resize', this._reset, this); map.on('zoom', this._reset, this); this._reset();
+        if (!this._canvas) { 
+            this._canvas = L.DomUtil.create('canvas', 'leaflet-zoom-animated'); 
+            this._canvas.style.position = 'absolute'; 
+            this._canvas.style.left = '0'; 
+            this._canvas.style.top = '0'; 
+            this._canvas.style.pointerEvents = 'none'; 
+            
+            // 🔴 အသစ်ထပ်ဖြည့်ချက် - မျဉ်းများအားလုံး၏ အပေါ်သို့ တက်နေစေရန် Z-Index မြှင့်ပေးခြင်း
+            this._canvas.style.zIndex = '650'; 
+            
+            this._ctx = this._canvas.getContext('2d'); 
+        }
+        
+        // 🔴 အရေးကြီးသော ပြင်ဆင်ချက် - overlayPane အစား အပေါ်ဆုံးအလွှာဖြစ်သော tooltipPane သို့ ပြောင်းတင်ခြင်း
+        map._panes.tooltipPane.appendChild(this._canvas); 
+        
+        map.on('move', this._reset, this); map.on('resize', this._reset, this); map.on('zoom', this._reset, this); 
+        this._reset();
     },
-    onRemove: function (map) { L.DomUtil.remove(this._canvas); map.off('move', this._reset, this); map.off('resize', this._reset, this); map.off('zoom', this._reset, this); },
-    _reset: function () { let size = this._map.getSize(); let tl = this._map.containerPointToLayerPoint([0, 0]); L.DomUtil.setPosition(this._canvas, tl); this._canvas.width = size.x; this._canvas.height = size.y; this._draw(); },
+    onRemove: function (map) { 
+        L.DomUtil.remove(this._canvas); 
+        map.off('move', this._reset, this); map.off('resize', this._reset, this); map.off('zoom', this._reset, this); 
+    },
+    _reset: function () { 
+        let size = this._map.getSize(); 
+        let tl = this._map.containerPointToLayerPoint([0, 0]); 
+        L.DomUtil.setPosition(this._canvas, tl); 
+        
+        // 🔴 ဤနေရာသည် ဖုန်း/ကွန်ပျူတာ Screen (High-DPI) ကြောင့် ဝါးနေခြင်းကို ဖြေရှင်းသည့်အပိုင်းဖြစ်သည်
+        let dpr = window.devicePixelRatio || 1;
+        this._canvas.width = size.x * dpr; 
+        this._canvas.height = size.y * dpr; 
+        this._canvas.style.width = size.x + 'px';
+        this._canvas.style.height = size.y + 'px';
+
+        this._draw(); 
+    },
     _draw: function () {
         let ctx = this._ctx;
+        let dpr = window.devicePixelRatio || 1;
+
         ctx.clearRect(0, 0, this._canvas.width, this._canvas.height);
 
+        // Zoom 19 ကျော်မှသာ စာသားများပေါ်မည်
         if (this._map.getZoom() < 19) return;
 
         let bounds = this._map.getBounds();
-        let dynamicFontSize = window.currentDxfTextSize;
-
-        ctx.font = `bold ${dynamicFontSize}px sans-serif`;
-        ctx.textBaseline = 'middle';
-        ctx.lineJoin = 'round';
-        ctx.miterLimit = 2;
-
         let isDarkMode = document.getElementById('master-ui').classList.contains('dark-mode');
+
+        ctx.save();
+        ctx.scale(dpr, dpr); // 🔴 High Definition (HD) ဖြစ်စေရန် Scale ချဲ့ခြင်း
 
         for (let i = 0; i < this._texts.length; i++) {
             let t = this._texts[i];
@@ -583,24 +627,43 @@ L.CanvasTextLayer = L.Layer.extend({
 
             if (bounds.contains([t.lat, t.lon])) {
                 let p = this._map.latLngToContainerPoint([t.lat, t.lon]);
-                if(t.align === 'center') ctx.textAlign = 'center'; else if(t.align === 'right') ctx.textAlign = 'right'; else ctx.textAlign = 'left';
-
-                let txtColor = t.color;
-                if ((txtColor === "#000000" || txtColor === "#0f172a") && isDarkMode) txtColor = "#FFFFFF";
-                if ((txtColor === "#FFFFFF" || txtColor === "#ffffff") && !isDarkMode) txtColor = "#0f172a";
-
-                ctx.fillStyle = txtColor;
-                ctx.strokeStyle = isDarkMode ? "rgba(0,0,0,0.8)" : "rgba(255,255,255,0.8)";
-                ctx.lineWidth = 3;
-
+                
                 ctx.save();
                 ctx.translate(p.x, p.y);
                 if (t.rotation) { ctx.rotate(-t.rotation * Math.PI / 180); }
-                ctx.strokeText(t.text, 0, 0);
-                ctx.fillText(t.text, 0, 0);
+
+                if(t.align === 'center') ctx.textAlign = 'center'; 
+                else if(t.align === 'right') ctx.textAlign = 'right'; 
+                else ctx.textAlign = 'left';
+
+                ctx.textBaseline = 'middle';
+                ctx.lineJoin = 'round';
+
+                // Contour စာသားများအတွက် Rendering
+                if (t.isContour) {
+                    ctx.font = 'bold 13px Arial, sans-serif'; 
+                    ctx.fillStyle = t.color; 
+                    ctx.strokeStyle = isDarkMode ? "rgba(15, 23, 42, 0.8)" : "rgba(255, 255, 255, 0.9)";
+                    ctx.lineWidth = 2.5; 
+                } 
+                // DXF စာသားများအတွက် Rendering
+                else {
+                    ctx.font = `bold ${window.currentDxfTextSize}px sans-serif`;
+                    let txtColor = t.color;
+                    if ((txtColor === "#000000" || txtColor === "#0f172a") && isDarkMode) txtColor = "#FFFFFF";
+                    if ((txtColor === "#FFFFFF" || txtColor === "#ffffff") && !isDarkMode) txtColor = "#0f172a";
+
+                    ctx.fillStyle = txtColor;
+                    ctx.strokeStyle = isDarkMode ? "rgba(0,0,0,0.8)" : "rgba(255,255,255,0.8)";
+                    ctx.lineWidth = 3;
+                }
+
+                ctx.strokeText(t.text, 0, 0); 
+                ctx.fillText(t.text, 0, 0);   
                 ctx.restore();
             }
         }
+        ctx.restore();
     }
 });
 

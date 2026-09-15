@@ -324,6 +324,7 @@ window.openCogoTool = function(toolName) {
     document.getElementById('cogo_trv_tool').classList.add('hidden'); // 🔴 Added
     document.getElementById('cogo_ecc_tool').classList.add('hidden');
     document.getElementById('cogo_topo_tool').classList.add('hidden');
+    document.getElementById('cogo_vol_tool').classList.add('hidden'); // 🔴 
 
     let titleEl = document.getElementById('cogo_tool_title');
     let mapContainer = document.getElementById('shared_map_view');
@@ -365,6 +366,7 @@ window.openCogoTool = function(toolName) {
         titleEl.style.color = '#f59e0b';
         mapContainer.classList.add('hidden');
         gpsBtn.classList.add('hidden');
+
     } else if (toolName === 'topo') {
         document.getElementById('cogo_topo_tool').classList.remove('hidden');
         titleEl.innerText = '⛰️ Topo Surface & Contour';
@@ -381,7 +383,16 @@ window.openCogoTool = function(toolName) {
         } else {
             mapContainer.classList.add('hidden');
         }
+
+    } else if (toolName === 'vol') { // 🔴 Volume အတွက် အသစ်
+        document.getElementById('cogo_vol_tool').classList.remove('hidden');
+        titleEl.innerText = '📦 Earthwork / Volume Calculator';
+        titleEl.style.color = '#059669';
+        mapContainer.classList.remove('hidden');
+        gpsBtn.classList.add('hidden');
+        if(window.leafletMap) setTimeout(() => { window.leafletMap.invalidateSize(); }, 300);
     }
+
     history.pushState({page: 4, subTool: toolName}, "Cogo Tool", "");
 };
 window.closeCogoTool = function() {
@@ -1496,25 +1507,39 @@ function showTopoPointsOnMapOnly() {
             let i_w = m_inverse(pt.e, calcN, zone, m_WGS); lat = i_w.lat; lon = i_w.lon;
         }
 
+        // 🔴 ဖြည့်စွက်ချက်: Canvas မှန်ချပ် တစ်ခုတည်းကိုသာ မျှဝေသုံးစွဲရန် (Global Canvas)
+        if (!window.globalSharedCanvas) window.globalSharedCanvas = L.canvas({ padding: 0.5 });
+
         if (!isNaN(lat) && !isNaN(lon)) {
             let marker = L.circleMarker([lat, lon], { 
-                radius: 4, color: 'transparent', weight: 20, fillColor: '#3b82f6', fillOpacity: 1 
+                radius: 4, color: 'transparent', weight: 20, fillColor: '#3b82f6', fillOpacity: 1,
+                renderer: window.globalSharedCanvas // <-- 🔴 ဒီစာကြောင်းလေး အသစ်ဝင်သွားတာပါ
             });
             
             marker.bindTooltip(`${pt.p}<br>Z: ${pt.z.toFixed(3)}`, { direction: 'top', className: 'pt-tooltip' });
             
            marker.on('click', function(e) {
-                if (window.activeApp === 4) {
+                L.DomEvent.stopPropagation(e);
+                
+                // 🔴 Topo Tool (Surface & Contour) ဖွင့်ထားချိန်
+                let topoTool = document.getElementById('cogo_topo_tool');
+                if (topoTool && !topoTool.classList.contains('hidden')) {
                     if (window.isDrawingBoundary) {
-                        L.DomEvent.stopPropagation(e);
                         window.topoBoundaryPolygon.push({ n: pt.n, e: pt.e, lat: lat, lon: lon });
                         updateBoundaryDrawUI();
-                    } 
-                    // 🔴 Exclude Area အတွက် အသစ်ထပ်တိုးထားသည်
-                    else if (window.isDrawingExclude) {
-                        L.DomEvent.stopPropagation(e);
+                    } else if (window.isDrawingExclude) {
                         window.currentExcludePolygon.push({ n: pt.n, e: pt.e, lat: lat, lon: lon });
                         updateBoundaryDrawUI();
+                    }
+                }
+                
+                // 🔴 Volume Tool ဖွင့်ထားချိန်
+                let volTool = document.getElementById('cogo_vol_tool');
+                if (volTool && !volTool.classList.contains('hidden')) {
+                    if (window.isVolDrawing) {
+                        // Volume Draw Mode ဖွင့်ထားရင် ထောက်လိုက်တဲ့ Point ကို Volume Boundary ထဲ တန်းထည့်မည်
+                        window.volBoundaryPts.push({ lat: lat, lon: lon, n: pt.n, e: pt.e, groundZ: pt.z });
+                        if (typeof window.volUpdateBoundaryUI === 'function') window.volUpdateBoundaryUI();
                     }
                 }
             });
@@ -1717,6 +1742,8 @@ window.processTopoSurface = function() {
     showTinOnMap(); // 🔴 TIN Surface ကို မြေပုံပေါ်ဆွဲတင်ရန် ခေါ်မည်
 };
 
+window.topoContourTextLayer = null; // Label များကို သိမ်းရန်
+
 function showContoursOnMap() {
     if (!window.leafletMap) return;
 
@@ -1755,6 +1782,16 @@ function showContoursOnMap() {
         return [lat, lon];
     };
 
+    let majorColorInp = document.getElementById('topo_major_color');
+    let minorColorInp = document.getElementById('topo_minor_color');
+    let opacInp = document.getElementById('topo_opacity');
+    
+    let mColor = majorColorInp ? majorColorInp.value : '#f59e0b';
+    let minColor = minorColorInp ? minorColorInp.value : '#b45309';
+    let opac = opacInp ? parseFloat(opacInp.value) : 1.0;
+
+    let contourTextsData = []; // Label စာသားများ သိမ်းရန် Array
+
     window.topoContours.forEach(poly => {
         if (poly.points.length < 2) return;
         let latlngs = [];
@@ -1764,31 +1801,54 @@ function showContoursOnMap() {
         });
 
        if (latlngs.length > 1) {
-            // 🔴 Color နှင့် Opacity ကို Input ကနေ လှမ်းယူခြင်း
-            let majorColorInp = document.getElementById('topo_major_color');
-            let minorColorInp = document.getElementById('topo_minor_color');
-            let opacInp = document.getElementById('topo_opacity');
-            
-            let mColor = majorColorInp ? majorColorInp.value : '#f59e0b';
-            let minColor = minorColorInp ? minorColorInp.value : '#b45309';
-            let opac = opacInp ? parseFloat(opacInp.value) : 1.0;
-
             let mapPoly = L.polyline(latlngs, { 
                 color: poly.isMajor ? mColor : minColor, 
                 weight: poly.isMajor ? 3 : 1,
                 opacity: opac, 
-                isMajorRef: poly.isMajor // နောက်ပိုင်း အရောင်ပြန်ပြောင်းရန် မှတ်သားထားခြင်း
+                isMajorRef: poly.isMajor 
             });
             
             if (poly.isMajor) {
                 mapPoly.bindTooltip(`Z: ${poly.z.toFixed(2)}`, { sticky: true });
+
+                // 🔴 Label စာသားအတွက် နေရာတွက်ချက်ခြင်း (Major Contour အတွက်သာ)
+                if (latlngs.length >= 2) {
+                    let midIndex = Math.floor(latlngs.length / 2);
+                    let p1 = latlngs[midIndex > 0 ? midIndex - 1 : 0];
+                    let p2 = latlngs[midIndex];
+
+                    let midLat = (p1[0] + p2[0]) / 2;
+                    let midLon = (p1[1] + p2[1]) / 2;
+
+                    // မျဉ်းစောင်းအတိုင်း စာသားစောင်းနေစေရန် Angle တွက်ခြင်း
+                    let dLat = p2[0] - p1[0];
+                    let dLon = (p2[1] - p1[1]) * Math.cos(p1[0] * Math.PI / 180);
+                    let angleDeg = Math.atan2(dLat, dLon) * (180 / Math.PI);
+                    if (angleDeg > 90 || angleDeg <= -90) angleDeg += 180;
+
+                    contourTextsData.push({
+                        lat: midLat,
+                        lon: midLon,
+                        text: poly.z.toFixed(2),
+                        color: mColor, 
+                        align: 'center',
+                        rotation: angleDeg,
+                        isContour: true // 🔴 Contour Text ဖြစ်ကြောင်း သီးသန့်မှတ်သားရန်
+                    });
+                }
             }
             window.topoLayerGroup.addLayer(mapPoly);
         }
     });
+
+    // 🔴 တွက်ချက်ထားသော Label များကို Map ပေါ်သို့ Zoom 19 ကျော်မှ ပေါ်မည့် Layer ဖြင့် တင်ခြင်း
+    if (contourTextsData.length > 0 && typeof L.CanvasTextLayer !== 'undefined') {
+        window.topoContourTextLayer = new L.CanvasTextLayer(contourTextsData);
+        // topoLayerGroup ထဲသို့ ထည့်လိုက်သည့်အတွက် Checkbox ဖွင့်/ပိတ်လုပ်လျှင် အလိုလို အတူတူ ပွင့်/ပိတ်ဖြစ်သွားပါမည်
+        window.topoLayerGroup.addLayer(window.topoContourTextLayer);
+    }
 }
 
-// 🔴 အသစ်ထည့်ထားသော Function (Color နှင့် Opacity ကို Real-time ပြောင်းပေးခြင်း)
 window.updateContourStyle = function() {
     if (!window.topoLayerGroup || !window.leafletMap) return;
 
@@ -1802,15 +1862,21 @@ window.updateContourStyle = function() {
     let minColor = minorColorInp.value;
     let opac = parseFloat(opacInp.value);
 
-    // Map ပေါ်မှာရှိတဲ့ မျဉ်းတွေ အားလုံးကို လိုက်ရှာပြီး အရောင်နဲ့ Opacity ချိန်းပေးခြင်း
+    // Map ပေါ်မှာရှိတဲ့ မျဉ်းတွေနဲ့ Label အားလုံးကို လိုက်ရှာပြီး အရောင်နဲ့ Opacity ချိန်းပေးခြင်း
     window.topoLayerGroup.eachLayer(function(layer) {
         if (layer instanceof L.Polyline) {
-            // Label / Text မဟုတ်ဘဲ Polyline ဖြစ်မှသာ ပြောင်းမည်
             if (layer.options.isMajorRef !== undefined) {
                 layer.setStyle({
                     color: layer.options.isMajorRef ? mColor : minColor,
                     opacity: opac
                 });
+            }
+        } 
+        // 🔴 Label အရောင်ကိုပါ လိုက်ပြောင်းပေးမည်
+        else if (layer instanceof L.CanvasTextLayer) {
+            if (layer._texts) {
+                layer._texts.forEach(t => t.color = mColor);
+                layer._reset(); // Redraw ပြန်လုပ်ခိုင်းမည်
             }
         }
     });
@@ -2111,7 +2177,6 @@ window.toggleTopoLayers = function() {
         }
     }
 
-    // 🔴 TIN Surface Layer အဖွင့်အပိတ် (အသစ်ထည့်ထားသည်)
     if (window.topoTinLayer) {
         let chkTin = document.getElementById('tgl_topo_tin');
         if (chkTin && chkTin.checked) {
@@ -2122,9 +2187,21 @@ window.toggleTopoLayers = function() {
             window.leafletMap.removeLayer(window.topoTinLayer);
         }
     }
+
+    // 🔴 အသစ်ထည့်ထားသော Surface 2 Points (လိမ္မော်ရောင်) Layer အဖွင့်အပိတ်
+    if (window.volSurface2Layer) {
+        let chkSurf2 = document.getElementById('tgl_surf2_pts');
+        if (chkSurf2 && chkSurf2.checked) {
+            if (!window.leafletMap.hasLayer(window.volSurface2Layer)) {
+                window.leafletMap.addLayer(window.volSurface2Layer);
+            }
+        } else {
+            window.leafletMap.removeLayer(window.volSurface2Layer);
+        }
+    }
 };
 
-// 🔴 Topo Data နှင့် Map တစ်ခုလုံးကို ရှင်းလင်းမည့် Function
+// 🔴 1. Topo Data နှင့် Map တစ်ခုလုံးကို ရှင်းလင်းမည့် Function (Ghost TIN ပါ ရှင်းမည်)
 window.clearTopoData = function() {
     if (!confirm("Are you sure you want to clear all Topo data and map?")) return;
     
@@ -2133,20 +2210,34 @@ window.clearTopoData = function() {
     window.topoTriangles = [];
     window.topoContours = [];
     window.topoExcludePolygons = [];
+    window.topoContourTextLayer = null; // 🔴 <--- ဒီစာကြောင်းလေး ထပ်ဖြည့်ပေးပါ
     
-    // Map ပေါ်မှ မျဉ်းများကို ဖျက်ခြင်း
-    if (window.topoPointsLayer) window.leafletMap.removeLayer(window.topoPointsLayer);
-    if (window.topoLayerGroup) window.leafletMap.removeLayer(window.topoLayerGroup);
-    if (window.topoTinLayer) window.leafletMap.removeLayer(window.topoTinLayer); // 🔴 TIN Layer ပါ ရှင်းပစ်မည်
+    // ... (ကျန်တဲ့ Code တွေ အတိုင်းထားပါ) ...    
+    // 🔴 ဖြည့်စွက်ချက်: Volume Tab အတွက် Copy ကူးထားတဲ့ Data တွေကိုပါ အပြီးရှင်းပစ်မည်
+    window.volPoints = [];
+    window.volTriangles = [];
+    window.volBoundaryPts = []; 
+    window.volSurface2Points = [];
+    window.volSurface2Triangles = [];
+    
+    if (window.topoPointsLayer) { window.topoPointsLayer.clearLayers(); window.leafletMap.removeLayer(window.topoPointsLayer); }
+    if (window.topoLayerGroup) { window.topoLayerGroup.clearLayers(); window.leafletMap.removeLayer(window.topoLayerGroup); }
+    if (window.topoTinLayer) { window.topoTinLayer.clearLayers(); window.leafletMap.removeLayer(window.topoTinLayer); } 
+    
+    if (window.volSurface2Layer) {
+        window.volSurface2Layer.clearLayers();
+        window.leafletMap.removeLayer(window.volSurface2Layer);
+        window.volSurface2Layer = null;
+    }
+    
     window.clearManualBoundary(true);
+    // Volume Boundary မျဉ်းတွေပါ မြေပုံပေါ်က ဖျောက်မည်
+    if (typeof window.clearVolBoundary === 'function') window.clearVolBoundary(true);
     
-    // UI ကို မူလအတိုင်း ပြန်ထားခြင်း
     document.getElementById('topo_export_box').classList.add('hidden');
     let statBox = document.getElementById('topo_status');
-    statBox.style.display = 'none';
-    statBox.innerText = '';
+    statBox.style.display = 'none'; statBox.innerText = '';
     
-    // မြေပုံကို ဖျောက်ထားလိုက်မည်
     let mapDiv = document.getElementById('shared_map_view');
     if (mapDiv) mapDiv.classList.add('hidden');
 };

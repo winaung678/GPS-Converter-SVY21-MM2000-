@@ -421,3 +421,89 @@ function generateContours(points, triangles, minorInt, majorInt) {
 
     return polylines; 
 }
+
+// ==========================================
+// --- VOLUME CALCULATION (GRID METHOD) ---
+// ==========================================
+
+// Point တစ်ခုက Polygon ထဲမှာ ရှိသလား စစ်ဆေးခြင်း (Ray-Casting Algorithm)
+function isPointInVolumeBoundary(n, e, boundaryPts) {
+    let isInside = false;
+    for (let i = 0, j = boundaryPts.length - 1; i < boundaryPts.length; j = i++) {
+        let pi = boundaryPts[i]; let pj = boundaryPts[j];
+        if (((pi.n > n) !== (pj.n > n)) && (e < (pj.e - pi.e) * (n - pi.n) / (pj.n - pi.n) + pi.e)) {
+            isInside = !isInside;
+        }
+    }
+    return isInside;
+}
+
+// Grid Cell လေးတွေ ပိုင်းပြီး Volume တွက်ခြင်း (Grid Size = 0.5m)
+function calcGridVolume(triangles, boundaryPts, targetLevels, baseType) {
+    let minN = Math.min(...boundaryPts.map(p => p.n));
+    let maxN = Math.max(...boundaryPts.map(p => p.n));
+    let minE = Math.min(...boundaryPts.map(p => p.e));
+    let maxE = Math.max(...boundaryPts.map(p => p.e));
+
+    let gridSize = 0.5; // 0.5m x 0.5m အကွက်လေးများဖြင့် တွက်မည်
+    let gridArea = gridSize * gridSize; // 0.25 sq.m
+
+    let totalCut = 0;
+    let totalFill = 0;
+    let cutArea = 0;
+    let fillArea = 0;
+
+    // အောက်ခြေမျက်နှာပြင် (Target Z) ကို တွက်ရန်အတွက် (Variable Corners ဖြစ်ခဲ့လျှင် S2S Sytle ဖြင့်တွက်ရန်)
+    let targetTriangles = [];
+    if (baseType === 'variable') {
+        // Variable ဖြစ်ခဲ့လျှင် ရိုက်ထည့်ထားသော Level များဖြင့် အောက်ခြေ TIN တစ်ခု ယာယီဖန်တီးသည်
+        if (typeof generateDelaunayTriangulation === 'function') {
+            targetTriangles = generateDelaunayTriangulation(targetLevels);
+        }
+    }
+
+    for (let n = minN; n <= maxN; n += gridSize) {
+        for (let e = minE; e <= maxE; e += gridSize) {
+            
+            // Grid ၏ ဗဟိုမှတ်သည် ဘောင်အတွင်း ရှိ/မရှိ စစ်ဆေးသည်
+            let cellN = n + (gridSize / 2);
+            let cellE = e + (gridSize / 2);
+
+            if (isPointInVolumeBoundary(cellN, cellE, boundaryPts)) {
+                
+                // 1. မြေပြင်အမြင့် (Ground Z) ကို ရှာခြင်း
+                let groundZ = getZFromTIN(cellN, cellE, triangles);
+                
+                if (groundZ !== null) {
+                    
+                    // 2. ရောက်လိုသောအမြင့် (Target Z) ကို ရှာခြင်း
+                    let targetZ = 0;
+                    if (baseType === 'flat') {
+                        targetZ = targetLevels[0].z; // Flat ဆိုလျှင် Z တစ်ခုတည်းရှိမည်
+                    } else if (baseType === 'variable') {
+                        targetZ = getZFromTIN(cellN, cellE, targetTriangles);
+                    }
+
+                    // 3. Volume တွက်ခြင်း
+                    if (targetZ !== null) {
+                        let diff = groundZ - targetZ; // အပေါင်းထွက်လျှင် Cut (တူးရန်), အနုတ်ထွက်လျှင် Fill (ဖို့ရန်)
+                        let vol = Math.abs(diff) * gridArea;
+
+                        if (diff > 0) {
+                            totalCut += vol;
+                            cutArea += gridArea;
+                        } else if (diff < 0) {
+                            totalFill += vol;
+                            fillArea += gridArea;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return { 
+        cutVol: totalCut, fillVol: totalFill, netVol: totalCut - totalFill, 
+        cutArea: cutArea, fillArea: fillArea, totalArea: cutArea + fillArea 
+    };
+}
