@@ -29,10 +29,10 @@
     <link rel="stylesheet" href="style.css">
    <script>
   // 🔴 ပိုမိုသေချာသော လမ်းကြောင်းလွှဲ Logic (Sub-folder ကော Cache ပါ ကျော်ဖြတ်နိုင်ရန်)
-  if (window.location.hostname !== "gpsconverter.site" && window.location.hostname !== "localhost") {
+ // if (window.location.hostname !== "gpsconverter.site" && window.location.hostname !== "localhost") {
     // လက်ရှိ ဝင်ထားတဲ့ Domain က gpsconverter.site မဟုတ်ရင် (github.io ဖြစ်နေရင်) Custom Domain ဆီ အတင်းလွှဲမည်
-   window.location.replace("https://gpsconverter.site/");
-  }
+  // window.location.replace("https://gpsconverter.site/");
+ // }
 </script>
 <!-- 🔴 3D Surface Rendering အတွက် Plotly.js -->
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
@@ -1035,13 +1035,16 @@
             <div class="card-body" style="padding: 10px;">
                 <!-- Offline Map Buttons Removed -->
                 <div style="background:var(--res-bg); padding:8px 10px; border-radius:8px; border:1px solid var(--input-border); margin-bottom:10px; display:flex; justify-content:space-between; flex-wrap:wrap; gap:8px;">
-                    <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_dxf_lines" checked onchange="toggleDxfLayers()"> 〰️ Lines</label>
-                    <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_dxf_texts" checked onchange="toggleDxfLayers()"> 🔠 Text</label>
+                    <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_dxf_lines" checked onchange="toggleDxfLayers()"> 〰️ Dxf Lines</label>
+                    <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_dxf_texts" checked onchange="toggleDxfLayers()"> 🔠 Dxf Text</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_so_pts" checked onchange="toggleDxfLayers()"> 🎯 SO Pts</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_so_texts" checked onchange="toggleDxfLayers()"> 🔠 SO Text</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_topo_pts" checked onchange="if(typeof toggleTopoLayers==='function') toggleTopoLayers()"> ⛰️ Topo Pts</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_topo_contours" checked onchange="if(typeof toggleTopoLayers==='function') toggleTopoLayers()"> 〰️ Contours</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_topo_tin" onchange="if(typeof toggleTopoLayers==='function') toggleTopoLayers()"> 🔺 TIN Surface</label>
+                    <!-- 🔴 အသစ်ထည့်ထားသော Name နဲ့ Z Value ဖွင့်/ပိတ် ခလုတ်များ -->
+                    <label style="font-size:12px; font-weight:bold; cursor:pointer; color:#8b5cf6;"><input type="checkbox" id="tgl_show_pt_name" onchange="if(typeof updateMapPointTexts==='function') updateMapPointTexts()"> 🔤 Topo Name</label>
+                    <label style="font-size:12px; font-weight:bold; cursor:pointer; color:#059669;"><input type="checkbox" id="tgl_show_z_val" onchange="if(typeof updateMapPointTexts==='function') updateMapPointTexts()"> ↕️ Topo Z Val</label>
                     <!-- 🔴 အသစ်ထည့်ထားသော Surface 2 Pts အဖွင့်အပိတ် Checkbox -->
                     <label style="font-size:12px; font-weight:bold; cursor:pointer; color:#ea580c;"><input type="checkbox" id="tgl_surf2_pts" checked onchange="if(typeof toggleTopoLayers==='function') toggleTopoLayers()"> 🟠 Surf-2 Pts</label> 
                    <label style="font-size:12px; font-weight:bold; cursor:pointer; color:#0ea5e9;"><input type="checkbox" id="tgl_vol_bdys" checked onchange="if(typeof toggleVolBdyLayer==='function') toggleVolBdyLayer()"> 🟦 Vol BDYs</label>

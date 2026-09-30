@@ -387,13 +387,14 @@ window.volLoadFromTopo = function() {
 function volShowPointsOnMap() {
     if (!window.leafletMap) return;
     
-    if (window.topoPointsLayer) window.leafletMap.removeLayer(window.topoPointsLayer);
+    if (window.topoPointsLayer) {
+        window.topoPointsLayer.clearLayers();
+        window.leafletMap.removeLayer(window.topoPointsLayer);
+    }
     window.topoPointsLayer = L.layerGroup().addTo(window.leafletMap);
 
-    // 🚀 OPTIMIZATION: Point ထောင်ချီပါလာရင် မထစ်အောင် Canvas Renderer ဖြင့် တစ်ပေါင်းတည်း ဆွဲမည်
-    // 🔴 ပြင်ဆင်ချက်: သီးသန့် Canvas အသစ်မလုပ်ဘဲ ခုနက Topo ဖန်တီးထားတဲ့ မှန်ချပ်ကိုပဲ ယူသုံးမည်
-    if (!window.globalSharedCanvas) window.globalSharedCanvas = L.canvas({ padding: 0.5 });
-    let sharedCanvasRenderer = window.globalSharedCanvas;
+    // 🔴 Master ကိုပဲ အမြဲယူသုံးမည်
+    if (!window.masterTopoCanvas) window.masterTopoCanvas = L.canvas({ padding: 0.5 }); 
 
     let bounds = [];
     let datum = document.getElementById('topo_datum') ? document.getElementById('topo_datum').value : "WGS_LL";
@@ -429,7 +430,7 @@ function volShowPointsOnMap() {
         if (!isNaN(lat) && !isNaN(lon)) {
             let marker = L.circleMarker([lat, lon], { 
                 radius: 4, color: 'transparent', weight: 25, fillColor: '#94a3b8', fillOpacity: 0.8,
-                renderer: sharedCanvasRenderer // <-- 🚀 Canvas သုံးရန် ညွှန်ကြားချက်
+                renderer: window.masterTopoCanvas // 🔴 Master ကို သုံးမည်
             });
             
             marker.bindTooltip(`Z: ${pt.z.toFixed(3)}`, { direction: 'top', className: 'pt-tooltip' });
@@ -437,23 +438,44 @@ function volShowPointsOnMap() {
             marker.on('click', function(e) {
                 L.DomEvent.stopPropagation(e);
                 
+                // 🔴 အသစ်ထည့်ထားသောအပိုင်း: Measure ဖွင့်ထားရင် ပေတံဆီကို Click လွှဲပေးမည်
+                if (window.isMeasuring) {
+                    window.leafletMap.fireEvent('click', {latlng: e.latlng});
+                    return;
+                }
+
+                let isActionTaken = false;
+                
                 let topoTool = document.getElementById('cogo_topo_tool');
                 if (topoTool && !topoTool.classList.contains('hidden')) {
                     if (window.isDrawingBoundary) {
                         window.topoBoundaryPolygon.push({ n: pt.n, e: pt.e, lat: lat, lon: lon });
                         if (typeof updateBoundaryDrawUI === 'function') updateBoundaryDrawUI();
+                        isActionTaken = true;
                     } else if (window.isDrawingExclude) {
                         window.currentExcludePolygon.push({ n: pt.n, e: pt.e, lat: lat, lon: lon });
                         if (typeof updateBoundaryDrawUI === 'function') updateBoundaryDrawUI();
+                        isActionTaken = true;
                     }
                 }
                 
                 let volTool = document.getElementById('cogo_vol_tool');
                 if (volTool && !volTool.classList.contains('hidden')) {
                     if (window.isVolDrawing) {
-                        window.volBoundaryPts.push({ lat: lat, lon: lon, n: pt.n, e: pt.e, groundZ: pt.z });
+                        // 🔴 Array ထဲ တန်းမထည့်ဘဲ Draft Point အဖြစ် သတ်မှတ်ပေးလိုက်ပါသည်
+                        window.volDraftPoint = { lat: lat, lon: lon, n: pt.n, e: pt.e, groundZ: pt.z };
                         if (typeof window.volUpdateBoundaryUI === 'function') window.volUpdateBoundaryUI();
+                        isActionTaken = true;
                     }
+                }
+
+                if (!isActionTaken) {
+                    let pName = pt.p ? `<b style="color:#1e40af; font-size:13px;">[ ${pt.p} ]</b><hr style="margin:4px 0; border:0.5px solid #ccc;">` : '';
+                    let popupHtml = `<div style="text-align:center; line-height:1.4; padding:2px;">
+                        ${pName}
+                        <b style="color:#b91c1c; font-size:13px;">N: ${pt.n.toFixed(3)}<br>E: ${pt.e.toFixed(3)}<br>Z: ${pt.z.toFixed(3)}</b>
+                    </div>`;
+                    L.popup().setLatLng(e.latlng).setContent(popupHtml).openOn(window.leafletMap);
                 }
             });
 
@@ -466,6 +488,7 @@ function volShowPointsOnMap() {
     
     if (typeof toggleTopoLayers === 'function') toggleTopoLayers();
 }
+
 // ==========================================
 // 4. BOUNDARY DRAWING & TARGET LEVEL UI
 // ==========================================
@@ -520,11 +543,9 @@ window.volMapClickListener = function(e) {
     window.volUpdateBoundaryUI();
 };
 
-// PC သမားများအတွက် Mouse ရွေ့နေစဉ် Ghost Line ပြပေးမည်
 window.volMouseMoveListener = function(e) {
     if (!window.isVolDrawing || window.volBoundaryPts.length === 0) return;
     
-    // ယာယီအမှတ် ချထားပြီးသားဆိုရင် (သို့) လက်နဲ့ဖိဆွဲနေရင် Ghost line မပြတော့ပါ
     if (window.volDraftPoint) {
         if (window.volGhostLine) window.leafletMap.removeLayer(window.volGhostLine);
         if (window.volGhostLabel) window.leafletMap.removeLayer(window.volGhostLabel);
@@ -534,20 +555,26 @@ window.volMouseMoveListener = function(e) {
 
     let lastPt = window.volBoundaryPts[window.volBoundaryPts.length - 1];
     let dist = calcDistance(lastPt.lat, lastPt.lon, e.latlng.lat, e.latlng.lng);
-    let midLat = (lastPt.lat + e.latlng.lat) / 2;
-    let midLon = (lastPt.lon + e.latlng.lng) / 2;
+    
+    // 🔴 အသစ်ပြင်ဆင်ချက်: အလယ်တည့်တည့်မှာ မပြဘဲ Mouse ရဲ့ အနီးနား (Offset) မှာ ပြပါမည်
+    let midLat = e.latlng.lat; 
+    let midLon = e.latlng.lng;
+
+    // 🔴 ဖောက်ထွင်းသွားစေမည့် CSS Style (pointer-events: none)
+    let labelHtml = `<div style="background: rgba(255, 255, 255, 0.85); border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 6px; pointer-events: none; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"><b style="color:#ef4444; font-size:12px;">${dist.toFixed(2)} m</b></div>`;
 
     if (!window.volGhostLine) {
         window.volGhostLine = L.polyline([[lastPt.lat, lastPt.lon], [e.latlng.lat, e.latlng.lng]], {
             color: '#94a3b8', weight: 2, dashArray: '4, 4', interactive: false
         }).addTo(window.leafletMap);
         
-        window.volGhostLabel = L.popup({
-            closeButton: false, autoClose: false, closeOnClick: false, autoPan: false
-        }).setLatLng([midLat, midLon]).setContent(`<span style="color:#64748b;">${dist.toFixed(2)} m</span>`).addTo(window.leafletMap);
+        // 🔴 L.popup အစား L.tooltip ကို သုံးခြင်း (Tooltip က နေရာရွှေ့ရပိုလွယ်ပြီး ဖောက်ထွင်းလုပ်ရလွယ်လို့ပါ)
+        window.volGhostLabel = L.tooltip({
+            permanent: true, direction: 'right', className: 'ghost-distance-label', offset: [15, 0], opacity: 1
+        }).setLatLng([midLat, midLon]).setContent(labelHtml).addTo(window.leafletMap);
     } else {
         window.volGhostLine.setLatLngs([[lastPt.lat, lastPt.lon], [e.latlng.lat, e.latlng.lng]]);
-        window.volGhostLabel.setLatLng([midLat, midLon]).setContent(`<span style="color:#64748b;">${dist.toFixed(2)} m</span>`);
+        window.volGhostLabel.setLatLng([midLat, midLon]).setContent(labelHtml);
         if (!window.leafletMap.hasLayer(window.volGhostLine)) window.volGhostLine.addTo(window.leafletMap);
         if (!window.leafletMap.hasLayer(window.volGhostLabel)) window.volGhostLabel.addTo(window.leafletMap);
     }
@@ -556,14 +583,17 @@ window.volMouseMoveListener = function(e) {
 window.toggleVolDrawMode = function() {
     if (!window.volPoints || window.volPoints.length === 0) return alert("Please load Data Source first!");
 
+    // 🔴 အသစ်ထည့်ရန်: ပေတံ (Measure Tool) ဖွင့်ထားရင် တားမည်
+    if (window.isMeasuring) return alert("⚠️ Please finish or close the Measure tool first.");
+
     window.isVolDrawing = !window.isVolDrawing;
     let btn = document.getElementById('btn_vol_draw');
-    let undoBtn = document.getElementById('volUndoBtn'); // Undo ခလုတ်ကို လှမ်းယူမည်
+    let undoBtn = document.getElementById('volUndoBtn'); 
     
     if (window.isVolDrawing) {
         btn.innerText = "🛑 Finish Boundary";
         btn.style.background = "#ef4444";
-        if (undoBtn) undoBtn.style.display = "flex"; // 🔴 Draw Mode စတာနဲ့ Undo ခလုတ်ကို ဖော်ပေးမည်
+        if (undoBtn) undoBtn.style.display = "flex"; 
         
         if (window.leafletMap) {
             window.leafletMap.on('click', window.volMapClickListener);
@@ -573,7 +603,7 @@ window.toggleVolDrawMode = function() {
     } else {
         btn.innerText = "✏️ Draw Boundary";
         btn.style.background = "#f59e0b";
-        if (undoBtn) undoBtn.style.display = "none"; // 🔴 Draw Mode ပိတ်ရင် Undo ခလုတ် ပြန်ဖျောက်မည်
+        if (undoBtn) undoBtn.style.display = "none"; 
         
         if (window.leafletMap) {
             window.leafletMap.off('click', window.volMapClickListener);
@@ -585,6 +615,9 @@ window.toggleVolDrawMode = function() {
         
         window.volUpdateBoundaryUI(true); 
     }
+
+    // 🔴 Draw Mode အဖွင့်အပိတ် လုပ်လိုက်တာနဲ့ အောက်က ခလုတ်တွေကို ချက်ချင်း ဖျောက်/ဖော် လုပ်ခိုင်းမယ်
+    window.renderVolTargetInputs();
 };
 
 // 🔴 "➕ Add" ကိုနှိပ်မှ အတည်ပြုပြီး Boundary ထဲ ထည့်မည့် Function
@@ -593,6 +626,64 @@ window.confirmVolDraftPoint = function() {
     window.volBoundaryPts.push(window.volDraftPoint);
     window.volDraftPoint = null; // ယာယီအမှတ် ရှင်းမည်
     if (window.leafletMap) window.leafletMap.closePopup(); // Popup ကို ပိတ်မည်
+    window.volUpdateBoundaryUI();
+};
+
+// 🔴 အသစ်ထည့်သွင်းထားသော (Distance အတိအကျဖြင့် ယာယီအမှတ်ကို ရွှေ့ပေးမည့်) Function
+window.applyVolDraftDistance = function() {
+    if (!window.volDraftPoint || window.volBoundaryPts.length === 0) return;
+
+    let distInput = document.getElementById('vol_draft_dist_inp');
+    if (!distInput) return;
+    
+    let targetDist = parseFloat(distInput.value);
+    if (isNaN(targetDist) || targetDist <= 0) return alert("⚠️ Please enter a valid distance greater than 0.");
+
+    // နောက်ဆုံးချထားသော အမှတ် (Base Point)
+    let lastPt = window.volBoundaryPts[window.volBoundaryPts.length - 1];
+    let dPt = window.volDraftPoint; // လက်ရှိ ယာယီအမှတ်
+
+    // လားရာ (Bearing Angle) တွက်ချက်ခြင်း
+    let diffN = dPt.n - lastPt.n;
+    let diffE = dPt.e - lastPt.e;
+    let bearingRad = Math.atan2(diffE, diffN);
+
+    // Distance သစ်ဖြင့် N, E အတိအကျကို တွက်ထုတ်ခြင်း
+    let newN = lastPt.n + (targetDist * Math.cos(bearingRad));
+    let newE = lastPt.e + (targetDist * Math.sin(bearingRad));
+
+    // N, E မှ Lat, Lon သို့ ပြန်ပြောင်းခြင်း (မြေပုံပေါ် နေရာပြန်ချရန်)
+    let datum = document.getElementById('topo_datum') ? document.getElementById('topo_datum').value : "WGS_LL";
+    let newLat, newLon;
+
+    if (datum === 'LOCAL') {
+        newLat = (newN - (window.localOffsetN || 0)) / 100000;
+        newLon = (newE - (window.localOffsetE || 0)) / 100000;
+    } else if (datum === "SVY21") {
+        let r = calc_v2_rev(newE, newN); newLat = r.lat; newLon = r.lon;
+    } else if (datum.startsWith("MM")) {
+        let zone = parseInt(datum.slice(-2)); let r = m_inverse(newE, newN, zone, m_EVE);
+        let x = m_llh2xyz(r.lat, r.lon, 0, m_EVE); let w = m_xyz2llh(x.x-m_DX, x.y-m_DY, x.z-m_DZ, m_WGS);
+        newLat = w.lat; newLon = w.lon;
+    } else if (datum.startsWith("WGS_UTM")) {
+        let zone = parseInt(datum.slice(-2)); let i = m_inverse(newE, newN, zone, m_WGS);
+        newLat = i.lat; newLon = i.lon;
+    } else if (datum === "GLOBAL_UTM") {
+        let zInput = document.getElementById('topo_custom_zone'); let hInput = document.getElementById('topo_custom_hemi');
+        let zone = (zInput && zInput.value) ? parseInt(zInput.value) : 47;
+        let hemi = hInput ? hInput.value : 'N';
+        let calcN = newN; if (hemi === 'S') calcN -= 10000000;
+        let i_w = m_inverse(newE, calcN, zone, m_WGS); newLat = i_w.lat; newLon = i_w.lon;
+    }
+
+    // နေရာအသစ်အတွက် Z (အမြင့်) ကို Surface ထဲမှ ပြန်ရှာခြင်း
+    let z = getZFromTIN(newN, newE, window.volTriangles);
+    if (z === null) {
+        return alert("⚠️ The calculated distance falls OUTSIDE the generated Topo Surface boundary!");
+    }
+
+    // ယာယီအမှတ်ကို Update လုပ်ပြီး မြေပုံကို ပြန်ဆွဲခြင်း
+    window.volDraftPoint = { lat: newLat, lon: newLon, n: newN, e: newE, groundZ: z };
     window.volUpdateBoundaryUI();
 };
 
@@ -628,11 +719,33 @@ window.volUpdateBoundaryUI = function(isClosed = false) {
     if (window.isVolDrawing && window.volDraftPoint) {
         let dPt = window.volDraftPoint;
 
-        // 🔴 ဖုန်းအတွက် အလွန်သေးငယ်ကျစ်လျစ်သော Popup Design (Add ခလုတ် တစ်ခုတည်းသာ ပါဝင်သည်)
-        let compactPopupHTML = `<div style="text-align:center; padding: 2px;">
-            <div style="font-weight:bold; font-size:11px; color:#d97706; margin-bottom:2px;">📍 Draft Point</div>
-            <b style="font-size:12px; color:#b91c1c; display:block; line-height:1.2; margin-bottom:5px;">N: ${dPt.n.toFixed(3)}<br>E: ${dPt.e.toFixed(3)}<br>Z: ${dPt.groundZ.toFixed(3)}</b>
-            <button class="so-popup-btn" style="background:#10b981; padding: 6px 15px; font-size: 11px; margin-top: 0; font-weight:bold; border-radius:4px; width:100%;" onclick="confirmVolDraftPoint()">➕ Add</button>
+       
+        // 🔴 အသစ်ထပ်ဖြည့်ချက် - Click ဖောက်မသွားအောင် တားထားပြီး၊ Box ကို အလွန်ကျစ်လျစ်အောင် ပြင်ထားသည်
+        let fixDistHTML = "";
+        if (window.volBoundaryPts.length > 0) {
+            let lastPt = window.volBoundaryPts[window.volBoundaryPts.length - 1];
+            let currentDist = Math.hypot(dPt.e - lastPt.e, dPt.n - lastPt.n); 
+            
+            fixDistHTML = `
+                <div style="margin-top:3px; margin-bottom:3px; border-top:1px dashed #cbd5e1; padding-top:3px;">
+                    <div style="display:flex; align-items:center; justify-content:center; gap:3px;">
+                        <span style="font-size:9px; color:#64748b; font-weight:bold;">Dist:</span>
+                        <!-- event.stopPropagation() ထည့်ထားသဖြင့် မြေပုံဆီ Click မရောက်တော့ပါ -->
+                        <input type="number" id="vol_draft_dist_inp" value="${currentDist.toFixed(3)}" step="0.001" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" style="width:55px; font-size:11px; padding:2px; border:1px solid #94a3b8; border-radius:3px; text-align:center; color:#1e40af; font-weight:bold; margin:0; height:20px;">
+                        <button style="background:#3b82f6; color:white; border:none; border-radius:3px; font-size:10px; padding:0 6px; height:20px; font-weight:bold; cursor:pointer;" onclick="event.stopPropagation(); applyVolDraftDistance();">Apply</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 🔴 ဖုန်းအတွက် အလွန်သေးငယ်ကျစ်လျစ်သော Popup Design
+        let compactPopupHTML = `<div style="text-align:center; padding: 0px; line-height: 1.2;">
+            <div style="font-weight:bold; font-size:10px; color:#d97706; margin-bottom:1px;">📍 Draft</div>
+            <div style="font-size:10px; color:#b91c1c; font-weight:bold; margin-bottom:2px;">
+                N: ${dPt.n.toFixed(2)} | E: ${dPt.e.toFixed(2)}<br>Z: ${dPt.groundZ.toFixed(2)}
+            </div>
+            ${fixDistHTML}
+            <button class="so-popup-btn" style="background:#10b981; padding: 4px; font-size: 11px; margin-top: 2px; font-weight:bold; border-radius:3px; width:100%;" onclick="event.stopPropagation(); confirmVolDraftPoint();">➕ Add</button>
         </div>`;
 
         if (!window.volDraftMarker) {
@@ -647,8 +760,10 @@ window.volUpdateBoundaryUI = function(isClosed = false) {
                 let ll = e.latlng;
                 if (window.volBoundaryPts.length > 0) {
                     let lastPt = window.volBoundaryPts[window.volBoundaryPts.length - 1];
-                    let dist = calcDistance(lastPt.lat, lastPt.lon, ll.lat, ll.lng);
-                    if (window.volDraftLine) window.volDraftLine.setLatLngs([[lastPt.lat, lastPt.lon], [ll.lat, ll.lng]]);
+            // 🔴 Lat/Lon အစား N, E ကိုသုံးပြီး Grid Distance အတိအကျ တွက်ယူခြင်း
+            let dragCoords = window.getDatumCoordsForLatLon(ll.lat, ll.lng);
+            let dist = Math.hypot(dragCoords.localE - lastPt.e, dragCoords.localN - lastPt.n);
+            if (window.volDraftLine) window.volDraftLine.setLatLngs([[lastPt.lat, lastPt.lon], [ll.lat, ll.lng]]);
                     if (window.volDraftLabel) window.volDraftLabel.setLatLng([(lastPt.lat + ll.lat)/2, (lastPt.lon + ll.lng)/2]).setContent(`<b style="color:#b91c1c; font-size:14px;">${dist.toFixed(2)} m</b>`);
                 }
             });
@@ -673,14 +788,24 @@ window.volUpdateBoundaryUI = function(isClosed = false) {
 
         if (window.volBoundaryPts.length > 0) {
             let lastPt = window.volBoundaryPts[window.volBoundaryPts.length - 1];
-            let dist = calcDistance(lastPt.lat, lastPt.lon, dPt.lat, dPt.lon);
+            // 🔴 N, E ကိုသုံးပြီး Grid Distance အတိအကျ တွက်ယူခြင်း
+            let dist = Math.hypot(dPt.e - lastPt.e, dPt.n - lastPt.n);
             let midLat = (lastPt.lat + dPt.lat) / 2, midLon = (lastPt.lon + dPt.lon) / 2;
 
             if (!window.volDraftLine) window.volDraftLine = L.polyline([[lastPt.lat, lastPt.lon], [dPt.lat, dPt.lon]], { color: '#eab308', weight: 3, dashArray: '5, 5' }).addTo(window.leafletMap);
             else { window.volDraftLine.setLatLngs([[lastPt.lat, lastPt.lon], [dPt.lat, dPt.lon]]); if (!window.leafletMap.hasLayer(window.volDraftLine)) window.volDraftLine.addTo(window.leafletMap); }
 
-            if (!window.volDraftLabel) window.volDraftLabel = L.popup({ closeButton: false, autoClose: false, closeOnClick: false, autoPan: false }).setLatLng([midLat, midLon]).setContent(`<b style="color:#b91c1c; font-size:14px;">${dist.toFixed(2)} m</b>`).addTo(window.leafletMap);
-            else { window.volDraftLabel.setLatLng([midLat, midLon]).setContent(`<b style="color:#b91c1c; font-size:14px;">${dist.toFixed(2)} m</b>`); if (!window.leafletMap.hasLayer(window.volDraftLabel)) window.volDraftLabel.addTo(window.leafletMap); }
+            // 🔴 အသစ်ပြင်ဆင်ချက်: Draft Point အတွက်လည်း Tooltip (ဖောက်ထွင်း Box) နဲ့ Offset ကို ပြောင်းသုံးပါမည်
+            let draftLabelHtml = `<div style="background: rgba(255, 255, 255, 0.85); border: 1px solid #eab308; border-radius: 4px; padding: 2px 6px; pointer-events: none; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"><b style="color:#b91c1c; font-size:12px;">${dist.toFixed(2)} m</b></div>`;
+
+            if (!window.volDraftLabel) {
+                window.volDraftLabel = L.tooltip({ 
+                    permanent: true, direction: 'right', className: 'ghost-distance-label', offset: [15, 0], opacity: 1 
+                }).setLatLng([midLat, midLon]).setContent(draftLabelHtml).addTo(window.leafletMap);
+            } else { 
+                window.volDraftLabel.setLatLng([midLat, midLon]).setContent(draftLabelHtml); 
+                if (!window.leafletMap.hasLayer(window.volDraftLabel)) window.volDraftLabel.addTo(window.leafletMap); 
+            }
         }
 
     } else {
@@ -738,15 +863,47 @@ window.volSurface2Triangles = [];
 window.renderVolTargetInputs = function() {
     let panel = document.getElementById('vol_target_panel');
     let container = document.getElementById('vol_target_inputs');
+    let settingsPanel = document.getElementById('vol_settings_panel');
     let baseType = document.getElementById('vol_base_type').value;
 
-    if (window.volBoundaryPts.length < 3) { panel.classList.add('hidden'); return; }
-
-    panel.classList.remove('hidden');
-    let settingsPanel = document.getElementById('vol_settings_panel');
-    if (settingsPanel) settingsPanel.classList.remove('hidden');
+    // 🔴 Draw Mode ဖွင့်ထားရင် (သို့) အမှတ် ၃ မှတ် မပြည့်ရင် Panel တွေကို ဖျောက်ထားမယ်
+    if (window.isVolDrawing || window.volBoundaryPts.length < 3) { 
+        if (panel) panel.classList.add('hidden'); 
+        if (settingsPanel) settingsPanel.classList.add('hidden');
+    } else {
+        // Draw Mode ပိတ်သွားပြီး အမှတ် ၃ မှတ်ပြည့်မှသာ ပြန်ဖော်မယ်
+        if (panel) panel.classList.remove('hidden');
+        if (settingsPanel) settingsPanel.classList.remove('hidden');
+    }
     
-    container.innerHTML = ''; 
+    // 🔴 Calculate ခလုတ် နဲ့ Save Box ကို ထိန်းချုပ်မည့် အပိုင်း (Timeout သုံးပြီး သေချာအောင် Update လုပ်မည်)
+    setTimeout(() => {
+        let saveBox = document.getElementById('vol_multi_area_box');
+        let calcBtn = document.querySelector('button[onclick*="calcVolume"]');
+        
+        // Boundary သေချာဆွဲပြီးသား ဖြစ်ရမယ်
+        let hasValidCurrentBdy = (window.volBoundaryPts.length >= 3 && !window.isVolDrawing);
+        // အရင် Save ထားတဲ့ Area တွေ ရှိနေသလား
+        let hasSavedAreas = (window.savedVolAreas && window.savedVolAreas.length > 0);
+
+        // Save Area Box က Current Boundary အတည်ဖြစ်မှ ပေါ်မယ်
+        if (saveBox) {
+            if (hasValidCurrentBdy) saveBox.classList.remove('hidden');
+            else saveBox.classList.add('hidden');
+        }
+
+        // Calculate ခလုတ်က လက်ရှိ Boundary အတည်ဖြစ်နေရင် (သို့) Save ထားတာရှိနေရင် ပေါ်မယ်
+        if (calcBtn) {
+            if (hasValidCurrentBdy || hasSavedAreas) calcBtn.style.display = 'block';
+            else calcBtn.style.display = 'none';
+        }
+    }, 50);
+
+    // UI (Panel) မပေါ်ရင် HTML တွေ အောက်မှာ ဆက်မထုတ်တော့ဘူး
+    if (window.isVolDrawing || window.volBoundaryPts.length < 3) {
+        container.innerHTML = '';
+        return;
+    }
 
     if (baseType === 'flat') {
         container.innerHTML = `
@@ -756,7 +913,18 @@ window.renderVolTargetInputs = function() {
             </div>`;
     } 
     else if (baseType === 'variable') {
-        let html = '<div style="font-size:11px; color:#0284c7; margin-bottom:5px;">Enter desired Target Level for each corner:</div>';
+        // 🔴 ၁။ အလိုအလျောက် ဖြည့်ထားကြောင်း ပြမည့် ခလုတ်နှင့် စာသား
+        let html = `
+            <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:6px; padding:10px; text-align:center;">
+                <span style="font-size:12px; font-weight:bold; color:#16a34a;">✅ Target Z levels are auto-filled with Ground Z.</span><br>
+                <button class="top-btn" style="background:#e2e8f0; color:#1e293b; padding:6px 12px; font-size:11px; margin-top:8px; border-radius:4px; font-weight:bold; border: 1px solid #cbd5e1;" onclick="let c = document.getElementById('var_z_inputs_container'); if(c.style.display === 'none') { c.style.display = 'block'; } else { c.style.display = 'none'; }">
+                    ✏️ Edit Individual Levels 🔽
+                </button>
+            </div>
+            <!-- 🔴 ၂။ Scroll ဆွဲကြည့်လို့ရမည့် (အမြင့်ကန့်သတ်ထားသော) Box အခွံ (စစချင်း ဖျောက်ထားမည်) -->
+            <div id="var_z_inputs_container" style="display: none; max-height: 210px; overflow-y: auto; margin-top: 10px; border: 1px solid #bae6fd; border-radius: 6px; padding: 5px; background: #f0f9ff;">
+        `;
+
         window.volBoundaryPts.forEach((pt, index) => {
             html += `
             <div style="display:flex; align-items:center; gap:5px; background:#fff; padding:5px 8px; border-radius:6px; border:1px solid #bae6fd; margin-bottom:5px;">
@@ -764,13 +932,14 @@ window.renderVolTargetInputs = function() {
                     <span style="font-size:12px; font-weight:bold; color:#0369a1;">BDY ${index + 1}</span><br>
                     <span style="font-size:10px; color:#64748b;">Ground: ${pt.groundZ.toFixed(3)}m</span>
                 </div>
-                <input type="number" id="vol_var_z_${index}" class="v2-input" placeholder="Target Z" style="flex:1.5; margin:0;">
+                <input type="number" id="vol_var_z_${index}" class="v2-input" value="${pt.groundZ.toFixed(3)}" placeholder="Target Z" style="flex:1.5; margin:0;">
             </div>`;
         });
+        
+        html += `</div>`; // Scroll Container ပိတ်ခြင်း
         container.innerHTML = html;
     }
     else if (baseType === 'surface2') {
-        // Surface 2 ကို အပေါ်မှာကတည်းက တင်ထားပြီးဖြစ်/မဖြစ် စစ်ဆေးမည်
         let isLoaded = (window.volSurface2Triangles && window.volSurface2Triangles.length > 0);
         let statusColor = isLoaded ? '#059669' : '#dc2626';
         let statusMsg = isLoaded ? '✅ Surface 2 is ready.' : '⚠️ No Surface 2 detected! Please Load Surface 2 at Step 1.';
@@ -845,22 +1014,21 @@ window.volSurface2Layer = null;
 window.volShowSurface2OnMap = function() {
     if (!window.leafletMap || !window.volSurface2Points || window.volSurface2Points.length === 0) return;
     
-    // Layer အဟောင်းရှိရင် ရှင်းမည်
     if (window.volSurface2Layer) {
+        window.volSurface2Layer.clearLayers();
         window.leafletMap.removeLayer(window.volSurface2Layer);
     }
     window.volSurface2Layer = L.layerGroup().addTo(window.leafletMap);
 
-    // 🔴 ပြင်ဆင်ချက်: သီးသန့် Canvas အသစ်မလုပ်ဘဲ ခုနက Topo ဖန်တီးထားတဲ့ မှန်ချပ်ကိုပဲ ယူသုံးမည်
-    if (!window.globalSharedCanvas) window.globalSharedCanvas = L.canvas({ padding: 0.5 });
-    let sharedCanvasRenderer = window.globalSharedCanvas;
+    // 🔴 ဖြေရှင်းချက်: Topo Canvas ကို topoPane သို့ သတ်မှတ်ပေးခြင်း
+    if (!window.masterTopoCanvas) window.masterTopoCanvas = L.canvas({ padding: 0.5, pane: 'topoPane' }); 
+    
     let bounds = [];
     let datum = document.getElementById('topo_datum') ? document.getElementById('topo_datum').value : "WGS_LL";
 
     window.volSurface2Points.forEach(pt => {
         let lat = pt.n, lon = pt.e; 
 
-        // Coordinate ပြောင်းသည့် အပိုင်း
         if (datum === 'LOCAL') {
             lat = (pt.n - (window.localOffsetN || 0)) / 100000;
             lon = (pt.e - (window.localOffsetE || 0)) / 100000;
@@ -887,23 +1055,40 @@ window.volShowSurface2OnMap = function() {
         }
 
         if (!isNaN(lat) && !isNaN(lon)) {
-            // လိမ္မော်ရောင် (Orange) ဖြင့် ပြမည်
             let marker = L.circleMarker([lat, lon], { 
                 radius: 4, color: '#ea580c', weight: 2, fillColor: '#f97316', fillOpacity: 0.8,
-                renderer: sharedCanvasRenderer 
+                renderer: window.masterTopoCanvas // 🔴 Master ကို သုံးမည် (ဒါမှ အချင်းချင်း မဖုံးတော့မှာပါ)
             });
             
             marker.bindTooltip(`<b>S2</b> Z: ${pt.z.toFixed(3)}`, { direction: 'top', className: 'pt-tooltip', offset: [0, -5] });
             
-            // ထောက်လိုက်ရင် Volume Boundary ထဲ အလိုလို ဝင်သွားအောင် ချိတ်ဆက်ထားသည်
             marker.on('click', function(e) {
                 L.DomEvent.stopPropagation(e);
+                
+                // 🔴 အသစ်ထည့်ထားသောအပိုင်း: Measure ဖွင့်ထားရင် ပေတံဆီကို Click လွှဲပေးမည်
+                if (window.isMeasuring) {
+                    window.leafletMap.fireEvent('click', {latlng: e.latlng});
+                    return;
+                }
+
+                let isActionTaken = false;
+                
                 let volTool = document.getElementById('cogo_vol_tool');
                 if (volTool && !volTool.classList.contains('hidden')) {
                     if (window.isVolDrawing) {
-                        window.volBoundaryPts.push({ lat: lat, lon: lon, n: pt.n, e: pt.e, groundZ: pt.z });
+                        // 🔴 Array ထဲ တန်းမထည့်ဘဲ Draft Point အဖြစ် သတ်မှတ်ပေးလိုက်ပါသည်
+                        window.volDraftPoint = { lat: lat, lon: lon, n: pt.n, e: pt.e, groundZ: pt.z };
                         if (typeof window.volUpdateBoundaryUI === 'function') window.volUpdateBoundaryUI();
+                        isActionTaken = true;
                     }
+                }
+
+                if (!isActionTaken) {
+                    let popupHtml = `<div style="text-align:center; line-height:1.4; padding:2px;">
+                        <b style="color:#ea580c; font-size:13px;">[ Surface 2 Pt ]</b><hr style="margin:4px 0; border:0.5px solid #ccc;">
+                        <b style="color:#b91c1c; font-size:13px;">N: ${pt.n.toFixed(3)}<br>E: ${pt.e.toFixed(3)}<br>Z: ${pt.z.toFixed(3)}</b>
+                    </div>`;
+                    L.popup().setLatLng(e.latlng).setContent(popupHtml).openOn(window.leafletMap);
                 }
             });
 
@@ -964,12 +1149,12 @@ function updateSavedVolAreasUI() {
             <div style="display:flex; justify-content:space-between; align-items:center; padding:8px;">
                 <div style="font-size:12px; color:#0369a1; font-weight:bold;">📍 Saved Vol BDY ${index + 1} <span style="font-size:10px; color:#64748b;">(${area.boundary.length} pts)</span></div>
                 <div style="display:flex; gap:5px;">
-                    <!-- 🔴 တစ်ကွက်ချင်းစီ တွက်ရန် Calc ခလုတ် -->
                     <button class="top-btn" style="background:#10b981; color:white; padding:4px 8px; font-size:11px;" onclick="calcIndividualVolume(${index})">📊 Calc</button>
+                    <!-- 🔴 အသစ်ထည့်ထားသော Edit ခလုတ် -->
+                    <button class="top-btn" style="background:#f59e0b; color:white; padding:4px 8px; font-size:11px;" onclick="editSavedVolArea(${index})">✏️ Edit</button>
                     <button class="top-btn" style="background:#ef4444; color:white; padding:4px 8px; font-size:11px;" onclick="deleteSavedVolArea(${index})">🗑️ Drop</button>
                 </div>
             </div>
-            <!-- 🔴 အဖြေပြမည့် Accordion Box (စစချင်း ဖျောက်ထားမည်) -->
             <div id="indiv_vol_res_${index}" style="display:none; border-top:1px dashed #7dd3fc; padding:8px; background:#fff; border-bottom-left-radius:6px; border-bottom-right-radius:6px;">
             </div>
         </div>`;
@@ -979,7 +1164,61 @@ function updateSavedVolAreasUI() {
     if (typeof window.drawSavedVolBdys === 'function') window.drawSavedVolBdys();
 }
 
-// 🔴 တစ်ကွက်ချင်းစီ သီးသန့်တွက်ထုတ်ပေးမည့် Function (Web Worker သုံးထားသည်)
+// 🔴 Edit ပြန်လုပ်မည့် Function အသစ်
+window.editSavedVolArea = function(index) {
+    let area = window.savedVolAreas[index];
+    if (!area) return;
+
+    // လက်ရှိ ဆွဲလက်စ ရှိနေရင် အရင် ရှင်းထုတ်မယ်
+    if (window.volBoundaryPts && window.volBoundaryPts.length > 0) {
+        if (!confirm("Current unsaved boundary will be replaced. Continue?")) return;
+        window.clearVolBoundary(true);
+    }
+
+    // ၁။ မြေပုံပေါ် ပြန်ဆွဲတင်မယ်
+    window.volBoundaryPts = [...area.boundary];
+    window.isVolDrawing = true;
+    
+    let btn = document.getElementById('btn_vol_draw');
+    if (btn) { btn.innerText = "🛑 Finish Boundary"; btn.style.background = "#ef4444"; }
+    let undoBtn = document.getElementById('volUndoBtn');
+    if (undoBtn) undoBtn.style.display = "flex";
+    
+    window.volUpdateBoundaryUI();
+
+    // ၂။ Settings တွေ ပြန်ဖြည့်မယ်
+    document.getElementById('vol_base_type').value = area.baseType;
+    document.getElementById('vol_grid_size').value = area.gridSize || 0.5;
+    document.getElementById('vol_swell').value = area.swellPct || 0;
+    document.getElementById('vol_shrink').value = area.shrinkPct || 0;
+
+    // ၃။ Input Box တွေ ပြန်ဖော်မယ်
+    window.renderVolTargetInputs();
+
+    // ၄။ Z Level တန်ဖိုးအဟောင်းတွေ ပြန်ထည့်ပေးမယ်
+    setTimeout(() => {
+        if (area.baseType === 'flat' && area.targetLevels.length > 0) {
+            let flatInp = document.getElementById('vol_flat_z');
+            if (flatInp) flatInp.value = area.targetLevels[0].z;
+        } else if (area.baseType === 'variable') {
+            for (let i = 0; i < area.targetLevels.length; i++) {
+                let varInp = document.getElementById(`vol_var_z_${i}`);
+                if (varInp && area.targetLevels[i]) varInp.value = area.targetLevels[i].z;
+            }
+        }
+    }, 50);
+
+    // ၅။ List ထဲကနေ ပြန်ထုတ်လိုက်မယ် (Save အသစ် ပြန်လုပ်ရမှာမို့လို့)
+    window.savedVolAreas.splice(index, 1);
+    updateSavedVolAreasUI();
+    
+    // ၆။ မြေပုံပေါ်မှာ Click ပြန်နှိပ်လို့ရအောင် ဖွင့်ပေးမယ်
+    if (window.leafletMap) {
+        window.leafletMap.on('click', window.volMapClickListener);
+        window.leafletMap.on('mousemove', window.volMouseMoveListener);
+    }
+};
+
 window.calcIndividualVolume = function(index) {
     let area = window.savedVolAreas[index];
     if (!area) return;
@@ -990,7 +1229,6 @@ window.calcIndividualVolume = function(index) {
     resDiv.style.display = 'block';
     resDiv.innerHTML = `<div style="text-align:center; font-size:11px; color:#d97706;">⏳ Calculating BDY ${index + 1}... <span id="indiv_prog_${index}" style="font-weight:bold; color:#1e40af;">0%</span></div>`;
 
-    // 🔴 ဖြည့်စွက်ချက်: Area ထဲမှာ သီးသန့် မှတ်ထားတဲ့ Grid Size, Swell, Shrink ကို ပို့ပေးမည်
     runVolumeWorker(window.volTriangles, area.boundary, area.targetLevels, area.baseType, area.gridSize, area.swellPct, area.shrinkPct,
         function(pct) {
             let progSpan = document.getElementById(`indiv_prog_${index}`);
@@ -1046,7 +1284,6 @@ window.drawSavedVolBdys = function() {
     window.toggleVolBdyLayer(); // လက်ရှိ Tab အခြေအနေနဲ့ Checkbox အခြေအနေကို စစ်ပြီးမှ မြေပုံပေါ်တင်မည်
 };
 
-// 🔴 Layer ကို On/Off လုပ်ပေးမည့် Function 
 window.toggleVolBdyLayer = function() {
     if (!window.leafletMap || !window.savedVolBdyLayer) return;
     
@@ -1054,15 +1291,19 @@ window.toggleVolBdyLayer = function() {
     let volTool = document.getElementById('cogo_vol_tool');
     let isVolActive = (window.activeApp === 4) && volTool && !volTool.classList.contains('hidden');
     
-    // Checkbox အမှန်ခြစ်ထားပြီး Volume Tool ထဲ ရောက်နေမှသာ မြေပုံပေါ်ပြမည်
     if (chk && chk.checked && isVolActive) {
         if (!window.leafletMap.hasLayer(window.savedVolBdyLayer)) {
             window.leafletMap.addLayer(window.savedVolBdyLayer);
         }
+        // 🔴 On လိုက်ပါက Auto Zoom သွားမည်
+        if (!window._prevChkVolBdy && typeof window.zoomToCustomLayer === 'function') window.zoomToCustomLayer(window.savedVolBdyLayer);
+        window._prevChkVolBdy = true;
     } else {
         if (window.leafletMap.hasLayer(window.savedVolBdyLayer)) {
             window.leafletMap.removeLayer(window.savedVolBdyLayer);
         }
+        // Tool ကနေထွက်သွားလို့ ပိတ်တာမဟုတ်ဘဲ အမှန်ခြစ်ဖြုတ်လို့ပိတ်ရင် အခြေအနေကို မှတ်ထားမည်
+        if (chk && !chk.checked) window._prevChkVolBdy = false;
     }
 };
 
@@ -1626,4 +1867,94 @@ window.exportVolDXF = function() {
         let a = document.createElement("a"); a.href = url; a.download = fileName; 
         document.body.appendChild(a); a.click(); document.body.removeChild(a); 
     }
+};
+
+// ==========================================
+// 🔴 HIGH PERFORMANCE POINT TEXT RENDERING (CANVAS)
+// ==========================================
+window.pointTextCanvasLayer = null;
+
+window.updateMapPointTexts = function() {
+    if (!window.leafletMap) return;
+    
+    // အဟောင်းရှိရင် အရင်ဖျက်မယ်
+    if (window.pointTextCanvasLayer) {
+        window.leafletMap.removeLayer(window.pointTextCanvasLayer);
+        window.pointTextCanvasLayer = null;
+    }
+
+    let chkName = document.getElementById('tgl_show_pt_name');
+    let chkZ = document.getElementById('tgl_show_z_val');
+    
+    // Checkbox နှစ်ခုလုံး ပိတ်ထားရင် ဘာမှဆက်မလုပ်တော့ဘူး (Memory သက်သာစေရန်)
+    if ((!chkName || !chkName.checked) && (!chkZ || !chkZ.checked)) return;
+
+    let textsData = [];
+    let datum = document.getElementById('topo_datum') ? document.getElementById('topo_datum').value : "WGS_LL";
+
+    // လက်ရှိ မြေပုံပေါ်မှာ ဘယ် Point တွေ ပြထားလဲ စစ်ဆေးပြီး သိမ်းမယ်
+    let pointsToProcess = [];
+    let topoTool = document.getElementById('cogo_topo_tool');
+    let volTool = document.getElementById('cogo_vol_tool');
+    
+    // Topo Tab ဖွင့်ထားရင်
+    if (topoTool && !topoTool.classList.contains('hidden') && window.topoPoints) {
+        pointsToProcess = window.topoPoints;
+    }
+    // Volume Tab ဖွင့်ထားရင် (Surface 1 ရော Surface 2 ပါ ယူမယ်)
+    if (volTool && !volTool.classList.contains('hidden')) {
+        if (window.volPoints) pointsToProcess = pointsToProcess.concat(window.volPoints);
+        if (window.volSurface2Points) pointsToProcess = pointsToProcess.concat(window.volSurface2Points);
+    }
+
+    pointsToProcess.forEach(pt => {
+        let lat = pt.n, lon = pt.e; 
+        
+        // Coordinate ပြောင်းတဲ့စနစ်
+        if (datum === 'LOCAL') {
+            lat = (pt.n - (window.localOffsetN || 0)) / 100000;
+            lon = (pt.e - (window.localOffsetE || 0)) / 100000;
+        } else if (datum === "SVY21") { 
+            let r = calc_v2_rev(pt.e, pt.n); lat = r.lat; lon = r.lon; 
+        } else if (datum.startsWith("MM")) {
+            let zone = parseInt(datum.slice(-2)); let r = m_inverse(pt.e, pt.n, zone, m_EVE); 
+            let x = m_llh2xyz(r.lat, r.lon, 0, m_EVE); let w = m_xyz2llh(x.x-m_DX, x.y-m_DY, x.z-m_DZ, m_WGS);
+            lat = w.lat; lon = w.lon;
+        } else if (datum.startsWith("WGS_UTM")) { 
+            let zone = parseInt(datum.slice(-2)); let i = m_inverse(pt.e, pt.n, zone, m_WGS); lat = i.lat; lon = i.lon; 
+        } else if (datum === "GLOBAL_UTM") {
+            let zInput = document.getElementById('topo_custom_zone'); let hInput = document.getElementById('topo_custom_hemi');
+            let zone = (zInput && zInput.value) ? parseInt(zInput.value) : 47; 
+            let hemi = hInput ? hInput.value : 'N'; 
+            let calcN = pt.n; if (hemi === 'S') calcN -= 10000000; 
+            let i_w = m_inverse(pt.e, calcN, zone, m_WGS); lat = i_w.lat; lon = i_w.lon;
+        }
+
+        if (!isNaN(lat) && !isNaN(lon)) {
+            let txt = "";
+            // Name ဖွင့်ထားရင် Name ထည့်မယ်
+            if (chkName && chkName.checked && pt.p) txt += `[${pt.p}]  `;
+            // Z ဖွင့်ထားရင် Z ထည့်မယ်
+            if (chkZ && chkZ.checked && pt.z !== undefined) txt += pt.z.toFixed(3);
+
+            if (txt.trim() !== "") {
+                textsData.push({
+                    lat: lat, lon: lon, text: txt.trim(), color: '#1e3a8a', align: 'left', isContour: false
+                });
+            }
+        }
+    });
+
+    // စာသားတွေကို မြေပုံပေါ် (Canvas စနစ်ဖြင့်) တင်မည် (DXF Text Layer အတိုင်း သုံးထားသဖြင့် လုံးဝ မလေးပါ)
+    if (textsData.length > 0 && typeof L.CanvasTextLayer !== 'undefined') {
+        window.pointTextCanvasLayer = new L.CanvasTextLayer(textsData);
+        window.pointTextCanvasLayer.addTo(window.leafletMap);
+    }
+};
+
+// Topo Layer တွေ အဖွင့်အပိတ် လုပ်တဲ့အခါ စာသားတွေပါ Update ဖြစ်အောင် ချိတ်ဆက်ခြင်း
+let _oldToggleTopoLayersHook = window.toggleTopoLayers;
+window.toggleTopoLayers = function() {
+    if (typeof _oldToggleTopoLayersHook === 'function') _oldToggleTopoLayersHook();
+    window.updateMapPointTexts(); // Point တွေ ပြောင်းသွားတိုင်း စာသားပါ လိုက်ပြောင်းမည်
 };

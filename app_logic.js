@@ -134,6 +134,8 @@ window.updateTopoUI = function() {
 };
 
 window.switchApp = function(n) {
+    // 🔴 အသစ်ထပ်ဖြည့်ချက်: Tab ပြောင်းတာနဲ့ ပေတံ သုံးနေရင် အလိုအလျောက် ပိတ်ပေးမည်
+    if (window.isMeasuring) { window.toggleMeasureMode(); }
     if (window.activeApp === 0 && n !== 0) { history.pushState({page: n}, "App " + n, ""); }
     if (window.isNativeGPSActive && window.activeApp !== n) { window.toggleGlobalGPS(); }
     if (window.activeApp === 3 && n !== 3) { window.stopNavigation(); }

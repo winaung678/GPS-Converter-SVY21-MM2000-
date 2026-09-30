@@ -374,23 +374,39 @@ window.openCogoTool = function(toolName) {
         gpsBtn.classList.add('hidden');
         if (typeof toggleTopoUI === 'function') toggleTopoUI();
         
-        // 🔴 Topo Data သွင်းထားပြီးသား ဆိုပါက မြေပုံကို ချက်ချင်း ပြန်ဖော်ပြပေးမည်
         if (window.topoPoints && window.topoPoints.length > 0) {
             mapContainer.classList.remove('hidden');
             if (window.leafletMap) {
-                setTimeout(() => { window.leafletMap.invalidateSize(); }, 300);
+                setTimeout(() => { 
+                    window.leafletMap.invalidateSize(); 
+                    // 🔴 Canvas ပျက်သွားတာကို ကာကွယ်ရန် Data များကို မြေပုံပေါ် အသစ်ပြန်ဆွဲတင်ပေးခြင်း
+                    if (typeof showTopoPointsOnMapOnly === 'function') showTopoPointsOnMapOnly();
+                    if (window.topoContours && window.topoContours.length > 0 && typeof showContoursOnMap === 'function') showContoursOnMap();
+                    if (window.topoTriangles && window.topoTriangles.length > 0 && typeof showTinOnMap === 'function') showTinOnMap();
+                }, 300);
             }
         } else {
             mapContainer.classList.add('hidden');
         }
 
-    } else if (toolName === 'vol') { // 🔴 Volume အတွက် အသစ်
+    } else if (toolName === 'vol') { 
         document.getElementById('cogo_vol_tool').classList.remove('hidden');
         titleEl.innerText = '📦 Earthwork / Volume Calculator';
         titleEl.style.color = '#059669';
         mapContainer.classList.remove('hidden');
         gpsBtn.classList.add('hidden');
-        if(window.leafletMap) setTimeout(() => { window.leafletMap.invalidateSize(); }, 300);
+        if(window.leafletMap) {
+            setTimeout(() => { 
+                window.leafletMap.invalidateSize(); 
+                // 🔴 Volume Point များကိုလည်း Click ပြန်ရအောင် အသစ်ပြန်ဆွဲတင်ပေးခြင်း
+                if (window.volPoints && window.volPoints.length > 0 && typeof volShowPointsOnMap === 'function') {
+                    volShowPointsOnMap();
+                }
+                if (window.volSurface2Points && window.volSurface2Points.length > 0 && typeof volShowSurface2OnMap === 'function') {
+                    window.volShowSurface2OnMap();
+                }
+            }, 300);
+        }
     }
 
     history.pushState({page: 4, subTool: toolName}, "Cogo Tool", "");
@@ -616,10 +632,15 @@ window.plotRecordedPointsOnMap = function() {
                 window.leafletMap.fireEvent('click', {latlng: e.latlng});
             }
             else {
+                let isAreaToolActive = (window.activeApp === 4 && document.getElementById('cogo_area_tool') && !document.getElementById('cogo_area_tool').classList.contains('hidden'));
                 let buttonsHtml = '';
-                if (window.activeApp === 3) { buttonsHtml = `<button class="so-popup-btn" style="background:#2563eb; margin-top:8px;" onclick="window.startMapSetOutFromTopo(${index})">🎯 Set Out</button>`; }
-                else if (window.activeApp === 4) { buttonsHtml = `<button class="so-popup-btn" style="background:#10b981; margin-top:8px;" onclick="window.addTopoPointToArea(${index})">➕ Add to Area</button>`; }
-                else { buttonsHtml = `<button class="so-popup-btn" style="background:#ef4444; margin-top:8px;" onclick="window.deleteRecordedPoint(${index})">🗑️ Delete Point</button>`; }
+                if (window.activeApp === 3) { 
+                    buttonsHtml = `<button class="so-popup-btn" style="background:#2563eb; margin-top:8px;" onclick="window.startMapSetOutFromTopo(${index})">🎯 Set Out</button>`; 
+                } else if (isAreaToolActive) { 
+                    buttonsHtml = `<button class="so-popup-btn" style="background:#10b981; margin-top:8px;" onclick="window.addTopoPointToArea(${index})">➕ Add to Area</button>`; 
+                } else if (window.activeApp === 1 || window.activeApp === 2 || window.activeApp === 5) { 
+                    buttonsHtml = `<button class="so-popup-btn" style="background:#ef4444; margin-top:8px;" onclick="window.deleteRecordedPoint(${index})">🗑️ Delete Point</button>`; 
+                }
                 let popupContent = window.buildSavedPointPopup(pLat, pLon, { pointName: pt.p, z: pt.z, icon: '📍', nameColor: '#f59e0b', buttonsHtml: buttonsHtml });
                 L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(window.leafletMap);
             }
@@ -1473,10 +1494,19 @@ function showTopoPointsOnMapOnly() {
         });
     }
 
-    if (window.topoPointsLayer) window.leafletMap.removeLayer(window.topoPointsLayer);
-    if (window.topoLayerGroup) window.leafletMap.removeLayer(window.topoLayerGroup); 
+    if (window.topoPointsLayer) {
+        window.topoPointsLayer.clearLayers();
+        window.leafletMap.removeLayer(window.topoPointsLayer);
+    }
+    if (window.topoLayerGroup) {
+        window.topoLayerGroup.clearLayers();
+        window.leafletMap.removeLayer(window.topoLayerGroup); 
+    }
     
     window.topoPointsLayer = L.layerGroup().addTo(window.leafletMap);
+
+    // 🔴 ဖြေရှင်းချက်: Topo Canvas ကို topoPane သို့ သတ်မှတ်ပေးခြင်း
+    if (!window.masterTopoCanvas) window.masterTopoCanvas = L.canvas({ padding: 0.5, pane: 'topoPane' });
 
     let bounds = [];
     window.topoPoints.forEach(pt => {
@@ -1507,13 +1537,10 @@ function showTopoPointsOnMapOnly() {
             let i_w = m_inverse(pt.e, calcN, zone, m_WGS); lat = i_w.lat; lon = i_w.lon;
         }
 
-        // 🔴 ဖြည့်စွက်ချက်: Canvas မှန်ချပ် တစ်ခုတည်းကိုသာ မျှဝေသုံးစွဲရန် (Global Canvas)
-        if (!window.globalSharedCanvas) window.globalSharedCanvas = L.canvas({ padding: 0.5 });
-
         if (!isNaN(lat) && !isNaN(lon)) {
             let marker = L.circleMarker([lat, lon], { 
                 radius: 4, color: 'transparent', weight: 20, fillColor: '#3b82f6', fillOpacity: 1,
-                renderer: window.globalSharedCanvas // <-- 🔴 ဒီစာကြောင်းလေး အသစ်ဝင်သွားတာပါ
+                renderer: window.masterTopoCanvas // 🔴 Master ကို သုံးမည်
             });
             
             marker.bindTooltip(`${pt.p}<br>Z: ${pt.z.toFixed(3)}`, { direction: 'top', className: 'pt-tooltip' });
@@ -1521,26 +1548,43 @@ function showTopoPointsOnMapOnly() {
            marker.on('click', function(e) {
                 L.DomEvent.stopPropagation(e);
                 
-                // 🔴 Topo Tool (Surface & Contour) ဖွင့်ထားချိန်
+                // 🔴 အသစ်ထည့်ထားသောအပိုင်း: Measure ဖွင့်ထားရင် ပေတံဆီကို Click လွှဲပေးမည်
+                if (window.isMeasuring) {
+                    window.leafletMap.fireEvent('click', {latlng: e.latlng});
+                    return;
+                }
+
+                let isActionTaken = false;
+                
                 let topoTool = document.getElementById('cogo_topo_tool');
                 if (topoTool && !topoTool.classList.contains('hidden')) {
                     if (window.isDrawingBoundary) {
                         window.topoBoundaryPolygon.push({ n: pt.n, e: pt.e, lat: lat, lon: lon });
                         updateBoundaryDrawUI();
+                        isActionTaken = true;
                     } else if (window.isDrawingExclude) {
                         window.currentExcludePolygon.push({ n: pt.n, e: pt.e, lat: lat, lon: lon });
                         updateBoundaryDrawUI();
+                        isActionTaken = true;
                     }
                 }
                 
-                // 🔴 Volume Tool ဖွင့်ထားချိန်
                 let volTool = document.getElementById('cogo_vol_tool');
                 if (volTool && !volTool.classList.contains('hidden')) {
                     if (window.isVolDrawing) {
-                        // Volume Draw Mode ဖွင့်ထားရင် ထောက်လိုက်တဲ့ Point ကို Volume Boundary ထဲ တန်းထည့်မည်
                         window.volBoundaryPts.push({ lat: lat, lon: lon, n: pt.n, e: pt.e, groundZ: pt.z });
                         if (typeof window.volUpdateBoundaryUI === 'function') window.volUpdateBoundaryUI();
+                        isActionTaken = true;
                     }
+                }
+
+                if (!isActionTaken) {
+                    let pName = pt.p ? `<b style="color:#1e40af; font-size:13px;">[ ${pt.p} ]</b><hr style="margin:4px 0; border:0.5px solid #ccc;">` : '';
+                    let popupHtml = `<div style="text-align:center; line-height:1.4; padding:2px;">
+                        ${pName}
+                        <b style="color:#b91c1c; font-size:13px;">N: ${pt.n.toFixed(3)}<br>E: ${pt.e.toFixed(3)}<br>Z: ${pt.z.toFixed(3)}</b>
+                    </div>`;
+                    L.popup().setLatLng(e.latlng).setContent(popupHtml).openOn(window.leafletMap);
                 }
             });
 
@@ -1555,6 +1599,9 @@ function showTopoPointsOnMapOnly() {
 // --- Exclude Boundary (Holes) Functions ---
 window.toggleExcludeDrawMode = function() {
     if (window.topoPoints.length === 0) return alert("Please Load CSV Points first!");
+
+    // 🔴 အသစ်ထည့်ရန်: ပေတံ (Measure Tool) ဖွင့်ထားရင် တားမည်
+    if (window.isMeasuring) return alert("⚠️ Please finish or close the Measure tool first.");
 
     // Outer Draw ဖွင့်ထားရင် ပိတ်မယ်
     if (window.isDrawingBoundary) window.toggleBoundaryDrawMode();
@@ -1598,6 +1645,9 @@ window.undoExcludeBoundary = function() {
 
 window.toggleBoundaryDrawMode = function() {
     if (window.topoPoints.length === 0) return alert("Please Load CSV Points first!");
+
+    // 🔴 အသစ်ထည့်ရန်: ပေတံ (Measure Tool) ဖွင့်ထားရင် တားမည်
+    if (window.isMeasuring) return alert("⚠️ Please finish or close the Measure tool first.");
 
     // 🔴 အသစ်ဖြည့်စွက်ချက်: Exclude (ရေကန်) ဆွဲတာ ဖွင့်ထားရင် အလိုလို ပြန်ပိတ်ပေးမယ် (မငြိအောင်လို့)
     if (window.isDrawingExclude) window.toggleExcludeDrawMode();
@@ -1646,16 +1696,26 @@ function updateBoundaryDrawUI(isClosed = false) {
         let latlngs = window.topoBoundaryPolygon.map(pt => [pt.lat, pt.lon]);
         if (isClosed && latlngs.length > 2) latlngs.push(latlngs[0]); 
         layers.push(L.polyline(latlngs, { color: '#ef4444', weight: 3, dashArray: '5, 5' }));
+        
+        // 🔴 ပြင်ဆင်ချက်: ထောက်လိုက်တဲ့ အမှတ်ကို အဝါရောင် အနားကွပ် ထူထူလေး ဝိုင်းပေးလိုက်ပါသည်
+        window.topoBoundaryPolygon.forEach(pt => {
+            layers.push(L.circleMarker([pt.lat, pt.lon], {radius: 5, color: '#eab308', fillColor: '#ef4444', fillOpacity: 1, weight: 3, interactive: false}));
+        });
     }
 
-    // Exclude Boundaries (အပြာရောင်မျဉ်း / Holes တွေ အကုန်ဆွဲပြမယ်)
+    // Exclude Boundaries (အပြာရောင်မျဉ်း / Holes)
     let allExcludes = [...window.topoExcludePolygons];
     if (window.currentExcludePolygon.length > 0) allExcludes.push(window.currentExcludePolygon);
 
     allExcludes.forEach(hole => {
         let h_latlngs = hole.map(pt => [pt.lat, pt.lon]);
-        if (h_latlngs.length > 2) h_latlngs.push(h_latlngs[0]); // ပိတ်သွားအောင်ဆွဲမယ်
+        if (h_latlngs.length > 2) h_latlngs.push(h_latlngs[0]); 
         layers.push(L.polygon(h_latlngs, { color: '#0284c7', weight: 2, fillColor: '#0ea5e9', fillOpacity: 0.2, dashArray: '4, 4' }));
+        
+        // 🔴 ပြင်ဆင်ချက်: ရေကန်ဆွဲတဲ့ အမှတ်ကိုလည်း အဝါရောင် အနားကွပ် ထူထူလေး ဝိုင်းပေးလိုက်ပါသည်
+        hole.forEach(pt => {
+            layers.push(L.circleMarker([pt.lat, pt.lon], {radius: 5, color: '#eab308', fillColor: '#0284c7', fillOpacity: 1, weight: 3, interactive: false}));
+        });
     });
 
     if (layers.length > 0) {
@@ -2161,8 +2221,12 @@ window.toggleTopoLayers = function() {
             if (!window.leafletMap.hasLayer(window.topoPointsLayer)) {
                 window.leafletMap.addLayer(window.topoPointsLayer);
             }
+            // 🔴 On လိုက်ပါက Auto Zoom သွားမည်
+            if (!window._prevChkTopoPts && typeof window.zoomToCustomLayer === 'function') window.zoomToCustomLayer(window.topoPointsLayer);
+            window._prevChkTopoPts = true;
         } else {
             window.leafletMap.removeLayer(window.topoPointsLayer);
+            window._prevChkTopoPts = false;
         }
     }
 
@@ -2172,8 +2236,12 @@ window.toggleTopoLayers = function() {
             if (!window.leafletMap.hasLayer(window.topoLayerGroup)) {
                 window.leafletMap.addLayer(window.topoLayerGroup);
             }
+            // 🔴 On လိုက်ပါက Auto Zoom သွားမည်
+            if (!window._prevChkContour && typeof window.zoomToCustomLayer === 'function') window.zoomToCustomLayer(window.topoLayerGroup);
+            window._prevChkContour = true;
         } else {
             window.leafletMap.removeLayer(window.topoLayerGroup);
+            window._prevChkContour = false;
         }
     }
 
@@ -2188,15 +2256,18 @@ window.toggleTopoLayers = function() {
         }
     }
 
-    // 🔴 အသစ်ထည့်ထားသော Surface 2 Points (လိမ္မော်ရောင်) Layer အဖွင့်အပိတ်
     if (window.volSurface2Layer) {
         let chkSurf2 = document.getElementById('tgl_surf2_pts');
         if (chkSurf2 && chkSurf2.checked) {
             if (!window.leafletMap.hasLayer(window.volSurface2Layer)) {
                 window.leafletMap.addLayer(window.volSurface2Layer);
             }
+            // 🔴 On လိုက်ပါက Auto Zoom သွားမည်
+            if (!window._prevChkSurf2 && typeof window.zoomToCustomLayer === 'function') window.zoomToCustomLayer(window.volSurface2Layer);
+            window._prevChkSurf2 = true;
         } else {
             window.leafletMap.removeLayer(window.volSurface2Layer);
+            window._prevChkSurf2 = false;
         }
     }
 };
