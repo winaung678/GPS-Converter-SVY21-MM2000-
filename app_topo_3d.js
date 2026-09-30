@@ -1958,3 +1958,37 @@ window.toggleTopoLayers = function() {
     if (typeof _oldToggleTopoLayersHook === 'function') _oldToggleTopoLayersHook();
     window.updateMapPointTexts(); // Point တွေ ပြောင်းသွားတိုင်း စာသားပါ လိုက်ပြောင်းမည်
 };
+
+window.toggleTopoPanel = function() {
+    let panel = document.getElementById('topo_controls_panel'); 
+    let mapDiv = document.getElementById('map_view'); 
+    let btn = document.getElementById('btn_toggle_topo_panel');
+    
+    if (panel.classList.contains('hidden')) { 
+        panel.classList.remove('hidden'); 
+        mapDiv.classList.remove('map-expanded'); 
+        btn.innerText = "🔼 Hide Controls & Expand Map"; 
+    } else { 
+        panel.classList.add('hidden'); 
+        mapDiv.classList.add('map-expanded'); 
+        btn.innerText = "🔽 Show Controls"; 
+    }
+    setTimeout(() => { if(window.leafletMap) window.leafletMap.invalidateSize(); }, 350);
+};
+
+window.toggleVolPanel = function() {
+    let panel = document.getElementById('vol_controls_panel'); 
+    let mapDiv = document.getElementById('map_view'); 
+    let btn = document.getElementById('btn_toggle_vol_panel');
+    
+    if (panel.classList.contains('hidden')) { 
+        panel.classList.remove('hidden'); 
+        mapDiv.classList.remove('map-expanded'); 
+        btn.innerText = "🔼 Hide Controls & Expand Map"; 
+    } else { 
+        panel.classList.add('hidden'); 
+        mapDiv.classList.add('map-expanded'); 
+        btn.innerText = "🔽 Show Controls"; 
+    }
+    setTimeout(() => { if(window.leafletMap) window.leafletMap.invalidateSize(); }, 350);
+};
