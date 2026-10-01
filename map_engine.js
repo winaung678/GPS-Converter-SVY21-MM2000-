@@ -16,10 +16,15 @@ window.updateMeasureModeButton = function() {
     if (!modeBtn) return;
 
     let isLocal = false;
-    let topoTool = document.getElementById('cogo_topo_tool');
-    if (topoTool && !topoTool.classList.contains('hidden')) {
-        let datum = document.getElementById('topo_datum') ? document.getElementById('topo_datum').value : "";
-        if (datum === 'LOCAL') isLocal = true;
+    
+    // 🔴 ပြင်ဆင်ချက်: COGO Tab တွင် Topo သို့မဟုတ် Volume ဖွင့်ထားမှသာ Local လား စစ်မည်
+    if (window.activeApp === 4) {
+        let topoTool = document.getElementById('cogo_topo_tool');
+        let volTool = document.getElementById('cogo_vol_tool');
+        if ((topoTool && !topoTool.classList.contains('hidden')) || (volTool && !volTool.classList.contains('hidden'))) {
+            let datum = document.getElementById('topo_datum') ? document.getElementById('topo_datum').value : "WGS_LL";
+            if (datum === 'LOCAL') isLocal = true;
+        }
     }
 
     if (isLocal) {
@@ -43,10 +48,15 @@ window.updateMeasureModeButton = function() {
 
 function calcSegmentDistance(lat1, lon1, lat2, lon2) {
     let isLocal = false;
-    let topoTool = document.getElementById('cogo_topo_tool');
-    if (topoTool && !topoTool.classList.contains('hidden')) {
-        let datum = document.getElementById('topo_datum') ? document.getElementById('topo_datum').value : "";
-        if (datum === 'LOCAL') isLocal = true;
+    
+    // 🔴 ပြင်ဆင်ချက်: COGO Tab တွင် Topo သို့မဟုတ် Volume ဖွင့်ထားမှသာ Local လား စစ်မည်
+    if (window.activeApp === 4) {
+        let topoTool = document.getElementById('cogo_topo_tool');
+        let volTool = document.getElementById('cogo_vol_tool');
+        if ((topoTool && !topoTool.classList.contains('hidden')) || (volTool && !volTool.classList.contains('hidden'))) {
+            let datum = document.getElementById('topo_datum') ? document.getElementById('topo_datum').value : "WGS_LL";
+            if (datum === 'LOCAL') isLocal = true;
+        }
     }
     
     if (isLocal || window.measureDistMode === 'grid') {
@@ -148,7 +158,9 @@ function finalizeActiveMeasureSession() {
         return;
     }
     active.id = window.nextMeasureSessionId++;
-    active.nodes.forEach(n => n.dragging.disable()); // အတည်ပြုပြီးရင် Drag ဆွဲမရတော့ပါ
+    
+    // 🔴 ပြင်ဆင်ချက်: Drag လုပ်လို့မရတော့သဖြင့် disable လုပ်သည့် Code ကို ဖြုတ်လိုက်ပါသည်
+    
     bindMeasureSessionClick(active);
     window.measureSessions.push(active);
     window.activeMeasureSession = null;
@@ -240,24 +252,20 @@ function addMeasurePoint(finalLat, finalLon, snapResult) {
 
     let markerIcon = L.divIcon({
         className: 'dxf-text-label',
-        html: `<div style="background:white; border-radius:50%; width:16px; height:16px; border:4px solid #10b981; cursor:pointer; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>`,
+        // 🔴 ပြင်ဆင်ချက်: ဆွဲလို့မရတော့သဖြင့် cursor:pointer ကို ဖြုတ်လိုက်ပါသည်
+        html: `<div style="background:white; border-radius:50%; width:16px; height:16px; border:4px solid #10b981; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>`,
         iconSize: [16, 16]
     });
     
-    let node = L.marker([finalLat, finalLon], { icon: markerIcon, draggable: true }).addTo(window.leafletMap);
+    // 🔴 ပြင်ဆင်ချက်: draggable: true ကို ဖြုတ်လိုက်ပါသည်
+    let node = L.marker([finalLat, finalLon], { icon: markerIcon, interactive: true }).addTo(window.leafletMap);
     
     node.on('click', function(e) {
         L.DomEvent.stopPropagation(e);
         if (window.isMeasuring) window.leafletMap.fireEvent('click', {latlng: e.latlng});
     });
 
-    node.on('drag', function(e) {
-        // 🔴 ဖိဆွဲနေစဉ်မှာ Auto-Snap ဖြစ်အောင် မနားတမ်း စစ်ပေးပါမည်
-        let snap = getSnapPoint(e.latlng.lat, e.latlng.lng, window.leafletMap.getZoom());
-        active.latlngs[idx] = [snap.lat, snap.lon];
-        node.setLatLng([snap.lat, snap.lon]); // အမှတ်ကို သံလိုက်လို သွားကပ်စေမည်
-        window.refreshMeasureVisuals(); 
-    });
+    // 🔴 ပြင်ဆင်ချက်: node.on('drag', ...) အပိုင်း အားလုံးကို ဖျက်ပစ်လိုက်ပါသည်
 
     active.nodes.push(node);
     window.refreshMeasureVisuals();
