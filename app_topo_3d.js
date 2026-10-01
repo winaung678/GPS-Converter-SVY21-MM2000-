@@ -544,40 +544,8 @@ window.volMapClickListener = function(e) {
 };
 
 window.volMouseMoveListener = function(e) {
-    if (!window.isVolDrawing || window.volBoundaryPts.length === 0) return;
-    
-    if (window.volDraftPoint) {
-        if (window.volGhostLine) window.leafletMap.removeLayer(window.volGhostLine);
-        if (window.volGhostLabel) window.leafletMap.removeLayer(window.volGhostLabel);
-        return;
-    }
-    if (window.volDraftMarker && window.volDraftMarker.dragging && window.volDraftMarker.dragging._draggable && window.volDraftMarker.dragging._draggable._moving) return;
-
-    let lastPt = window.volBoundaryPts[window.volBoundaryPts.length - 1];
-    let dist = calcDistance(lastPt.lat, lastPt.lon, e.latlng.lat, e.latlng.lng);
-    
-    // 🔴 အသစ်ပြင်ဆင်ချက်: အလယ်တည့်တည့်မှာ မပြဘဲ Mouse ရဲ့ အနီးနား (Offset) မှာ ပြပါမည်
-    let midLat = e.latlng.lat; 
-    let midLon = e.latlng.lng;
-
-    // 🔴 ဖောက်ထွင်းသွားစေမည့် CSS Style (pointer-events: none)
-    let labelHtml = `<div style="background: rgba(255, 255, 255, 0.85); border: 1px solid #cbd5e1; border-radius: 4px; padding: 2px 6px; pointer-events: none; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"><b style="color:#ef4444; font-size:12px;">${dist.toFixed(2)} m</b></div>`;
-
-    if (!window.volGhostLine) {
-        window.volGhostLine = L.polyline([[lastPt.lat, lastPt.lon], [e.latlng.lat, e.latlng.lng]], {
-            color: '#94a3b8', weight: 2, dashArray: '4, 4', interactive: false
-        }).addTo(window.leafletMap);
-        
-        // 🔴 L.popup အစား L.tooltip ကို သုံးခြင်း (Tooltip က နေရာရွှေ့ရပိုလွယ်ပြီး ဖောက်ထွင်းလုပ်ရလွယ်လို့ပါ)
-        window.volGhostLabel = L.tooltip({
-            permanent: true, direction: 'right', className: 'ghost-distance-label', offset: [15, 0], opacity: 1
-        }).setLatLng([midLat, midLon]).setContent(labelHtml).addTo(window.leafletMap);
-    } else {
-        window.volGhostLine.setLatLngs([[lastPt.lat, lastPt.lon], [e.latlng.lat, e.latlng.lng]]);
-        window.volGhostLabel.setLatLng([midLat, midLon]).setContent(labelHtml);
-        if (!window.leafletMap.hasLayer(window.volGhostLine)) window.volGhostLine.addTo(window.leafletMap);
-        if (!window.leafletMap.hasLayer(window.volGhostLabel)) window.volGhostLabel.addTo(window.leafletMap);
-    }
+    // 🔴 ဖြည့်စွက်ချက်: မီးခိုးရောင် အရိပ်မျဉ်း (Ghost Line) ကို မပေါ်စေရန် ပိတ်ထားလိုက်ပါသည်
+    return;
 };
 
 window.toggleVolDrawMode = function() {
@@ -719,8 +687,6 @@ window.volUpdateBoundaryUI = function(isClosed = false) {
     if (window.isVolDrawing && window.volDraftPoint) {
         let dPt = window.volDraftPoint;
 
-       
-        // 🔴 အသစ်ထပ်ဖြည့်ချက် - Click ဖောက်မသွားအောင် တားထားပြီး၊ Box ကို အလွန်ကျစ်လျစ်အောင် ပြင်ထားသည်
         let fixDistHTML = "";
         if (window.volBoundaryPts.length > 0) {
             let lastPt = window.volBoundaryPts[window.volBoundaryPts.length - 1];
@@ -730,7 +696,6 @@ window.volUpdateBoundaryUI = function(isClosed = false) {
                 <div style="margin-top:3px; margin-bottom:3px; border-top:1px dashed #cbd5e1; padding-top:3px;">
                     <div style="display:flex; align-items:center; justify-content:center; gap:3px;">
                         <span style="font-size:9px; color:#64748b; font-weight:bold;">Dist:</span>
-                        <!-- event.stopPropagation() ထည့်ထားသဖြင့် မြေပုံဆီ Click မရောက်တော့ပါ -->
                         <input type="number" id="vol_draft_dist_inp" value="${currentDist.toFixed(3)}" step="0.001" onclick="event.stopPropagation();" onmousedown="event.stopPropagation();" style="width:55px; font-size:11px; padding:2px; border:1px solid #94a3b8; border-radius:3px; text-align:center; color:#1e40af; font-weight:bold; margin:0; height:20px;">
                         <button style="background:#3b82f6; color:white; border:none; border-radius:3px; font-size:10px; padding:0 6px; height:20px; font-weight:bold; cursor:pointer;" onclick="event.stopPropagation(); applyVolDraftDistance();">Apply</button>
                     </div>
@@ -738,7 +703,6 @@ window.volUpdateBoundaryUI = function(isClosed = false) {
             `;
         }
 
-        // 🔴 ဖုန်းအတွက် အလွန်သေးငယ်ကျစ်လျစ်သော Popup Design
         let compactPopupHTML = `<div style="text-align:center; padding: 0px; line-height: 1.2;">
             <div style="font-weight:bold; font-size:10px; color:#d97706; margin-bottom:1px;">📍 Draft</div>
             <div style="font-size:10px; color:#b91c1c; font-weight:bold; margin-bottom:2px;">
@@ -760,11 +724,8 @@ window.volUpdateBoundaryUI = function(isClosed = false) {
                 let ll = e.latlng;
                 if (window.volBoundaryPts.length > 0) {
                     let lastPt = window.volBoundaryPts[window.volBoundaryPts.length - 1];
-            // 🔴 Lat/Lon အစား N, E ကိုသုံးပြီး Grid Distance အတိအကျ တွက်ယူခြင်း
-            let dragCoords = window.getDatumCoordsForLatLon(ll.lat, ll.lng);
-            let dist = Math.hypot(dragCoords.localE - lastPt.e, dragCoords.localN - lastPt.n);
-            if (window.volDraftLine) window.volDraftLine.setLatLngs([[lastPt.lat, lastPt.lon], [ll.lat, ll.lng]]);
-                    if (window.volDraftLabel) window.volDraftLabel.setLatLng([(lastPt.lat + ll.lat)/2, (lastPt.lon + ll.lng)/2]).setContent(`<b style="color:#b91c1c; font-size:14px;">${dist.toFixed(2)} m</b>`);
+                    if (window.volDraftLine) window.volDraftLine.setLatLngs([[lastPt.lat, lastPt.lon], [ll.lat, ll.lng]]);
+                    // 🔴 ယာယီဆွဲနေစဉ် Distance Box ဖြုတ်လိုက်ပါပြီ
                 }
             });
             window.volDraftMarker.on('dragend', function(e) {
@@ -788,24 +749,11 @@ window.volUpdateBoundaryUI = function(isClosed = false) {
 
         if (window.volBoundaryPts.length > 0) {
             let lastPt = window.volBoundaryPts[window.volBoundaryPts.length - 1];
-            // 🔴 N, E ကိုသုံးပြီး Grid Distance အတိအကျ တွက်ယူခြင်း
-            let dist = Math.hypot(dPt.e - lastPt.e, dPt.n - lastPt.n);
-            let midLat = (lastPt.lat + dPt.lat) / 2, midLon = (lastPt.lon + dPt.lon) / 2;
-
             if (!window.volDraftLine) window.volDraftLine = L.polyline([[lastPt.lat, lastPt.lon], [dPt.lat, dPt.lon]], { color: '#eab308', weight: 3, dashArray: '5, 5' }).addTo(window.leafletMap);
             else { window.volDraftLine.setLatLngs([[lastPt.lat, lastPt.lon], [dPt.lat, dPt.lon]]); if (!window.leafletMap.hasLayer(window.volDraftLine)) window.volDraftLine.addTo(window.leafletMap); }
-
-            // 🔴 အသစ်ပြင်ဆင်ချက်: Draft Point အတွက်လည်း Tooltip (ဖောက်ထွင်း Box) နဲ့ Offset ကို ပြောင်းသုံးပါမည်
-            let draftLabelHtml = `<div style="background: rgba(255, 255, 255, 0.85); border: 1px solid #eab308; border-radius: 4px; padding: 2px 6px; pointer-events: none; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.1);"><b style="color:#b91c1c; font-size:12px;">${dist.toFixed(2)} m</b></div>`;
-
-            if (!window.volDraftLabel) {
-                window.volDraftLabel = L.tooltip({ 
-                    permanent: true, direction: 'right', className: 'ghost-distance-label', offset: [15, 0], opacity: 1 
-                }).setLatLng([midLat, midLon]).setContent(draftLabelHtml).addTo(window.leafletMap);
-            } else { 
-                window.volDraftLabel.setLatLng([midLat, midLon]).setContent(draftLabelHtml); 
-                if (!window.leafletMap.hasLayer(window.volDraftLabel)) window.volDraftLabel.addTo(window.leafletMap); 
-            }
+            
+            // 🔴 အဖြူရောင် Distance Box Label ထုတ်ပေးတဲ့ အပိုင်းကို အပြီးဖျက်လိုက်ပါပြီ
+            if (window.volDraftLabel) window.leafletMap.removeLayer(window.volDraftLabel);
         }
 
     } else {
