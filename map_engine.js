@@ -247,25 +247,40 @@ function addMeasurePoint(finalLat, finalLon, snapResult) {
     let active = window.activeMeasureSession;
     if (!active) return;
     
+    // 🔴 [START] ANTI-GHOST CLICK FIX (Double Line မပေါ်အောင် တားဆီးခြင်း)
+    let now = Date.now();
+    // (၁) မီလီစက္ကန့် ၄၀၀ အတွင်း နောက်တစ်ချက် ထပ်ဝင်လာရင် လက်မခံဘဲ ကျော်ပစ်မည်
+    if (active.lastAddTime && (now - active.lastAddTime < 400)) {
+        return; 
+    }
+    
+    // (၂) နေရာတူလွန်းနေရင် (Screen ပေါ်မှာ 10 pixel အတွင်းဖြစ်နေရင်) ပယ်ချမည်
+    if (active.latlngs.length > 0) {
+        let lastPt = active.latlngs[active.latlngs.length - 1];
+        let pxDist = window.leafletMap.latLngToLayerPoint([finalLat, finalLon])
+                    .distanceTo(window.leafletMap.latLngToLayerPoint([lastPt[0], lastPt[1]]));
+        if (pxDist < 10) { 
+             return;
+        }
+    }
+    active.lastAddTime = now; // အချိန်မှတ်သားထားမည်
+    // 🔴 [END] ANTI-GHOST CLICK FIX
+    
     let idx = active.latlngs.length;
     active.latlngs.push([finalLat, finalLon]);
 
     let markerIcon = L.divIcon({
         className: 'dxf-text-label',
-        // 🔴 ပြင်ဆင်ချက်: ဆွဲလို့မရတော့သဖြင့် cursor:pointer ကို ဖြုတ်လိုက်ပါသည်
         html: `<div style="background:white; border-radius:50%; width:16px; height:16px; border:4px solid #10b981; box-shadow: 0 0 5px rgba(0,0,0,0.5);"></div>`,
         iconSize: [16, 16]
     });
     
-    // 🔴 ပြင်ဆင်ချက်: draggable: true ကို ဖြုတ်လိုက်ပါသည်
     let node = L.marker([finalLat, finalLon], { icon: markerIcon, interactive: true }).addTo(window.leafletMap);
     
     node.on('click', function(e) {
         L.DomEvent.stopPropagation(e);
         if (window.isMeasuring) window.leafletMap.fireEvent('click', {latlng: e.latlng});
     });
-
-    // 🔴 ပြင်ဆင်ချက်: node.on('drag', ...) အပိုင်း အားလုံးကို ဖျက်ပစ်လိုက်ပါသည်
 
     active.nodes.push(node);
     window.refreshMeasureVisuals();
