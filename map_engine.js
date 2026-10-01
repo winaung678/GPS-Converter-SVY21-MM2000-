@@ -247,24 +247,17 @@ function addMeasurePoint(finalLat, finalLon, snapResult) {
     let active = window.activeMeasureSession;
     if (!active) return;
     
-    // 🔴 [START] ANTI-GHOST CLICK FIX (Double Line မပေါ်အောင် တားဆီးခြင်း)
+    // 1. Anti-Ghost Click 
     let now = Date.now();
-    // (၁) မီလီစက္ကန့် ၄၀၀ အတွင်း နောက်တစ်ချက် ထပ်ဝင်လာရင် လက်မခံဘဲ ကျော်ပစ်မည်
-    if (active.lastAddTime && (now - active.lastAddTime < 400)) {
-        return; 
-    }
+    if (active.lastAddTime && (now - active.lastAddTime < 400)) return; 
     
-    // (၂) နေရာတူလွန်းနေရင် (Screen ပေါ်မှာ 10 pixel အတွင်းဖြစ်နေရင်) ပယ်ချမည်
     if (active.latlngs.length > 0) {
         let lastPt = active.latlngs[active.latlngs.length - 1];
         let pxDist = window.leafletMap.latLngToLayerPoint([finalLat, finalLon])
                     .distanceTo(window.leafletMap.latLngToLayerPoint([lastPt[0], lastPt[1]]));
-        if (pxDist < 10) { 
-             return;
-        }
+        if (pxDist < 10) return;
     }
-    active.lastAddTime = now; // အချိန်မှတ်သားထားမည်
-    // 🔴 [END] ANTI-GHOST CLICK FIX
+    active.lastAddTime = now; 
     
     let idx = active.latlngs.length;
     active.latlngs.push([finalLat, finalLon]);
@@ -284,6 +277,15 @@ function addMeasurePoint(finalLat, finalLon, snapResult) {
 
     active.nodes.push(node);
     window.refreshMeasureVisuals();
+
+    // 🔴 [အဓိက ပြင်ဆင်ချက်] ယာယီ Preview Line ကို ချက်ချင်း ဖျောက်ဖျက်ပစ်ခြင်း
+    // ဒါမှ ဖုန်းစခရင်မှာ လက်နဲ့ထောက်တဲ့နေရာနဲ့ Point Center မတူတဲ့အခါ ၂ ကြောင်းကွဲမထွက်တော့မှာပါ
+    if (window.measurePreviewLine) {
+        window.measurePreviewLine.setLatLngs([]);
+    }
+    if (window.measurePreviewLabel) {
+        window.measurePreviewLabel.setLatLng([0, 0]).setIcon(L.divIcon({ className: 'measure-label measure-preview-label', html: '', iconSize: [0, 0] }));
+    }
 }
 
 // 🔴 Measure Tool အတွက် Undo လုပ်မည့် Function အသစ်
