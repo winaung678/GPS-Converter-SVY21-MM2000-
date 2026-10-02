@@ -556,7 +556,7 @@ window.toggleVolDrawMode = function() {
 
     window.isVolDrawing = !window.isVolDrawing;
     let btn = document.getElementById('btn_vol_draw');
-    let undoBtn = document.getElementById('volUndoBtn'); 
+    let undoBtn = document.getElementById('sharedMapUndoBtn'); // 🔴 နာမည်ပြောင်းထားသည် 
     
     if (window.isVolDrawing) {
         btn.innerText = "🛑 Finish Boundary";
@@ -1129,7 +1129,7 @@ window.editSavedVolArea = function(index) {
     
     let btn = document.getElementById('btn_vol_draw');
     if (btn) { btn.innerText = "🛑 Finish Boundary"; btn.style.background = "#ef4444"; }
-    let undoBtn = document.getElementById('volUndoBtn');
+    let undoBtn = document.getElementById('sharedMapUndoBtn'); // 🔴 နာမည်ပြောင်းထားသည်
     if (undoBtn) undoBtn.style.display = "flex";
     
     window.volUpdateBoundaryUI();

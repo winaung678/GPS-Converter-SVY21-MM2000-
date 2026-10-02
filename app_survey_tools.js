@@ -1599,25 +1599,23 @@ function showTopoPointsOnMapOnly() {
 // --- Exclude Boundary (Holes) Functions ---
 window.toggleExcludeDrawMode = function() {
     if (window.topoPoints.length === 0) return alert("Please Load CSV Points first!");
-
-    // 🔴 အသစ်ထည့်ရန်: ပေတံ (Measure Tool) ဖွင့်ထားရင် တားမည်
     if (window.isMeasuring) return alert("⚠️ Please finish or close the Measure tool first.");
-
-    // Outer Draw ဖွင့်ထားရင် ပိတ်မယ်
     if (window.isDrawingBoundary) window.toggleBoundaryDrawMode();
 
     window.isDrawingExclude = !window.isDrawingExclude;
     let btn = document.getElementById('btn_draw_exclude');
+    let undoBtn = document.getElementById('sharedMapUndoBtn'); // 🔴 Map Undo ခလုတ်ကို ယူသုံးမည်
     
     if (window.isDrawingExclude) {
         btn.innerText = "✅ Finish Exclude Area";
-        btn.style.background = "#16a34a"; // အစိမ်းရောင်ပြောင်းသွားမယ်
-        window.currentExcludePolygon = []; // စဆွဲဖို့ အလွတ်လုပ်မယ်
+        btn.style.background = "#16a34a"; 
+        if (undoBtn) undoBtn.style.display = "flex"; // 🔴 Undo ခလုတ်ဖော်မည်
+        window.currentExcludePolygon = []; 
         alert("Tap points to draw an Exclude Area (e.g., Pond). Click 'Finish' when done.");
     } else {
         btn.innerText = "🚫 Draw Exclude Area (Hole)";
         btn.style.background = "#0284c7";
-        // ဆွဲပြီးသွားလို့ ပိတ်လိုက်ရင် သိမ်းထားလိုက်မယ်
+        if (undoBtn) undoBtn.style.display = "none"; // 🔴 Undo ခလုတ်ဖျောက်မည်
         if (window.currentExcludePolygon.length > 2) {
             window.topoExcludePolygons.push([...window.currentExcludePolygon]);
         }
@@ -1645,24 +1643,22 @@ window.undoExcludeBoundary = function() {
 
 window.toggleBoundaryDrawMode = function() {
     if (window.topoPoints.length === 0) return alert("Please Load CSV Points first!");
-
-    // 🔴 အသစ်ထည့်ရန်: ပေတံ (Measure Tool) ဖွင့်ထားရင် တားမည်
     if (window.isMeasuring) return alert("⚠️ Please finish or close the Measure tool first.");
-
-    // 🔴 အသစ်ဖြည့်စွက်ချက်: Exclude (ရေကန်) ဆွဲတာ ဖွင့်ထားရင် အလိုလို ပြန်ပိတ်ပေးမယ် (မငြိအောင်လို့)
     if (window.isDrawingExclude) window.toggleExcludeDrawMode();
 
     window.isDrawingBoundary = !window.isDrawingBoundary;
     let btn = document.getElementById('btn_draw_bdy');
+    let undoBtn = document.getElementById('sharedMapUndoBtn'); // 🔴 Map Undo ခလုတ်ကို ယူသုံးမည်
     
     if (window.isDrawingBoundary) {
         btn.innerText = "🛑 Finish Outer";
         btn.style.background = "#ef4444";
+        if (undoBtn) undoBtn.style.display = "flex"; // 🔴 Undo ခလုတ်ဖော်မည်
         alert("Click on the points on the map to draw your outer boundary line.");
     } else {
-        // 🔴 စာသား ပြန်မှန်သွားအောင် ပြင်ထားသည်
         btn.innerText = "✏️ Outer Boundary"; 
         btn.style.background = "#f59e0b";
+        if (undoBtn) undoBtn.style.display = "none"; // 🔴 Undo ခလုတ်ဖျောက်မည်
         updateBoundaryDrawUI(true); 
     }
 };
@@ -2311,4 +2307,17 @@ window.clearTopoData = function() {
     
     let mapDiv = document.getElementById('shared_map_view');
     if (mapDiv) mapDiv.classList.add('hidden');
+};
+
+// ==========================================
+// 🔴 SHARED MAP UNDO FUNCTION
+// ==========================================
+window.handleSharedMapUndo = function() {
+    if (window.isVolDrawing) {
+        if (typeof window.undoVolBoundary === 'function') window.undoVolBoundary();
+    } else if (window.isDrawingBoundary) {
+        if (typeof window.undoManualBoundary === 'function') window.undoManualBoundary();
+    } else if (window.isDrawingExclude) {
+        if (typeof window.undoExcludeBoundary === 'function') window.undoExcludeBoundary();
+    }
 };
