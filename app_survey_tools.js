@@ -102,16 +102,66 @@ window.downloadCSV = function() { if (!window.finalCSVOutput) return; let dName 
 window.clearCSVFile = function() { let csvFileInput = document.getElementById('csv_file'); if(csvFileInput) csvFileInput.value = ""; let statusBox = document.getElementById('csv_status'); if(statusBox) statusBox.style.display = 'none'; let dlBtn = document.getElementById('csv_download_btn'); if(dlBtn) dlBtn.style.display = 'none'; window.finalCSVOutput = ""; };
 
 window.importTopoToSetOut = function() {
-    if (window.recordedPointsBank.length === 0) return alert("No Topo Points recorded yet!");
+    let gpsPts = window.recordedPointsBank || [];
+    let topoCsvPts = window.topoPoints || [];
+
+    if (gpsPts.length === 0 && topoCsvPts.length === 0) return alert("No GPS Points or Topo CSV Points available!");
+
     let addedCount = 0;
-    window.recordedPointsBank.forEach(pt => {
-        let exists = window.setOutPoints.some(s => s.p === pt.p && s.lat === pt.wLa && s.lon === pt.wLo);
-        if (!exists) { window.setOutPoints.push({p: pt.p, lat: pt.wLa, lon: pt.wLo, z: pt.z, d: pt.d}); addedCount++; }
+    
+    // 1. GPS က ကောက်ထားတဲ့ အမှတ်တွေကို ထည့်ခြင်း
+    gpsPts.forEach(pt => {
+        // Point နာမည် နဲ့ နေရာတူနေရင် ထပ်မထည့်အောင် စစ်ထုတ်ခြင်း (Safe Check)
+        let exists = window.setOutPoints.some(s => s.p === pt.p && Math.abs(s.lat - pt.wLa) < 0.00001 && Math.abs(s.lon - pt.wLo) < 0.00001);
+        if (!exists) { 
+            window.setOutPoints.push({p: pt.p, lat: pt.wLa, lon: pt.wLo, z: pt.z, d: pt.d}); 
+            addedCount++; 
+        }
     });
+
+    // 2. Topo ထဲက CSV Data တွေကို ထည့်ခြင်း
+    let datum = document.getElementById('topo_datum') ? document.getElementById('topo_datum').value : "WGS_LL";
+
+    topoCsvPts.forEach(pt => {
+        let tLat = 0, tLon = 0;
+        
+        // Topo မှာ ရွေးထားတဲ့ Datum အပေါ်မူတည်ပြီး Lat, Lon ပြန်တွက်ယူခြင်း
+        if (datum === 'LOCAL') {
+            tLat = (pt.n - (window.localOffsetN || 0)) / 100000;
+            tLon = (pt.e - (window.localOffsetE || 0)) / 100000;
+        } else if (datum === "SVY21") {
+            let r = calc_v2_rev(pt.e, pt.n); tLat = r.lat; tLon = r.lon;
+        } else if (datum.startsWith("MM")) {
+            let zone = parseInt(datum.slice(-2)); let r = m_inverse(pt.e, pt.n, zone, m_EVE);
+            let x = m_llh2xyz(r.lat, r.lon, 0, m_EVE); let w = m_xyz2llh(x.x-m_DX, x.y-m_DY, x.z-m_DZ, m_WGS);
+            tLat = w.lat; tLon = w.lon;
+        } else if (datum.startsWith("WGS_UTM")) {
+            let zone = parseInt(datum.slice(-2)); let i = m_inverse(pt.e, pt.n, zone, m_WGS); tLat = i.lat; tLon = i.lon;
+        } else if (datum === "GLOBAL_UTM") {
+            let zInput = document.getElementById('topo_custom_zone'); let hInput = document.getElementById('topo_custom_hemi');
+            let zone = (zInput && zInput.value) ? parseInt(zInput.value) : 47; let hemi = hInput ? hInput.value : 'N';
+            let calcN = pt.n; if (hemi === 'S') calcN -= 10000000; let i_w = m_inverse(pt.e, calcN, zone, m_WGS); tLat = i_w.lat; tLon = i_w.lon;
+        }
+
+        if(tLat !== 0 && tLon !== 0 && !isNaN(tLat)) {
+             let exists = window.setOutPoints.some(s => s.p === pt.p && Math.abs(s.lat - tLat) < 0.00001 && Math.abs(s.lon - tLon) < 0.00001);
+             if (!exists) { 
+                 window.setOutPoints.push({p: pt.p, lat: tLat, lon: tLon, z: pt.z, d: pt.d}); 
+                 addedCount++; 
+             }
+        }
+    });
+
     if (addedCount > 0) {
-        savePointsToStorage(); updateTargetDropdown(); window.plotPointsOnMap(); window.refreshPointsAfterDataChange(); window.populateAreaPoints();
-        alert(`Successfully imported ${addedCount} Topo points!`);
-    } else { alert("Points are already in the list."); }
+        savePointsToStorage(); 
+        updateTargetDropdown(); 
+        window.plotPointsOnMap(); 
+        window.refreshPointsAfterDataChange(); 
+        window.populateAreaPoints();
+        alert(`Successfully imported ${addedCount} points from GPS & Topo CSV!`);
+    } else { 
+        alert("All points are already in the list. No new points found."); 
+    }
 };
 
 function savePointsToStorage() { localStorage.setItem('surveyProSetOutPoints', JSON.stringify(window.setOutPoints)); }
@@ -126,17 +176,75 @@ window.stopNavigation = function() { window.targetPoint = null; let sel = docume
 window.clearSetOutPoints = function() { if(!confirm("Are you sure you want to delete ALL Points?")) return; window.setOutPoints = []; window.orderedAreaPoints = []; savePointsToStorage(); updateTargetDropdown(); window.stopNavigation(); if(window.pointsLayerGroup) window.pointsLayerGroup.clearLayers(); window.populateAreaPoints(); window.updateAreaOrderUI(); window.clearAreaCalc(); alert("Points Cleared!"); };
 window.loadSetOutCSV = function(event) { const file = event.target.files[0]; if (!file) return; const reader = new FileReader(); reader.onload = function(e) { parseSetOutCSV(e.target.result); }; reader.readAsText(file); event.target.value = ''; };
 
-function parseSetOutCSV(text) { window.stopNavigation(); let lines = text.split('\n'); let successCount = 0; let errorCount = 0; for (let i = 0; i < lines.length; i++) { let line = lines[i].trim(); if(!line) continue; let cols = line.split(','); if (cols.length < 3) { errorCount++; continue; } let p = cols[0].trim(); let val1 = parseFloat(cols[1]); let val2 = parseFloat(cols[2]); if (isNaN(val1) || isNaN(val2)) { errorCount++; continue; } let z = parseFloat(cols[3]) || 0.000; processRawPointToTarget(p, val1, val2, z, "", true); successCount++; } savePointsToStorage(); updateTargetDropdown(); window.plotPointsOnMap(); window.refreshPointsAfterDataChange(); window.populateAreaPoints(); if(errorCount > 0) alert(`Loaded ${successCount} points.\nSkipped ${errorCount} points.`); else alert(`Loaded ${successCount} points successfully!`); }
+function parseSetOutCSV(text) { 
+    window.stopNavigation(); 
+    let lines = text.split('\n'); 
+    let successCount = 0; 
+    let errorCount = 0; 
+    let i = 0; 
+    let chunkSize = 500; // တစ်ခါဖတ်ရင် Point ၅၀၀ စီ ခွဲဖတ်မည် (App မဟန်းအောင်)
+    let totalLines = lines.length;
+
+    // Loading ပြရန် (Optional)
+    let btn = document.querySelector('button[onclick="document.getElementById(\'cogo_csv\').click()"]') || document.querySelector('button[onclick="document.getElementById(\'so_csv\').click()"]');
+    let originalBtnText = btn ? btn.innerText : "📂 CSV";
+    if (btn) btn.innerText = "⏳ Loading...";
+
+    function processChunk() {
+        let end = Math.min(i + chunkSize, totalLines);
+        for (; i < end; i++) { 
+            let line = lines[i].trim(); 
+            if(!line) continue; 
+            let cols = line.split(','); 
+            if (cols.length < 3) { errorCount++; continue; } 
+            let p = cols[0].trim(); 
+            let val1 = parseFloat(cols[1]); 
+            let val2 = parseFloat(cols[2]); 
+            if (isNaN(val1) || isNaN(val2)) { errorCount++; continue; } 
+            let z = parseFloat(cols[3]) || 0.000; 
+            // မြေပုံကို ချက်ချင်း မဆွဲသေးဘဲ (skipUI = true) နောက်ကွယ်မှာပဲ Data သိမ်းမည်
+            processRawPointToTarget(p, val1, val2, z, "", true); 
+            successCount++; 
+        }
+
+        if (i < totalLines) {
+            setTimeout(processChunk, 10); // Browser ကို အသက်ရှူခွင့်ပေးမည်
+        } else {
+            // Data အကုန်ဖတ်ပြီးမှ UI တွေကို တစ်ခါတည်း Update လုပ်မည်
+            savePointsToStorage(); 
+            updateTargetDropdown(); 
+            window.plotPointsOnMap(); 
+            window.refreshPointsAfterDataChange(); 
+            window.populateAreaPoints(); 
+            
+            if (btn) btn.innerText = originalBtnText; // ခလုတ်စာသား မူလအတိုင်းပြန်ထားမည်
+
+            if(errorCount > 0) alert(`Loaded ${successCount} points.\nSkipped ${errorCount} points.`); 
+            else alert(`Loaded ${successCount} points successfully!`); 
+        }
+    }
+    processChunk(); // လုပ်ငန်းစဉ် စတင်မည်
+}
 
 window.addManualSetOut = function() { let p = document.getElementById('so_m_p').value || "M1"; let n = parseFloat(document.getElementById('so_m_n').value); let e = parseFloat(document.getElementById('so_m_e').value); if(isNaN(n) || isNaN(e)) return alert("Invalid Coordinates"); processRawPointToTarget(p, n, e, 0, "Manual", false); savePointsToStorage(); window.populateAreaPoints(); alert("Point Added!"); };
 
 function processRawPointToTarget(p, val1, val2, z, desc, skipUI) { let datum = document.getElementById('so_datum') ? document.getElementById('so_datum').value : "WGS_LL"; let tLat = 0, tLon = 0; if (datum === "SVY21") { let r = calc_v2_rev(val2, val1); tLat = r.lat; tLon = r.lon; } else if (datum === "WGS_LL") { tLat = val1; tLon = val2; } else if (datum === "GLOBAL_UTM") { let zInput = document.getElementById('so_custom_zone'); let hInput = document.getElementById('so_custom_hemi'); let zone = (zInput && zInput.value) ? parseInt(zInput.value) : 47; let hemi = hInput ? hInput.value : 'N'; let calcN = val1; if (hemi === 'S') calcN -= 10000000; let iW = m_inverse(val2, calcN, zone, m_WGS); tLat = iW.lat; tLon = iW.lon; } else { let isMM = datum.startsWith("MM"); let zone = parseInt(datum.slice(-2)); let r = m_inverse(val2, val1, zone, isMM ? m_EVE : m_WGS); if (isMM) { let x = m_llh2xyz(r.lat, r.lon, 0, m_EVE); let w = m_xyz2llh(x.x-m_DX, x.y-m_DY, x.z-m_DZ, m_WGS); tLat = w.lat; tLon = w.lon; } else { tLat = r.lat; tLon = r.lon; } } window.setOutPoints.push({p: p, lat: tLat, lon: tLon, z: z, d: desc}); if (!skipUI) { updateTargetDropdown(); window.plotPointsOnMap(); } }
 
-function updateTargetDropdown() { let sel = document.getElementById('so_target_list'); if(sel) { sel.innerHTML = '<option value="">-- Select Point --</option>'; window.setOutPoints.forEach((pt, idx) => { sel.innerHTML += `<option value="${idx}">${pt.p}</option>`; }); } }
-window.selectTarget = function() { let idx = document.getElementById('so_target_list').value; if(idx === "") { window.stopNavigation(); return; } activateTarget(window.setOutPoints[idx]); };
-
+function updateTargetDropdown() { 
+    let sel = document.getElementById('so_target_list'); 
+    if(!sel) return;
+    
+    // Array ထဲ အရင်စုပြီးမှ HTML ပြောင်းခြင်းက Browser အတွက် အဆ ၁၀၀ ပိုမြန်စေပါတယ်
+    let htmlArr = ['<option value="">-- Select Point --</option>']; 
+    window.setOutPoints.forEach((pt, idx) => { 
+        htmlArr.push(`<option value="${idx}">${pt.p}</option>`); 
+    }); 
+    sel.innerHTML = htmlArr.join('');
+}
 window.addPointToArea = function(idx) {
     let indexPos = window.orderedAreaPoints.indexOf(idx);
+    
+    // အမှတ်ကို ထည့်တာလား၊ ပြန်ဖြုတ်တာလား စစ်ဆေးခြင်း
     if (indexPos === -1) window.orderedAreaPoints.push(idx);
     else window.orderedAreaPoints.splice(indexPos, 1);
 
@@ -144,6 +252,29 @@ window.addPointToArea = function(idx) {
     if (typeof window.updateAreaOrderUI === "function") window.updateAreaOrderUI();
     if (window.leafletMap) window.leafletMap.closePopup();
     if (typeof window.plotPointsOnMap === "function") window.plotPointsOnMap();
+
+    // 🔴 ၃ မှတ်ပြည့်တာနဲ့ အပြာရောင် Area ကွက်ကို အလိုအလျောက် (Auto) ဆွဲပေးမည့်အပိုင်း
+    if (window.orderedAreaPoints.length >= 3) {
+        window.calculateAreaFromSelection();
+    } else {
+        window.clearAreaResultOnly(); // ၃ မှတ်မပြည့်ရင် အပြာကွက်ကို ဖျောက်ထားမယ်
+    }
+};
+
+window.toggleCheckboxArea = function(idx, isChecked) { 
+    let indexPos = window.orderedAreaPoints.indexOf(idx); 
+    if (isChecked && indexPos === -1) window.orderedAreaPoints.push(idx); 
+    else if (!isChecked && indexPos !== -1) window.orderedAreaPoints.splice(indexPos, 1); 
+    
+    window.updateAreaOrderUI(); 
+    window.plotPointsOnMap(); 
+
+    // 🔴 Checkbox ကနေ အမှန်ခြစ် ဖြုတ်/တပ် လုပ်ရင်လည်း အပြာကွက် Auto ဆွဲပေးရန်
+    if (window.orderedAreaPoints.length >= 3) {
+        window.calculateAreaFromSelection();
+    } else {
+        window.clearAreaResultOnly();
+    }
 };
 
 window.updateSetOut = function() {
@@ -181,38 +312,47 @@ window.updateSetOut = function() {
 window.toggleCheckboxArea = function(idx, isChecked) { let indexPos = window.orderedAreaPoints.indexOf(idx); if (isChecked && indexPos === -1) window.orderedAreaPoints.push(idx); else if (!isChecked && indexPos !== -1) window.orderedAreaPoints.splice(indexPos, 1); window.updateAreaOrderUI(); window.plotPointsOnMap(); };
 window.updateAreaOrderUI = function() { let orderTextSpan = document.getElementById('area_order_text'); if (!orderTextSpan) return; if (window.orderedAreaPoints.length === 0) { orderTextSpan.innerHTML = "None"; orderTextSpan.style.color = "#ef4444"; } else { let textArray = window.orderedAreaPoints.map((idx, step) => `<b>${step+1}.</b> ${window.setOutPoints[idx].p}`); orderTextSpan.innerHTML = textArray.join(" ➔ "); orderTextSpan.style.color = "#059669"; } };
 // 🔴 Area List ကို ပုံဖော်ခြင်း (Delete ခလုတ် အသစ်ပါဝင်သည်)
+// 🔴 Area List ကို ပုံဖော်ခြင်း (High Performance Chunking System)
 window.populateAreaPoints = function() {
     let listDiv = document.getElementById('area_point_list');
     if (!listDiv) return;
-    listDiv.innerHTML = '';
     
     if (window.setOutPoints.length === 0) {
         listDiv.innerHTML = '<p style="text-align:center; opacity:0.5; font-size:12px; margin: 10px 0;">No points available.</p>';
         return;
     }
     
-    window.setOutPoints.forEach((pt, index) => {
-        let item = document.createElement('div');
-        item.className = 'area-pt-item';
-        item.style.display = 'flex';
-        item.style.justifyContent = 'space-between';
-        item.style.alignItems = 'center';
-        item.style.marginBottom = '6px';
-        item.style.background = 'var(--res-bg)';
-        item.style.padding = '5px 8px';
-        item.style.borderRadius = '5px';
-        item.style.border = '1px solid var(--input-border)';
+    let i = 0;
+    let total = window.setOutPoints.length;
+    let chunkSize = 200; // HTML Element ၂၀၀ စီ ခွဲထည့်မည်
+    let htmlArray = [];
 
-        let isChecked = window.orderedAreaPoints.includes(index) ? 'checked' : '';
-        item.innerHTML = `
-            <div style="flex:1; display:flex; align-items:center; gap:8px;">
-                <input type="checkbox" id="chk_pt_${index}" value="${index}" ${isChecked} onchange="window.toggleCheckboxArea(${index}, this.checked)">
-                <label for="chk_pt_${index}" style="cursor:pointer; font-size:12px; font-weight:bold; color:var(--primary);">[${pt.p}]</label>
-            </div>
-            <button class="top-btn" style="background:#ef4444; color:white; padding:4px 10px; font-size:11px; border-radius:4px;" onclick="deleteSinglePoint(${index})">🗑️ Delete</button>
-        `;
-        listDiv.appendChild(item);
-    });
+    listDiv.innerHTML = '<p style="text-align:center; color:#f59e0b; font-size:12px;">⏳ Rendering list... please wait</p>';
+
+    function renderListChunk() {
+        let end = Math.min(i + chunkSize, total);
+        for (; i < end; i++) {
+            let pt = window.setOutPoints[i];
+            let isChecked = window.orderedAreaPoints.includes(i) ? 'checked' : '';
+            htmlArray.push(`
+                <div class="area-pt-item" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; background:var(--res-bg); padding:5px 8px; border-radius:5px; border:1px solid var(--input-border);">
+                    <div style="flex:1; display:flex; align-items:center; gap:8px;">
+                        <input type="checkbox" id="chk_pt_${i}" value="${i}" ${isChecked} onchange="window.toggleCheckboxArea(${i}, this.checked)">
+                        <label for="chk_pt_${i}" style="cursor:pointer; font-size:12px; font-weight:bold; color:var(--primary);">[${pt.p}]</label>
+                    </div>
+                    <button class="top-btn" style="background:#ef4444; color:white; padding:4px 10px; font-size:11px; border-radius:4px;" onclick="deleteSinglePoint(${i})">🗑️ Delete</button>
+                </div>
+            `);
+        }
+        
+        if (i < total) {
+            setTimeout(renderListChunk, 5); 
+        } else {
+            // အားလုံးပြီးမှ HTML ထဲကို တစ်ပြိုင်နက်တည်း ထည့်လိုက်မည် (ပိုမြန်သည်)
+            listDiv.innerHTML = htmlArray.join('');
+        }
+    }
+    renderListChunk();
 };
 
 // 🔴 အမှတ် တစ်ခုချင်းစီကို ဖျက်ရန် Function အသစ်
@@ -374,23 +514,39 @@ window.openCogoTool = function(toolName) {
         gpsBtn.classList.add('hidden');
         if (typeof toggleTopoUI === 'function') toggleTopoUI();
         
-        // 🔴 Topo Data သွင်းထားပြီးသား ဆိုပါက မြေပုံကို ချက်ချင်း ပြန်ဖော်ပြပေးမည်
         if (window.topoPoints && window.topoPoints.length > 0) {
             mapContainer.classList.remove('hidden');
             if (window.leafletMap) {
-                setTimeout(() => { window.leafletMap.invalidateSize(); }, 300);
+                setTimeout(() => { 
+                    window.leafletMap.invalidateSize(); 
+                    // 🔴 Canvas ပျက်သွားတာကို ကာကွယ်ရန် Data များကို မြေပုံပေါ် အသစ်ပြန်ဆွဲတင်ပေးခြင်း
+                    if (typeof showTopoPointsOnMapOnly === 'function') showTopoPointsOnMapOnly();
+                    if (window.topoContours && window.topoContours.length > 0 && typeof showContoursOnMap === 'function') showContoursOnMap();
+                    if (window.topoTriangles && window.topoTriangles.length > 0 && typeof showTinOnMap === 'function') showTinOnMap();
+                }, 300);
             }
         } else {
             mapContainer.classList.add('hidden');
         }
 
-    } else if (toolName === 'vol') { // 🔴 Volume အတွက် အသစ်
+    } else if (toolName === 'vol') { 
         document.getElementById('cogo_vol_tool').classList.remove('hidden');
         titleEl.innerText = '📦 Earthwork / Volume Calculator';
         titleEl.style.color = '#059669';
         mapContainer.classList.remove('hidden');
         gpsBtn.classList.add('hidden');
-        if(window.leafletMap) setTimeout(() => { window.leafletMap.invalidateSize(); }, 300);
+        if(window.leafletMap) {
+            setTimeout(() => { 
+                window.leafletMap.invalidateSize(); 
+                // 🔴 Volume Point များကိုလည်း Click ပြန်ရအောင် အသစ်ပြန်ဆွဲတင်ပေးခြင်း
+                if (window.volPoints && window.volPoints.length > 0 && typeof volShowPointsOnMap === 'function') {
+                    volShowPointsOnMap();
+                }
+                if (window.volSurface2Points && window.volSurface2Points.length > 0 && typeof volShowSurface2OnMap === 'function') {
+                    window.volShowSurface2OnMap();
+                }
+            }, 300);
+        }
     }
 
     history.pushState({page: 4, subTool: toolName}, "Cogo Tool", "");
@@ -616,10 +772,15 @@ window.plotRecordedPointsOnMap = function() {
                 window.leafletMap.fireEvent('click', {latlng: e.latlng});
             }
             else {
+                let isAreaToolActive = (window.activeApp === 4 && document.getElementById('cogo_area_tool') && !document.getElementById('cogo_area_tool').classList.contains('hidden'));
                 let buttonsHtml = '';
-                if (window.activeApp === 3) { buttonsHtml = `<button class="so-popup-btn" style="background:#2563eb; margin-top:8px;" onclick="window.startMapSetOutFromTopo(${index})">🎯 Set Out</button>`; }
-                else if (window.activeApp === 4) { buttonsHtml = `<button class="so-popup-btn" style="background:#10b981; margin-top:8px;" onclick="window.addTopoPointToArea(${index})">➕ Add to Area</button>`; }
-                else { buttonsHtml = `<button class="so-popup-btn" style="background:#ef4444; margin-top:8px;" onclick="window.deleteRecordedPoint(${index})">🗑️ Delete Point</button>`; }
+                if (window.activeApp === 3) { 
+                    buttonsHtml = `<button class="so-popup-btn" style="background:#2563eb; margin-top:8px;" onclick="window.startMapSetOutFromTopo(${index})">🎯 Set Out</button>`; 
+                } else if (isAreaToolActive) { 
+                    buttonsHtml = `<button class="so-popup-btn" style="background:#10b981; margin-top:8px;" onclick="window.addTopoPointToArea(${index})">➕ Add to Area</button>`; 
+                } else if (window.activeApp === 1 || window.activeApp === 2 || window.activeApp === 5) { 
+                    buttonsHtml = `<button class="so-popup-btn" style="background:#ef4444; margin-top:8px;" onclick="window.deleteRecordedPoint(${index})">🗑️ Delete Point</button>`; 
+                }
                 let popupContent = window.buildSavedPointPopup(pLat, pLon, { pointName: pt.p, z: pt.z, icon: '📍', nameColor: '#f59e0b', buttonsHtml: buttonsHtml });
                 L.popup().setLatLng(e.latlng).setContent(popupContent).openOn(window.leafletMap);
             }
@@ -1473,10 +1634,19 @@ function showTopoPointsOnMapOnly() {
         });
     }
 
-    if (window.topoPointsLayer) window.leafletMap.removeLayer(window.topoPointsLayer);
-    if (window.topoLayerGroup) window.leafletMap.removeLayer(window.topoLayerGroup); 
+    if (window.topoPointsLayer) {
+        window.topoPointsLayer.clearLayers();
+        window.leafletMap.removeLayer(window.topoPointsLayer);
+    }
+    if (window.topoLayerGroup) {
+        window.topoLayerGroup.clearLayers();
+        window.leafletMap.removeLayer(window.topoLayerGroup); 
+    }
     
     window.topoPointsLayer = L.layerGroup().addTo(window.leafletMap);
+
+    // 🔴 ဖြေရှင်းချက်: Topo Canvas ကို topoPane သို့ သတ်မှတ်ပေးခြင်း
+    if (!window.masterTopoCanvas) window.masterTopoCanvas = L.canvas({ padding: 0.5, pane: 'topoPane' });
 
     let bounds = [];
     window.topoPoints.forEach(pt => {
@@ -1507,13 +1677,10 @@ function showTopoPointsOnMapOnly() {
             let i_w = m_inverse(pt.e, calcN, zone, m_WGS); lat = i_w.lat; lon = i_w.lon;
         }
 
-        // 🔴 ဖြည့်စွက်ချက်: Canvas မှန်ချပ် တစ်ခုတည်းကိုသာ မျှဝေသုံးစွဲရန် (Global Canvas)
-        if (!window.globalSharedCanvas) window.globalSharedCanvas = L.canvas({ padding: 0.5 });
-
         if (!isNaN(lat) && !isNaN(lon)) {
             let marker = L.circleMarker([lat, lon], { 
                 radius: 4, color: 'transparent', weight: 20, fillColor: '#3b82f6', fillOpacity: 1,
-                renderer: window.globalSharedCanvas // <-- 🔴 ဒီစာကြောင်းလေး အသစ်ဝင်သွားတာပါ
+                renderer: window.masterTopoCanvas // 🔴 Master ကို သုံးမည်
             });
             
             marker.bindTooltip(`${pt.p}<br>Z: ${pt.z.toFixed(3)}`, { direction: 'top', className: 'pt-tooltip' });
@@ -1521,26 +1688,43 @@ function showTopoPointsOnMapOnly() {
            marker.on('click', function(e) {
                 L.DomEvent.stopPropagation(e);
                 
-                // 🔴 Topo Tool (Surface & Contour) ဖွင့်ထားချိန်
+                // 🔴 အသစ်ထည့်ထားသောအပိုင်း: Measure ဖွင့်ထားရင် ပေတံဆီကို Click လွှဲပေးမည်
+                if (window.isMeasuring) {
+                    window.leafletMap.fireEvent('click', {latlng: e.latlng});
+                    return;
+                }
+
+                let isActionTaken = false;
+                
                 let topoTool = document.getElementById('cogo_topo_tool');
                 if (topoTool && !topoTool.classList.contains('hidden')) {
                     if (window.isDrawingBoundary) {
                         window.topoBoundaryPolygon.push({ n: pt.n, e: pt.e, lat: lat, lon: lon });
                         updateBoundaryDrawUI();
+                        isActionTaken = true;
                     } else if (window.isDrawingExclude) {
                         window.currentExcludePolygon.push({ n: pt.n, e: pt.e, lat: lat, lon: lon });
                         updateBoundaryDrawUI();
+                        isActionTaken = true;
                     }
                 }
                 
-                // 🔴 Volume Tool ဖွင့်ထားချိန်
                 let volTool = document.getElementById('cogo_vol_tool');
                 if (volTool && !volTool.classList.contains('hidden')) {
                     if (window.isVolDrawing) {
-                        // Volume Draw Mode ဖွင့်ထားရင် ထောက်လိုက်တဲ့ Point ကို Volume Boundary ထဲ တန်းထည့်မည်
                         window.volBoundaryPts.push({ lat: lat, lon: lon, n: pt.n, e: pt.e, groundZ: pt.z });
                         if (typeof window.volUpdateBoundaryUI === 'function') window.volUpdateBoundaryUI();
+                        isActionTaken = true;
                     }
+                }
+
+                if (!isActionTaken) {
+                    let pName = pt.p ? `<b style="color:#1e40af; font-size:13px;">[ ${pt.p} ]</b><hr style="margin:4px 0; border:0.5px solid #ccc;">` : '';
+                    let popupHtml = `<div style="text-align:center; line-height:1.4; padding:2px;">
+                        ${pName}
+                        <b style="color:#b91c1c; font-size:13px;">N: ${pt.n.toFixed(3)}<br>E: ${pt.e.toFixed(3)}<br>Z: ${pt.z.toFixed(3)}</b>
+                    </div>`;
+                    L.popup().setLatLng(e.latlng).setContent(popupHtml).openOn(window.leafletMap);
                 }
             });
 
@@ -1555,22 +1739,23 @@ function showTopoPointsOnMapOnly() {
 // --- Exclude Boundary (Holes) Functions ---
 window.toggleExcludeDrawMode = function() {
     if (window.topoPoints.length === 0) return alert("Please Load CSV Points first!");
-
-    // Outer Draw ဖွင့်ထားရင် ပိတ်မယ်
+    if (window.isMeasuring) return alert("⚠️ Please finish or close the Measure tool first.");
     if (window.isDrawingBoundary) window.toggleBoundaryDrawMode();
 
     window.isDrawingExclude = !window.isDrawingExclude;
     let btn = document.getElementById('btn_draw_exclude');
+    let undoBtn = document.getElementById('sharedMapUndoBtn'); // 🔴 Map Undo ခလုတ်ကို ယူသုံးမည်
     
     if (window.isDrawingExclude) {
         btn.innerText = "✅ Finish Exclude Area";
-        btn.style.background = "#16a34a"; // အစိမ်းရောင်ပြောင်းသွားမယ်
-        window.currentExcludePolygon = []; // စဆွဲဖို့ အလွတ်လုပ်မယ်
+        btn.style.background = "#16a34a"; 
+        if (undoBtn) undoBtn.style.display = "flex"; // 🔴 Undo ခလုတ်ဖော်မည်
+        window.currentExcludePolygon = []; 
         alert("Tap points to draw an Exclude Area (e.g., Pond). Click 'Finish' when done.");
     } else {
         btn.innerText = "🚫 Draw Exclude Area (Hole)";
         btn.style.background = "#0284c7";
-        // ဆွဲပြီးသွားလို့ ပိတ်လိုက်ရင် သိမ်းထားလိုက်မယ်
+        if (undoBtn) undoBtn.style.display = "none"; // 🔴 Undo ခလုတ်ဖျောက်မည်
         if (window.currentExcludePolygon.length > 2) {
             window.topoExcludePolygons.push([...window.currentExcludePolygon]);
         }
@@ -1598,21 +1783,22 @@ window.undoExcludeBoundary = function() {
 
 window.toggleBoundaryDrawMode = function() {
     if (window.topoPoints.length === 0) return alert("Please Load CSV Points first!");
-
-    // 🔴 အသစ်ဖြည့်စွက်ချက်: Exclude (ရေကန်) ဆွဲတာ ဖွင့်ထားရင် အလိုလို ပြန်ပိတ်ပေးမယ် (မငြိအောင်လို့)
+    if (window.isMeasuring) return alert("⚠️ Please finish or close the Measure tool first.");
     if (window.isDrawingExclude) window.toggleExcludeDrawMode();
 
     window.isDrawingBoundary = !window.isDrawingBoundary;
     let btn = document.getElementById('btn_draw_bdy');
+    let undoBtn = document.getElementById('sharedMapUndoBtn'); // 🔴 Map Undo ခလုတ်ကို ယူသုံးမည်
     
     if (window.isDrawingBoundary) {
         btn.innerText = "🛑 Finish Outer";
         btn.style.background = "#ef4444";
+        if (undoBtn) undoBtn.style.display = "flex"; // 🔴 Undo ခလုတ်ဖော်မည်
         alert("Click on the points on the map to draw your outer boundary line.");
     } else {
-        // 🔴 စာသား ပြန်မှန်သွားအောင် ပြင်ထားသည်
         btn.innerText = "✏️ Outer Boundary"; 
         btn.style.background = "#f59e0b";
+        if (undoBtn) undoBtn.style.display = "none"; // 🔴 Undo ခလုတ်ဖျောက်မည်
         updateBoundaryDrawUI(true); 
     }
 };
@@ -1646,16 +1832,26 @@ function updateBoundaryDrawUI(isClosed = false) {
         let latlngs = window.topoBoundaryPolygon.map(pt => [pt.lat, pt.lon]);
         if (isClosed && latlngs.length > 2) latlngs.push(latlngs[0]); 
         layers.push(L.polyline(latlngs, { color: '#ef4444', weight: 3, dashArray: '5, 5' }));
+        
+        // 🔴 ပြင်ဆင်ချက်: ထောက်လိုက်တဲ့ အမှတ်ကို အဝါရောင် အနားကွပ် ထူထူလေး ဝိုင်းပေးလိုက်ပါသည်
+        window.topoBoundaryPolygon.forEach(pt => {
+            layers.push(L.circleMarker([pt.lat, pt.lon], {radius: 5, color: '#eab308', fillColor: '#ef4444', fillOpacity: 1, weight: 3, interactive: false}));
+        });
     }
 
-    // Exclude Boundaries (အပြာရောင်မျဉ်း / Holes တွေ အကုန်ဆွဲပြမယ်)
+    // Exclude Boundaries (အပြာရောင်မျဉ်း / Holes)
     let allExcludes = [...window.topoExcludePolygons];
     if (window.currentExcludePolygon.length > 0) allExcludes.push(window.currentExcludePolygon);
 
     allExcludes.forEach(hole => {
         let h_latlngs = hole.map(pt => [pt.lat, pt.lon]);
-        if (h_latlngs.length > 2) h_latlngs.push(h_latlngs[0]); // ပိတ်သွားအောင်ဆွဲမယ်
+        if (h_latlngs.length > 2) h_latlngs.push(h_latlngs[0]); 
         layers.push(L.polygon(h_latlngs, { color: '#0284c7', weight: 2, fillColor: '#0ea5e9', fillOpacity: 0.2, dashArray: '4, 4' }));
+        
+        // 🔴 ပြင်ဆင်ချက်: ရေကန်ဆွဲတဲ့ အမှတ်ကိုလည်း အဝါရောင် အနားကွပ် ထူထူလေး ဝိုင်းပေးလိုက်ပါသည်
+        hole.forEach(pt => {
+            layers.push(L.circleMarker([pt.lat, pt.lon], {radius: 5, color: '#eab308', fillColor: '#0284c7', fillOpacity: 1, weight: 3, interactive: false}));
+        });
     });
 
     if (layers.length > 0) {
@@ -2161,8 +2357,12 @@ window.toggleTopoLayers = function() {
             if (!window.leafletMap.hasLayer(window.topoPointsLayer)) {
                 window.leafletMap.addLayer(window.topoPointsLayer);
             }
+            // 🔴 On လိုက်ပါက Auto Zoom သွားမည်
+            if (!window._prevChkTopoPts && typeof window.zoomToCustomLayer === 'function') window.zoomToCustomLayer(window.topoPointsLayer);
+            window._prevChkTopoPts = true;
         } else {
             window.leafletMap.removeLayer(window.topoPointsLayer);
+            window._prevChkTopoPts = false;
         }
     }
 
@@ -2172,8 +2372,12 @@ window.toggleTopoLayers = function() {
             if (!window.leafletMap.hasLayer(window.topoLayerGroup)) {
                 window.leafletMap.addLayer(window.topoLayerGroup);
             }
+            // 🔴 On လိုက်ပါက Auto Zoom သွားမည်
+            if (!window._prevChkContour && typeof window.zoomToCustomLayer === 'function') window.zoomToCustomLayer(window.topoLayerGroup);
+            window._prevChkContour = true;
         } else {
             window.leafletMap.removeLayer(window.topoLayerGroup);
+            window._prevChkContour = false;
         }
     }
 
@@ -2188,15 +2392,18 @@ window.toggleTopoLayers = function() {
         }
     }
 
-    // 🔴 အသစ်ထည့်ထားသော Surface 2 Points (လိမ္မော်ရောင်) Layer အဖွင့်အပိတ်
     if (window.volSurface2Layer) {
         let chkSurf2 = document.getElementById('tgl_surf2_pts');
         if (chkSurf2 && chkSurf2.checked) {
             if (!window.leafletMap.hasLayer(window.volSurface2Layer)) {
                 window.leafletMap.addLayer(window.volSurface2Layer);
             }
+            // 🔴 On လိုက်ပါက Auto Zoom သွားမည်
+            if (!window._prevChkSurf2 && typeof window.zoomToCustomLayer === 'function') window.zoomToCustomLayer(window.volSurface2Layer);
+            window._prevChkSurf2 = true;
         } else {
             window.leafletMap.removeLayer(window.volSurface2Layer);
+            window._prevChkSurf2 = false;
         }
     }
 };
@@ -2240,4 +2447,17 @@ window.clearTopoData = function() {
     
     let mapDiv = document.getElementById('shared_map_view');
     if (mapDiv) mapDiv.classList.add('hidden');
+};
+
+// ==========================================
+// 🔴 SHARED MAP UNDO FUNCTION
+// ==========================================
+window.handleSharedMapUndo = function() {
+    if (window.isVolDrawing) {
+        if (typeof window.undoVolBoundary === 'function') window.undoVolBoundary();
+    } else if (window.isDrawingBoundary) {
+        if (typeof window.undoManualBoundary === 'function') window.undoManualBoundary();
+    } else if (window.isDrawingExclude) {
+        if (typeof window.undoExcludeBoundary === 'function') window.undoExcludeBoundary();
+    }
 };
