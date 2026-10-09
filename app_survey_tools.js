@@ -241,6 +241,18 @@ function updateTargetDropdown() {
     }); 
     sel.innerHTML = htmlArr.join('');
 }
+window.selectTarget = function() { 
+    let idx = document.getElementById('so_target_list').value; 
+    if(idx === "") { window.stopNavigation(); return; } 
+    activateTarget(window.setOutPoints[idx]); 
+};
+
+window.startMapSetOut = function(idx) { 
+    if (window.activeApp !== 3) window.switchApp(3); 
+    document.getElementById('so_target_list').value = idx; 
+    window.selectTarget(); 
+    if (window.leafletMap) window.leafletMap.closePopup(); 
+};
 window.addPointToArea = function(idx) {
     let indexPos = window.orderedAreaPoints.indexOf(idx);
     
