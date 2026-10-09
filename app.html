@@ -29,10 +29,10 @@
     <link rel="stylesheet" href="style.css">
    <script>
   // 🔴 ပိုမိုသေချာသော လမ်းကြောင်းလွှဲ Logic (Sub-folder ကော Cache ပါ ကျော်ဖြတ်နိုင်ရန်)
-     if (window.location.hostname !== "gpsconverter.site" && window.location.hostname !== "localhost") {
+    if (window.location.hostname !== "gpsconverter.site" && window.location.hostname !== "localhost") {
     // လက်ရှိ ဝင်ထားတဲ့ Domain က gpsconverter.site မဟုတ်ရင် (github.io ဖြစ်နေရင်) Custom Domain ဆီ အတင်းလွှဲမည်
-      window.location.replace("https://gpsconverter.site/");
-     }
+     window.location.replace("https://gpsconverter.site/");
+    }
 </script>
 <!-- 🔴 3D Surface Rendering အတွက် Plotly.js -->
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
@@ -433,9 +433,7 @@
                         <div style="border-top:1px dashed var(--input-border); margin-top:15px; padding-top:15px;">
                             <div style="font-size:12px; color:var(--label-text); margin-bottom:8px; font-weight:bold;">2. Select Points from Map or List (Min: 3)</div>
                             <div id="area_point_list" class="area-point-list"><p style="text-align:center; opacity:0.5; font-size:12px; margin: 10px 0;">No Set Out points available. Load CSV first.</p></div>
-                            <div id="area_selected_order" style="margin-top:8px; font-size:12px; line-height:1.5; font-weight:bold; color:#1e40af; word-wrap: break-word; background: #f1f5f9; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; max-height: 48px; overflow-y: auto;">
-    Selected: <span id="area_order_text" style="color:#ef4444;">None</span>
-</div>
+                            <div id="area_selected_order" style="margin-top:8px; font-size:12px; font-weight:bold; color:#1e40af; word-wrap: break-word;">Selected: <span id="area_order_text" style="color:#ef4444;">None</span></div>
                             <div style="display:flex; gap:5px; margin-top:10px;">
                                 <button class="btn-action" style="flex:1; padding:12px; font-size:13px; background:#10b981;" onclick="calculateAreaFromSelection()">📊 Calculate Area</button>
                                 <button class="btn-action" style="flex:0.5; padding:12px; font-size:13px; background:#ef4444;" onclick="clearAreaCalc()">🛑 Stop</button>
@@ -1046,7 +1044,7 @@
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_dxf_lines" checked onchange="toggleDxfLayers()"> 〰️ Dxf Lines</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_dxf_texts" checked onchange="toggleDxfLayers()"> 🔠 Dxf Text</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_so_pts" checked onchange="toggleDxfLayers()"> 🎯 SO Pts</label>
-                    <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_so_texts" checked onchange="if(typeof updateSoMapPointTexts==='function') updateSoMapPointTexts()"> 🔠 SO Text</label>
+                    <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_so_texts" checked onchange="toggleDxfLayers()"> 🔠 SO Text</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_topo_pts" checked onchange="if(typeof toggleTopoLayers==='function') toggleTopoLayers()"> ⛰️ Topo Pts</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_topo_contours" checked onchange="if(typeof toggleTopoLayers==='function') toggleTopoLayers()"> 〰️ Contours</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_topo_tin" onchange="if(typeof toggleTopoLayers==='function') toggleTopoLayers()"> 🔺 TIN Surface</label>
