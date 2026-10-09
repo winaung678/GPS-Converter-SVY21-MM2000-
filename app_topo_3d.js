@@ -677,7 +677,9 @@ window.volUpdateBoundaryUI = function(isClosed = false) {
                 `<div style="line-height: 1.1; text-align:center;">
                     <b style="font-size:11px; color:#ef4444; display:block;">BDY ${index + 1}</b>
                     <span style="font-size:10px; color:#0f172a; font-weight:bold;">Z: ${pt.groundZ.toFixed(3)}</span>
-                 </div>`, { permanent: true, direction: 'top', className: 'pt-tooltip', offset: [0, -6] }
+                 </div>`, 
+                 // 🔴 className ကို 'pt-tooltip' အစား 'vol-bdy-tooltip' ဟု ပြောင်းလိုက်ပါပြီ
+                 { permanent: true, direction: 'top', className: 'vol-bdy-tooltip', offset: [0, -6] }
             );
             layers.push(ptMarker);
         });
@@ -1233,24 +1235,35 @@ window.drawSavedVolBdys = function() {
 };
 
 window.toggleVolBdyLayer = function() {
-    if (!window.leafletMap || !window.savedVolBdyLayer) return;
+    if (!window.leafletMap) return;
     
+    // 🔴 CSS ကို Dynamic ထည့်သွင်းပြီး Vol BDY စာသားများကို ဖျောက်/ဖော် လုပ်မည့်စနစ်
+    if (!document.getElementById('vol-bdy-css')) {
+        let style = document.createElement('style');
+        style.id = 'vol-bdy-css';
+        style.innerHTML = `.hide-vol-bdys .vol-bdy-tooltip { opacity: 0 !important; visibility: hidden !important; }`;
+        document.head.appendChild(style);
+    }
+
     let chk = document.getElementById('tgl_vol_bdys');
     let volTool = document.getElementById('cogo_vol_tool');
     let isVolActive = (window.activeApp === 4) && volTool && !volTool.classList.contains('hidden');
-    
+    let mapCont = document.getElementById('map_container');
+
     if (chk && chk.checked && isVolActive) {
-        if (!window.leafletMap.hasLayer(window.savedVolBdyLayer)) {
+        if (mapCont) mapCont.classList.remove('hide-vol-bdys'); // စာသား ဖော်မည်
+        if (window.savedVolBdyLayer && !window.leafletMap.hasLayer(window.savedVolBdyLayer)) {
             window.leafletMap.addLayer(window.savedVolBdyLayer);
         }
-        // 🔴 On လိုက်ပါက Auto Zoom သွားမည်
-        if (!window._prevChkVolBdy && typeof window.zoomToCustomLayer === 'function') window.zoomToCustomLayer(window.savedVolBdyLayer);
+        if (!window._prevChkVolBdy && typeof window.zoomToCustomLayer === 'function' && window.savedVolBdyLayer) {
+            window.zoomToCustomLayer(window.savedVolBdyLayer);
+        }
         window._prevChkVolBdy = true;
     } else {
-        if (window.leafletMap.hasLayer(window.savedVolBdyLayer)) {
+        if (mapCont) mapCont.classList.add('hide-vol-bdys'); // စာသား ဖျောက်မည်
+        if (window.savedVolBdyLayer && window.leafletMap.hasLayer(window.savedVolBdyLayer)) {
             window.leafletMap.removeLayer(window.savedVolBdyLayer);
         }
-        // Tool ကနေထွက်သွားလို့ ပိတ်တာမဟုတ်ဘဲ အမှန်ခြစ်ဖြုတ်လို့ပိတ်ရင် အခြေအနေကို မှတ်ထားမည်
         if (chk && !chk.checked) window._prevChkVolBdy = false;
     }
 };
@@ -1273,7 +1286,6 @@ window.switchApp = function(n) {
     if(typeof _oldSwitchAppVol === 'function') _oldSwitchAppVol(n);
     setTimeout(window.toggleVolBdyLayer, 100);
 };
-
 
 // ==========================================
 // --- VOLUME CALCULATION (WEB WORKER + OPTIMIZED) ---
@@ -1434,44 +1446,24 @@ function runVolumeWorker(triangles, boundaryPts, targetLevels, baseType, customG
 }
 
 window.calcVolume = function() {
-    if (typeof window.savedVolAreas === 'undefined') window.savedVolAreas = [];
-    let areasToCalc = [...window.savedVolAreas];
-
+    // 🔴 AUTO SAVE LOGIC: အနီရောင်မျဉ်းဆွဲထားတာ ရှိနေရင် Calculate မလုပ်ခင် အရင်ဆုံး Auto Save လုပ်ပေးမည်
     if (window.volBoundaryPts && window.volBoundaryPts.length >= 3) {
-        let baseType = document.getElementById('vol_base_type').value;
-        let targetLevels = [];
-
-        if (baseType === 'flat') {
-            let flatZInput = document.getElementById('vol_flat_z');
-            if (!flatZInput || flatZInput.value === "") return alert("⚠️ Please enter a Flat Base Level (Z) before calculating.");
-            targetLevels.push({ z: parseFloat(flatZInput.value) });
-        } 
-        else if (baseType === 'variable') {
-            let valid = true;
-            for (let i = 0; i < window.volBoundaryPts.length; i++) {
-                let varZInput = document.getElementById(`vol_var_z_${i}`);
-                if (!varZInput || varZInput.value === "") { alert(`⚠️ Please enter Target Level for BDY ${i+1}.`); valid = false; break; }
-                targetLevels.push({ n: window.volBoundaryPts[i].n, e: window.volBoundaryPts[i].e, z: parseFloat(varZInput.value) });
-            }
-            if (!valid) return; 
-        }
-        else if (baseType === 'surface2') {
-            if (!window.volSurface2Triangles || window.volSurface2Triangles.length === 0) return alert("⚠️ Please upload Surface 2 CSV first!");
-            targetLevels = window.volSurface2Triangles;
+        let prevCount = window.savedVolAreas ? window.savedVolAreas.length : 0;
+        
+        // saveCurrentVolArea ကို လှမ်းခေါ်မည် (လိုအပ်သော Error စစ်ဆေးမှုများ သူဘာသာ လုပ်သွားပါမည်)
+        if (typeof window.saveCurrentVolArea === 'function') {
+            window.saveCurrentVolArea();
         }
 
-        if (targetLevels.length > 0) {
-            // 🔴 Save မလုပ်ရသေးတဲ့ လက်ရှိ Area အတွက်ဆိုရင်တော့ မျက်နှာပြင်က လက်ရှိ Input Box တန်ဖိုးကို ယူသုံးမည်
-            let curGrid = parseFloat(document.getElementById('vol_grid_size').value) || 0.5;
-            let curSwell = parseFloat(document.getElementById('vol_swell').value) || 0;
-            let curShrink = parseFloat(document.getElementById('vol_shrink').value) || 0;
-
-            areasToCalc.push({ 
-                boundary: [...window.volBoundaryPts], baseType: baseType, targetLevels: targetLevels,
-                gridSize: curGrid, swellPct: curSwell, shrinkPct: curShrink 
-            });
+        // 🔴 အကယ်၍ Base Level Input အကွက်တွေ မဖြည့်ရသေးလို့ Validation Error တက်ပြီး Save မဖြစ်သွားရင် ဆက်မတွက်ဘဲ ရပ်ထားမည်
+        if (window.savedVolAreas && window.savedVolAreas.length === prevCount) {
+            return; 
         }
     }
+
+    // 🔴 အပြာရောင် ပြောင်းသွားသော Area များကိုသာ တွက်ချက်မည်
+    if (typeof window.savedVolAreas === 'undefined') window.savedVolAreas = [];
+    let areasToCalc = [...window.savedVolAreas];
 
     if (areasToCalc.length === 0) return alert("⚠️ No valid areas to calculate. Please draw a boundary and enter target levels.");
 

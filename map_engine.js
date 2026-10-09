@@ -1151,25 +1151,29 @@ window.plotPointsOnMap = function() {
             let ptIndex = i;
             let pt = window.setOutPoints[ptIndex];
 
-            // 🔴 Canvas ကို လုံးဝမသုံးတော့ဘဲ မူလစနစ်အတိုင်း ဆွဲမည်
+            // Area Tool ဖွင့်ထားပြီး ဒီအမှတ်ကို ရွေးထားသလား စစ်ဆေးခြင်း
+            let isSelectedAtCreation = false;
+            let areaToolDiv = document.getElementById('cogo_area_tool');
+            if (window.activeApp === 4 && areaToolDiv && !areaToolDiv.classList.contains('hidden') && window.orderedAreaPoints) {
+                isSelectedAtCreation = window.orderedAreaPoints.includes(ptIndex);
+            }
+
+            let markerFillColor = isSelectedAtCreation ? '#10b981' : '#ef4444'; 
+            let markerRadius = isSelectedAtCreation ? 7 : 5; 
+
             let ptMarker = L.circleMarker([pt.lat, pt.lon], {
-                // 🔴 အသစ်ထည့်ချက်: SO Point များကို အခြားမှန်ချပ်များအောက် နစ်မသွားစေရန် အပေါ်ဆုံးအလွှာ (markerPane) သို့ ပို့မည်
-                radius: 5, color: 'rgba(0,0,0,0.01)', weight: 25, fillColor: '#ef4444', fillOpacity: 1, pane: 'markerPane'
+                radius: markerRadius, color: 'rgba(0,0,0,0.01)', weight: 25, fillColor: markerFillColor, fillOpacity: 1, pane: 'markerPane'
             });
-            
-            ptMarker.bindTooltip(pt.p, { permanent: true, direction: 'right', className: 'pt-tooltip', offset: [5, 0] });
 
             ptMarker.on('click', function(e) {
                 L.DomEvent.stopPropagation(e);
                 
-                // 🔴 အသစ်ထည့်ထားသောအပိုင်း: Boundary တွက်ဖို့ N, E ရှာမည်
                 let isActionTaken = false;
                 let coords = window.getDatumCoordsForLatLon(pt.lat, pt.lon);
                 let localN = coords.showLocal ? coords.localN : 0;
                 let localE = coords.showLocal ? coords.localE : 0;
                 let ptZ = pt.z || 0;
 
-                // Topo Tool မှာ Boundary ဆွဲနေရင် SO Point တွေကို ထည့်ပေးမည်
                 let topoTool = document.getElementById('cogo_topo_tool');
                 if (topoTool && !topoTool.classList.contains('hidden') && coords.showLocal) {
                     if (window.isDrawingBoundary) {
@@ -1183,25 +1187,28 @@ window.plotPointsOnMap = function() {
                     }
                 }
                 
-                // Volume Tool မှာ Boundary ဆွဲနေရင် SO Point တွေကို ထည့်ပေးမည်
                 let volTool = document.getElementById('cogo_vol_tool');
                 if (volTool && !volTool.classList.contains('hidden') && coords.showLocal) {
                     if (window.isVolDrawing) {
-                        // 🔴 Array ထဲ တန်းမထည့်ဘဲ အဝါရောင် Draft Point အဖြစ် ပြောင်းထားလိုက်ပါပြီ
                         window.volDraftPoint = { lat: pt.lat, lon: pt.lon, n: localN, e: localE, groundZ: ptZ };
                         if (typeof window.volUpdateBoundaryUI === 'function') window.volUpdateBoundaryUI();
                         isActionTaken = true;
                     }
                 }
 
-                if (isActionTaken) return; // Boundary ဆွဲလိုက်ရင် အောက်က Popup တွေဆက်မလုပ်တော့ပါ
+                if (isActionTaken) return; 
 
-                if (window.isMeasuring) { window.leafletMap.fireEvent('click', {latlng: e.latlng}); }
-                else {
-                    let isAreaToolActive = (window.activeApp === 4 && document.getElementById('cogo_area_tool') && !document.getElementById('cogo_area_tool').classList.contains('hidden'));
+                if (window.isMeasuring) { 
+                    window.leafletMap.fireEvent('click', {latlng: e.latlng}); 
+                } else {
                     let buttonsHtml = '';
-                    if (isAreaToolActive) { 
-                        buttonsHtml = `<button class="so-popup-btn" style="background:#10b981; margin-top:8px;" onclick="window.addPointToArea(${ptIndex})">➕ Add to Area</button>`; 
+                    let isAreaActiveNow = (window.activeApp === 4 && document.getElementById('cogo_area_tool') && !document.getElementById('cogo_area_tool').classList.contains('hidden'));
+                    
+                    if (isAreaActiveNow) { 
+                        let isSelectedNow = window.orderedAreaPoints.includes(ptIndex);
+                        let areaBtnText = isSelectedNow ? "➖ Remove from Area" : "➕ Add to Area";
+                        let areaBtnColor = isSelectedNow ? "#f59e0b" : "#10b981"; 
+                        buttonsHtml = `<button class="so-popup-btn" style="background:${areaBtnColor}; margin-top:8px;" onclick="window.addPointToArea(${ptIndex})">${areaBtnText}</button>`; 
                     } else if (window.activeApp === 3) { 
                         buttonsHtml = `<button class="so-popup-btn" style="background:#2563eb; margin-top:8px;" onclick="window.startMapSetOut(${ptIndex})">🎯 Set Out Here</button>`; 
                     }
@@ -1216,6 +1223,7 @@ window.plotPointsOnMap = function() {
             setTimeout(processChunk, 15);
         } else {
             if (typeof window.ensureSoPointsLayerVisible === 'function') window.ensureSoPointsLayerVisible();
+            if (typeof window.updateSoMapPointTexts === 'function') window.updateSoMapPointTexts();
         }
     }
     processChunk();
@@ -1302,5 +1310,37 @@ window.toggleDarkMode = function() {
         window.drawUTMZones(); // မျဉ်းတွေပြန်ဆွဲမယ်
         let chk = document.getElementById('tgl_utm_zones');
         if (chk && chk.checked) window.leafletMap.addLayer(window.utmZonesLayer);
+    }
+};
+
+// ==========================================
+// 🔴 SO / AREA POINTS TEXT RENDERING (HIGH PERFORMANCE CANVAS)
+// ==========================================
+window.soPointTextCanvasLayer = null;
+
+window.updateSoMapPointTexts = function() {
+    if (!window.leafletMap) return;
+    
+    if (window.soPointTextCanvasLayer) {
+        window.leafletMap.removeLayer(window.soPointTextCanvasLayer);
+        window.soPointTextCanvasLayer = null;
+    }
+
+    let chkText = document.getElementById('tgl_so_texts');
+    if (!chkText || !chkText.checked) return;
+    if (!window.setOutPoints || window.setOutPoints.length === 0) return;
+
+    let textsData = [];
+    window.setOutPoints.forEach(pt => {
+        if (!isNaN(pt.lat) && !isNaN(pt.lon) && pt.p) {
+            textsData.push({
+                lat: pt.lat, lon: pt.lon, text: `[${pt.p}]`, color: '#1e3a8a', align: 'left', isContour: false
+            });
+        }
+    });
+
+    if (textsData.length > 0 && typeof L.CanvasTextLayer !== 'undefined') {
+        window.soPointTextCanvasLayer = new L.CanvasTextLayer(textsData);
+        window.soPointTextCanvasLayer.addTo(window.leafletMap);
     }
 };
