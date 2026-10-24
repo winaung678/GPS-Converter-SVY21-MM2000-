@@ -1,12 +1,11 @@
 // ==========================================
 // --- GLOBALS & STATE VARIABLES ---
-// (ဖိုင်ခွဲထုတ်သော်လည်း Error မတက်စေရန် window Object ပေါ်တွင် တင်ထားပါသည်)
 // ==========================================
 
 // GPS & App State
 window.geoidMode = 0;
 window.isNativeGPSActive = false;
-window.isTopoMode = true; // 🔴 Topo Mode State (GPS ဖွင့်လျှင် Auto ဖွင့်ရန်)
+window.isTopoMode = true; 
 window.activeApp = 0;
 window.currentRawAlt = 0;
 window.zOffset = 0;
@@ -17,7 +16,7 @@ window.appliedPoleH = 0;
 window.globalZText = "MSL: --.--- m";
 window.webGPSWatchId = null;
 
-// Map Coordinates
+// Map Coordinates (For Maps Navigation)
 window.v2_map_lat = null; window.v2_map_lon = null;
 window.m_map_lat = null; window.m_map_lon = null;
 window.g_map_lat = null; window.g_map_lon = null;
@@ -43,8 +42,8 @@ window.markerTarget = null;
 window.pointsLayerGroup = null;
 window.distanceLine = null;
 window.areaPolygonLayer = null;
-window.recordedLayerGroup = null; // 🔴 Topo Points များကို Map ပေါ်တင်ရန် Layer
-window.topoTinLayer = null; // 🔴 TIN Surface ဆွဲရန် Layer အသစ်
+window.recordedLayerGroup = null; 
+window.topoTinLayer = null; 
 
 // User Location & Status
 window.currentLat = 0; window.currentLon = 0;
@@ -72,16 +71,19 @@ window.measurePreviewLine = null;
 window.measurePreviewLabel = null;
 window.nextMeasureSessionId = 1;
 
-// Offline DB Variables
+// Tracking & Database Variables
 window.mapDB = null;
+window.trackDB = null;
 window.tilesToDownload = [];
 window.isDownloadingMap = false;
 window.mapTileUrl = 'https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}';
+
+// Point Averaging
 window.isAveraging = false;
 window.avgDataBuffer = [];
 window.avgInterval = null;
 
-// DB Initialization
+// DB Initialization (Map & DXF)
 const requestDB = indexedDB.open("SurveyProMapDB", 2);
 requestDB.onupgradeneeded = function(e) {
     window.mapDB = e.target.result;
@@ -90,7 +92,6 @@ requestDB.onupgradeneeded = function(e) {
 };
 requestDB.onsuccess = function(e) {
     window.mapDB = e.target.result;
-    // 🔴 ဤနေရာတွင် DXF ကို အလိုအလျောက် ပြန်ခေါ်ရန် ထည့်ထားပါသည်
     if (typeof window.loadSavedDXF === "function") {
         window.loadSavedDXF();
     }

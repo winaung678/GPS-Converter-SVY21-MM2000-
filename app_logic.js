@@ -3,8 +3,12 @@
 // ==========================================
 class WebGeoidReader {
     constructor(url, startLat, endLat, minLon, maxLon, step, isLittleEndian) {
-        this.url = url; this.startLat = startLat; this.endLat = endLat;
-        this.minLon = minLon; this.maxLon = maxLon; this.step = step;
+        this.url = url; 
+        this.startLat = startLat; 
+        this.endLat = endLat;
+        this.minLon = minLon; 
+        this.maxLon = maxLon; 
+        this.step = step;
         this.isLittleEndian = isLittleEndian;
         this.gridData = null;
         this.rows = Math.round(Math.abs(endLat - startLat) / step) + 1;
@@ -12,6 +16,7 @@ class WebGeoidReader {
         this.isGlobal = (startLat === 90.0 && endLat === -90.0);
         this.loadData();
     }
+    
     async loadData() {
         try {
             let response = await fetch(this.url);
@@ -21,26 +26,42 @@ class WebGeoidReader {
             for (let i = 0; i < this.gridData.length; i++) {
                 this.gridData[i] = dataView.getFloat32(i * 4, this.isLittleEndian);
             }
-        } catch (e) { console.error("Failed to load Geoid:", this.url); }
+        } catch (e) { 
+            console.error("Failed to load Geoid:", this.url); 
+        }
     }
+    
     getUndulation(lat, lon) {
         if (!this.gridData) return null;
-        let adjustedLon = lon; if (this.isGlobal && adjustedLon < 0) adjustedLon += 360.0;
-        let minLat = Math.min(this.startLat, this.endLat); let maxLat = Math.max(this.startLat, this.endLat);
+        let adjustedLon = lon; 
+        if (this.isGlobal && adjustedLon < 0) adjustedLon += 360.0;
+        
+        let minLat = Math.min(this.startLat, this.endLat); 
+        let maxLat = Math.max(this.startLat, this.endLat);
+        
         if (lat < minLat || lat > maxLat || adjustedLon < this.minLon || adjustedLon > this.maxLon) return null;
+        
         let r = (this.startLat > this.endLat) ? (this.startLat - lat) / this.step : (lat - this.startLat) / this.step;
         let c = (adjustedLon - this.minLon) / this.step;
-        let r0 = Math.floor(r); let c0 = Math.floor(c);
-        let r1 = (r0 + 1 < this.rows) ? r0 + 1 : r0; let c1 = (c0 + 1 < this.cols) ? c0 + 1 : (this.isGlobal ? 0 : c0);
-        let n00 = this.gridData[r0 * this.cols + c0]; let n01 = this.gridData[r0 * this.cols + c1];
-        let n10 = this.gridData[r1 * this.cols + c0]; let n11 = this.gridData[r1 * this.cols + c1];
-        if (n00===undefined || n01===undefined || n10===undefined || n11===undefined) return null;
-        let dr = r - r0; let dc = c - c0;
+        
+        let r0 = Math.floor(r); 
+        let c0 = Math.floor(c);
+        let r1 = (r0 + 1 < this.rows) ? r0 + 1 : r0; 
+        let c1 = (c0 + 1 < this.cols) ? c0 + 1 : (this.isGlobal ? 0 : c0);
+        
+        let n00 = this.gridData[r0 * this.cols + c0]; 
+        let n01 = this.gridData[r0 * this.cols + c1];
+        let n10 = this.gridData[r1 * this.cols + c0]; 
+        let n11 = this.gridData[r1 * this.cols + c1];
+        
+        if (n00 === undefined || n01 === undefined || n10 === undefined || n11 === undefined) return null;
+        
+        let dr = r - r0; 
+        let dc = c - c0;
         return (n00 * (1 - dc) + n01 * dc) * (1 - dr) + (n10 * (1 - dc) + n11 * dc) * dr;
     }
 }
 
-// Load Geoids for Web
 window.webEgm2008 = new WebGeoidReader("egm2008_1min.bin", 1.0, 29.0, 92.0, 104.0, 1.0/60.0, false);
 window.webEgm96 = new WebGeoidReader("egm96_global.bin", 90.0, -90.0, 0.0, 360.0, 0.25, true);
 
@@ -55,26 +76,25 @@ window.onload = function() {
     attachPasteFilterToInputs();
 
     let sSoDatum = localStorage.getItem('pref_so_datum');
-    if(sSoDatum) { document.getElementById('so_datum').value = sSoDatum; window.toggleSoDatum(); }
+    if (sSoDatum) { document.getElementById('so_datum').value = sSoDatum; window.toggleSoDatum(); }
+    
     let sDxfDatum = localStorage.getItem('pref_dxf_datum');
-    if(sDxfDatum) { document.getElementById('dxf_datum').value = sDxfDatum; window.toggleDxfDatum(); }
+    if (sDxfDatum) { document.getElementById('dxf_datum').value = sDxfDatum; window.toggleDxfDatum(); }
+    
     if (typeof window.syncTrackColorInputs === 'function') {
         window.syncTrackColorInputs(localStorage.getItem('pref_track_color') || '#3b82f6');
     }
 
-    // 🔴 ဝင်ဝင်ချင်း အမြဲတမ်း Dashboard (Main Face) ကိုသာ ပြသမည်
     window.switchApp(0);
 
-    // Web Compass Listener
     if (window.DeviceOrientationEvent) {
         window.addEventListener("deviceorientationabsolute", (event) => {
             if (event.alpha !== null) window.onCompassUpdate(360 - event.alpha);
         }, true);
         window.addEventListener("deviceorientation", (event) => {
-            if (event.webkitCompassHeading) window.onCompassUpdate(event.webkitCompassHeading); // iOS
+            if (event.webkitCompassHeading) window.onCompassUpdate(event.webkitCompassHeading);
         }, true);
     }
-// Browser ၏ Ghost Event ကို ကာကွယ်ရန် Initial State ကပ်ခြင်း
     history.replaceState({page: 0}, "Dashboard", "");
 };
 
@@ -82,40 +102,87 @@ function attachPasteFilterToInputs() {
     let inputs = document.querySelectorAll('.v2-input, .dms-grid input');
     inputs.forEach(input => {
         if (input.id.includes('_lat_') || input.id.includes('_lon_') || input.id.includes('_inp_') || input.id.includes('so_m_')) {
-            input.addEventListener('paste', function(e) { e.preventDefault(); let pasteData = (e.clipboardData || window.clipboardData).getData('text'); let cleanNumber = pasteData.replace(/[^\d.-]/g, ''); document.execCommand('insertText', false, cleanNumber); });
+            input.addEventListener('paste', function(e) { 
+                e.preventDefault(); 
+                let pasteData = (e.clipboardData || window.clipboardData).getData('text'); 
+                let cleanNumber = pasteData.replace(/[^\d.-]/g, ''); 
+                document.execCommand('insertText', false, cleanNumber); 
+            });
         }
     });
 }
 
-// Modals ဖွင့်ခြင်း/ပိတ်ခြင်းများ
 window.openAbout = function() { document.getElementById('aboutModal').style.display='flex'; history.pushState({modal: true}, "Modal", ""); };
-window.closeAbout = function() { document.getElementById('aboutModal').style.display='none'; };
+window.closeAbout = function() {
+    if(document.getElementById('aboutModal').style.display === 'flex') {
+        history.back(); 
+    }
+};
 
-// 🔴 Play Store သို့ Web မှတစ်ဆင့် သွားနိုင်ရန် ပြင်ဆင်ချက်
 window.openPlayStore = function() {
-    if(window.AndroidNative && window.AndroidNative.openPlayStore) {
+    if (window.AndroidNative && window.AndroidNative.openPlayStore) {
         window.AndroidNative.openPlayStore();
     } else {
-        // Web Browser မှ နှိပ်လျှင် Play Store Link ကို တိုက်ရိုက်ဖွင့်မည်
         window.open("https://play.google.com/store/apps/details?id=com.winaung.svy21converter", "_blank");
     }
 };
-window.toggleSound = function() { window.isSoundOn = !window.isSoundOn; let btn = document.getElementById('soundBtn'); btn.innerText = window.isSoundOn ? "🔊 Sound: ON" : "🔇 Sound: OFF"; btn.style.background = window.isSoundOn ? "#10b981" : "#ef4444"; };
-window.toggleInputLock = function(lock) { document.querySelectorAll('.v2-input, .dms-grid input').forEach(i => { if(i.id !== 'pt_id' && i.id !== 'pt_desc' && i.id !== 'csv_mode' && !i.id.startsWith('so_') && !i.id.startsWith('dxf_') && !i.id.startsWith('cam_') && !i.id.endsWith('_man_pt') && !i.id.endsWith('_man_desc')) { if(lock) { i.classList.add('input-locked'); i.readOnly = true; } else { i.classList.remove('input-locked'); i.readOnly = false; } } }); };
 
-window.toggleSoDatum = function() { let v = document.getElementById('so_datum').value; let customDiv = document.getElementById('so_custom_utm'); if(customDiv) customDiv.style.display = (v === "GLOBAL_UTM") ? "flex" : "none"; localStorage.setItem('pref_so_datum', v); };
-window.toggleDxfDatum = function() { let v = document.getElementById('dxf_datum').value; let customDiv = document.getElementById('dxf_custom_utm'); if(customDiv) customDiv.style.display = (v === "GLOBAL_UTM") ? "flex" : "none"; localStorage.setItem('pref_dxf_datum', v); };
-window.toggleCogoDatum = function() { let v = document.getElementById('cogo_datum').value; let customDiv = document.getElementById('cogo_custom_utm'); if(customDiv) customDiv.style.display = (v === "GLOBAL_UTM") ? "flex" : "none"; };
+window.toggleSound = function() { 
+    window.isSoundOn = !window.isSoundOn; 
+    let btn = document.getElementById('soundBtn'); 
+    if (btn) {
+        btn.innerText = window.isSoundOn ? "🔊 Sound: ON" : "🔇 Sound: OFF"; 
+        btn.style.background = window.isSoundOn ? "#10b981" : "#ef4444"; 
+    }
+};
 
-window.handleTopMenuClick = function() { window.isTopoMode = !window.isTopoMode; window.updateTopoUI(); };
+window.toggleInputLock = function(lock) { 
+    document.querySelectorAll('.v2-input, .dms-grid input').forEach(i => { 
+        if (i.id !== 'pt_id' && i.id !== 'pt_desc' && i.id !== 'csv_mode' && !i.id.startsWith('so_') && !i.id.startsWith('dxf_') && !i.id.startsWith('cam_') && !i.id.endsWith('_man_pt') && !i.id.endsWith('_man_desc')) { 
+            if (lock) { i.classList.add('input-locked'); i.readOnly = true; } 
+            else { i.classList.remove('input-locked'); i.readOnly = false; } 
+        } 
+    }); 
+};
+
+window.toggleSoDatum = function() { 
+    let v = document.getElementById('so_datum').value; 
+    let customDiv = document.getElementById('so_custom_utm'); 
+    if (customDiv) customDiv.style.display = (v === "GLOBAL_UTM") ? "flex" : "none"; 
+    localStorage.setItem('pref_so_datum', v); 
+};
+
+window.toggleDxfDatum = function() { 
+    let v = document.getElementById('dxf_datum').value; 
+    let customDiv = document.getElementById('dxf_custom_utm'); 
+    if (customDiv) customDiv.style.display = (v === "GLOBAL_UTM") ? "flex" : "none"; 
+    localStorage.setItem('pref_dxf_datum', v); 
+};
+
+window.toggleCogoDatum = function() { 
+    let v = document.getElementById('cogo_datum').value; 
+    let customDiv = document.getElementById('cogo_custom_utm'); 
+    if (customDiv) customDiv.style.display = (v === "GLOBAL_UTM") ? "flex" : "none"; 
+};
+
+window.handleTopMenuClick = function() { 
+    window.isTopoMode = !window.isTopoMode; 
+    window.updateTopoUI(); 
+};
 
 window.updateTopoUI = function() {
-    let btn = document.getElementById('topMenuBtn'); let n = window.activeApp;
+    let btn = document.getElementById('topMenuBtn'); 
+    let n = window.activeApp;
+    
     if (window.isNativeGPSActive && (n === 1 || n === 2 || n === 5)) {
         btn.classList.remove('hidden');
         if (window.isTopoMode) {
-            btn.innerHTML = "🧮 Data View"; btn.classList.add('topo-active'); document.getElementById('shared_map_view').classList.remove('hidden');
-            document.getElementById('v2_calc_ui').classList.add('hidden'); document.getElementById('m_calc_ui').classList.add('hidden'); document.getElementById('g_calc_ui').classList.add('hidden');
+            btn.innerHTML = "🧮 Data View"; 
+            btn.classList.add('topo-active'); 
+            document.getElementById('shared_map_view').classList.remove('hidden');
+            document.getElementById('v2_calc_ui').classList.add('hidden'); 
+            document.getElementById('m_calc_ui').classList.add('hidden'); 
+            document.getElementById('g_calc_ui').classList.add('hidden');
             if (!window.leafletMap) window.initMap();
             setTimeout(() => {
                 window.leafletMap.invalidateSize({ animate: false });
@@ -124,17 +191,25 @@ window.updateTopoUI = function() {
                 }
             }, 350);
         } else {
-            btn.innerHTML = "🗺️ Map View"; btn.classList.remove('topo-active'); document.getElementById('shared_map_view').classList.add('hidden');
-            if (n === 1) document.getElementById('v2_calc_ui').classList.remove('hidden'); if (n === 2) document.getElementById('m_calc_ui').classList.remove('hidden'); if (n === 5) document.getElementById('g_calc_ui').classList.remove('hidden');
+            btn.innerHTML = "🗺️ Map View"; 
+            btn.classList.remove('topo-active'); 
+            document.getElementById('shared_map_view').classList.add('hidden');
+            if (n === 1) document.getElementById('v2_calc_ui').classList.remove('hidden'); 
+            if (n === 2) document.getElementById('m_calc_ui').classList.remove('hidden'); 
+            if (n === 5) document.getElementById('g_calc_ui').classList.remove('hidden');
         }
     } else {
         btn.classList.add('hidden');
-        if (!window.isNativeGPSActive && (n === 1 || n === 2 || n === 5)) { document.getElementById('shared_map_view').classList.add('hidden'); if (n === 1) document.getElementById('v2_calc_ui').classList.remove('hidden'); if (n === 2) document.getElementById('m_calc_ui').classList.remove('hidden'); if (n === 5) document.getElementById('g_calc_ui').classList.remove('hidden'); }
+        if (!window.isNativeGPSActive && (n === 1 || n === 2 || n === 5)) { 
+            document.getElementById('shared_map_view').classList.add('hidden'); 
+            if (n === 1) document.getElementById('v2_calc_ui').classList.remove('hidden'); 
+            if (n === 2) document.getElementById('m_calc_ui').classList.remove('hidden'); 
+            if (n === 5) document.getElementById('g_calc_ui').classList.remove('hidden'); 
+        }
     }
 };
 
 window.switchApp = function(n) {
-    // 🔴 အသစ်ထပ်ဖြည့်ချက်: Tab ပြောင်းတာနဲ့ ပေတံ သုံးနေရင် အလိုအလျောက် ပိတ်ပေးမည်
     if (window.isMeasuring) { window.toggleMeasureMode(); }
     if (window.activeApp === 0 && n !== 0) { history.pushState({page: n}, "App " + n, ""); }
     if (window.isNativeGPSActive && window.activeApp !== n) { window.toggleGlobalGPS(); }
@@ -142,8 +217,6 @@ window.switchApp = function(n) {
     if (window.activeApp === 4 && n !== 4) { window.clearAreaResultOnly(); }
 
     window.activeApp = n;
-
-    // 🔴 ရောက်သွားတဲ့ စာမျက်နှာကို မှတ်ထားမည် (Refresh လုပ်ရင် ပြန်ခေါ်နိုင်ရန်)
     localStorage.setItem('surveyProLastApp', n);
 
     document.getElementById('dashboard_view').classList.toggle('hidden', n !== 0);
@@ -158,101 +231,167 @@ window.switchApp = function(n) {
     let showSharedTools = (n === 1 || n === 2 || n === 5) && !window.isNativeGPSActive;
     let showRecordPanel = (n === 1 || n === 2 || n === 5) && window.isNativeGPSActive;
 
-    if (n === 0 || n === 3 || n === 4 || n === 6 || n === 7) { document.getElementById('shared_tools_view').classList.add('hidden'); }
-    else { document.getElementById('shared_tools_view').classList.remove('hidden'); document.getElementById('record_panel').style.display = showRecordPanel ? 'block' : 'none'; document.getElementById('csv_panel').style.display = showSharedTools ? 'block' : 'none'; }
+    if (n === 0 || n === 3 || n === 4 || n === 6 || n === 7) { 
+        document.getElementById('shared_tools_view').classList.add('hidden'); 
+    } else { 
+        document.getElementById('shared_tools_view').classList.remove('hidden'); 
+        document.getElementById('record_panel').style.display = showRecordPanel ? 'block' : 'none'; 
+        document.getElementById('csv_panel').style.display = showSharedTools ? 'block' : 'none'; 
+    }
 
-    let gpsBtn = document.getElementById('globalGpsBtn'); let menuBtn = document.getElementById('topMenuBtn');
-    if (n === 0 || n === 4) { gpsBtn.classList.add('hidden'); menuBtn.classList.add('hidden'); document.getElementById('shared_map_view').classList.add('hidden'); } else { gpsBtn.classList.remove('hidden'); }
+    let gpsBtn = document.getElementById('globalGpsBtn'); 
+    let menuBtn = document.getElementById('topMenuBtn');
+    if (n === 0 || n === 4) { 
+        gpsBtn.classList.add('hidden'); 
+        menuBtn.classList.add('hidden'); 
+        document.getElementById('shared_map_view').classList.add('hidden'); 
+    } else { 
+        gpsBtn.classList.remove('hidden'); 
+    }
 
-    if (n === 3 || n === 6) { window.isTopoMode = false; menuBtn.classList.add('hidden'); document.getElementById('shared_map_view').classList.remove('hidden'); let mapDiv = document.getElementById('map_view'); if (n === 6) { mapDiv.classList.add('map-full-height'); } else { mapDiv.classList.remove('map-full-height'); } }
-    else if (n === 4) { window.isTopoMode = false; menuBtn.classList.add('hidden'); document.getElementById('shared_map_view').classList.add('hidden'); document.getElementById('map_view').classList.remove('map-full-height'); if (typeof window.closeCogoTool === "function") window.closeCogoTool(); }
-    else if (n === 7) { document.getElementById('shared_map_view').classList.add('hidden'); window.isTopoMode = false; menuBtn.classList.add('hidden'); }
+    if (n === 3 || n === 6) { 
+        window.isTopoMode = false; menuBtn.classList.add('hidden'); 
+        document.getElementById('shared_map_view').classList.remove('hidden'); 
+        let mapDiv = document.getElementById('map_view'); 
+        if (n === 6) { mapDiv.classList.add('map-full-height'); } else { mapDiv.classList.remove('map-full-height'); } 
+    } else if (n === 4) { 
+        window.isTopoMode = false; menuBtn.classList.add('hidden'); 
+        document.getElementById('shared_map_view').classList.add('hidden'); 
+        document.getElementById('map_view').classList.remove('map-full-height'); 
+        if (typeof window.closeCogoTool === "function") window.closeCogoTool(); 
+    } else if (n === 7) { 
+        document.getElementById('shared_map_view').classList.add('hidden'); 
+        window.isTopoMode = false; menuBtn.classList.add('hidden'); 
+    }
 
-// 🔴 CSV Zone Box များကို လိုအပ်တဲ့ App မှာပဲ ဖော်ပြရန်
     let csvZoneSet = document.getElementById('csv_zone_settings');
     let csvHemiInp = document.getElementById('csv_hemi_inp');
     if (csvZoneSet) {
-        if (n === 2) { // MM2000
+        if (n === 2) { 
             csvZoneSet.style.display = 'flex';
-            csvHemiInp.style.display = 'none'; // MM2000 က North အမြဲဖြစ်လို့ Hemi မလိုပါ
-        } else if (n === 5) { // Global UTM
+            csvHemiInp.style.display = 'none'; 
+        } else if (n === 5) { 
             csvZoneSet.style.display = 'flex';
-            csvHemiInp.style.display = 'block'; // Global မို့လို့ North/South ရွေးခွင့်ပေးမယ်
-        } else { // SVY21 (n === 1)
-            csvZoneSet.style.display = 'none'; // SVY က Zone မလိုပါ
+            csvHemiInp.style.display = 'block'; 
+        } else { 
+            csvZoneSet.style.display = 'none'; 
         }
     }
 
     let csvSelect = document.getElementById('csv_mode');
-    if(csvSelect) { if (n === 5) { csvSelect.options[0].text = `UTM (PNEZD) → WGS84 (Lat, Lon)`; csvSelect.options[1].text = `WGS84 (Lat, Lon) → UTM (PNEZD)`; csvSelect.options[2].style.display = 'none'; if (csvSelect.value === "3") csvSelect.value = "1"; } else { let dName = (n === 1) ? "SVY21" : "MM2000"; csvSelect.options[0].text = `${dName} (Local NE) → WGS84 LL & NE`; csvSelect.options[1].text = `WGS84 LL (Lat, Lon) → ${dName} NE`; csvSelect.options[2].text = `WGS84 NE → ${dName} Local NE`; csvSelect.options[2].style.display = 'block'; } }
+    if (csvSelect) { 
+        if (n === 5) { 
+            csvSelect.options[0].text = `UTM (PNEZD) → WGS84 (Lat, Lon)`; 
+            csvSelect.options[1].text = `WGS84 (Lat, Lon) → UTM (PNEZD)`; 
+            csvSelect.options[2].style.display = 'none'; 
+            if (csvSelect.value === "3") csvSelect.value = "1"; 
+        } else { 
+            let dName = (n === 1) ? "SVY21" : "MM2000"; 
+            csvSelect.options[0].text = `${dName} (Local NE) → WGS84 LL & NE`; 
+            csvSelect.options[1].text = `WGS84 LL (Lat, Lon) → ${dName} NE`; 
+            csvSelect.options[2].text = `WGS84 NE → ${dName} Local NE`; 
+            csvSelect.options[2].style.display = 'block'; 
+        } 
+    }
 
-    if((n === 3 || n === 7) && !window.isNativeGPSActive) window.toggleGlobalGPS();
+    if ((n === 3 || n === 7) && !window.isNativeGPSActive) window.toggleGlobalGPS();
 
-    if(n !== 0 && n !== 7) {
-        if(!window.leafletMap) window.initMap();
-
-        // 🔴 DXF စာမျက်နှာ (App 6) ကို ရောက်ရင် Memory ထဲမှာ DXF မရှိရင် DB ထဲကနေ အတင်းပြန်ခေါ်မည်
+    if (n !== 0 && n !== 7) {
+        if (!window.leafletMap) window.initMap();
         if (n === 6) {
             if ((!window.rawDxfEntities || window.rawDxfEntities.length === 0) && typeof window.loadSavedDXF === 'function') {
                 window.loadSavedDXF();
             }
         }
-
         setTimeout(() => {
             if (window.leafletMap) window.leafletMap.invalidateSize({ animate: false });
-
             if (window.rawDxfEntities && window.rawDxfEntities.length > 0) {
                 if (window.dxfLineLayer === null) { window.renderDXF(); }
                 else if (typeof window.toggleDxfLayers === 'function') { window.toggleDxfLayers(); }
             }
-
             if (n === 1 || n === 2 || n === 5) { window.updateTopoUI(); }
-
-            let refreshPoints = () => {
-                if (typeof window.refreshMapPointLayers === 'function') window.refreshMapPointLayers(n);
-            };
-            refreshPoints();
-            setTimeout(refreshPoints, 200);
+            let refreshPoints = () => { if (typeof window.refreshMapPointLayers === 'function') window.refreshMapPointLayers(n); };
+            refreshPoints(); setTimeout(refreshPoints, 200);
         }, 350);
     }
-    if(n === 4) { window.populateAreaPoints(); window.updateAreaOrderUI(); }
+    if (n === 4) { window.populateAreaPoints(); window.updateAreaOrderUI(); }
 };
 
 window.toggleGlobalGPS = function() {
-    window.isNativeGPSActive = !window.isNativeGPSActive; let btn = document.getElementById('globalGpsBtn');
-    let subV2 = document.getElementById('v2_subtitle'); let subM = document.getElementById('m_subtitle'); let subG = document.getElementById('g_subtitle');
+    window.isNativeGPSActive = !window.isNativeGPSActive; 
+    let btn = document.getElementById('globalGpsBtn');
+    let subV2 = document.getElementById('v2_subtitle'); 
+    let subM = document.getElementById('m_subtitle'); 
+    let subG = document.getElementById('g_subtitle');
 
-    if(window.isNativeGPSActive) {
-        window.isTopoMode = true; btn.innerHTML = "🛑 Stop GPS"; btn.classList.add('active');
-        if(subV2) subV2.innerHTML = "Singapore Datum (Topo Mode)"; if(subM) subM.innerHTML = "Myanmar Datum (Topo Mode)"; if(subG) subG.innerHTML = "Universal Transverse Mercator (Topo Mode)";
-        document.getElementById('v2_gps_box').classList.remove('hidden'); document.getElementById('m_gps_box').classList.remove('hidden'); document.getElementById('g_gps_box').classList.remove('hidden');
-        document.getElementById('v2_mode').value = 'LL2SVY'; document.getElementById('m_mode').value = 'W2M_LL'; document.getElementById('g_mode').value = 'LL2UTM';
-        document.getElementById('v2_mode').disabled = true; document.getElementById('m_mode').disabled = true; document.getElementById('m_zone').disabled = true; document.getElementById('g_mode').disabled = true;
+    if (window.isNativeGPSActive) {
+        window.isTopoMode = true; 
+        btn.innerHTML = "🛑 Stop GPS"; 
+        btn.classList.add('active');
+        if (subV2) subV2.innerHTML = "Singapore Datum (Topo Mode)"; 
+        if (subM) subM.innerHTML = "Myanmar Datum (Topo Mode)"; 
+        if (subG) subG.innerHTML = "Universal Transverse Mercator (Topo Mode)";
+        
+        document.getElementById('v2_gps_box').classList.remove('hidden'); 
+        document.getElementById('m_gps_box').classList.remove('hidden'); 
+        document.getElementById('g_gps_box').classList.remove('hidden');
+        
+        document.getElementById('v2_mode').value = 'LL2SVY'; 
+        document.getElementById('m_mode').value = 'W2M_LL'; 
+        document.getElementById('g_mode').value = 'LL2UTM';
+        
+        document.getElementById('v2_mode').disabled = true; 
+        document.getElementById('m_mode').disabled = true; 
+        document.getElementById('m_zone').disabled = true; 
+        document.getElementById('g_mode').disabled = true;
+        
         window.v2_toggleUI(); window.m_toggleUI(); window.g_toggleUI(); window.toggleInputLock(true);
-        if (window.activeApp === 1 || window.activeApp === 2 || window.activeApp === 5) { document.getElementById('record_panel').style.display = 'block'; document.getElementById('csv_panel').style.display = 'none'; window.updateTopoUI(); }
+        if (window.activeApp === 1 || window.activeApp === 2 || window.activeApp === 5) { 
+            document.getElementById('record_panel').style.display = 'block'; 
+            document.getElementById('csv_panel').style.display = 'none'; 
+            window.updateTopoUI(); 
+        }
 
-        // WEB GPS TRACKING (Fallback)
         if (typeof window.AndroidNative === 'undefined' && navigator.geolocation) {
             window.webGPSWatchId = navigator.geolocation.watchPosition((pos) => {
                 window.onNativeGPSUpdate({
                     lat: pos.coords.latitude, lon: pos.coords.longitude,
                     alt: pos.coords.altitude||0, acc: pos.coords.accuracy||0, hAcc: pos.coords.accuracy||0,
-                    vAcc: pos.coords.altitudeAccuracy||0, satCount: 5
+                    vAcc: "Web", satCount: "Web"
                 });
             }, (err) => { alert("GPS Error: " + err.message); }, { enableHighAccuracy: true, maximumAge: 0 });
         }
     } else {
-        window.isTopoMode = false; btn.innerHTML = "🛰️ GPS: OFF"; btn.classList.remove('active');
-        if(subV2) subV2.innerHTML = "Singapore Datum (Converter Mode)"; if(subM) subM.innerHTML = "Myanmar Datum (Converter Mode)"; if(subG) subG.innerHTML = "Universal Transverse Mercator (Converter Mode)";
-        document.getElementById('v2_gps_box').classList.add('hidden'); document.getElementById('m_gps_box').classList.add('hidden'); document.getElementById('g_gps_box').classList.add('hidden');
-        document.getElementById('v2_mode').disabled = false; document.getElementById('m_mode').disabled = false; document.getElementById('m_zone').disabled = false; document.getElementById('g_mode').disabled = false;
+        window.isTopoMode = false; 
+        btn.innerHTML = "🛰️ GPS: OFF"; 
+        btn.classList.remove('active');
+        if (subV2) subV2.innerHTML = "Singapore Datum (Converter Mode)"; 
+        if (subM) subM.innerHTML = "Myanmar Datum (Converter Mode)"; 
+        if (subG) subG.innerHTML = "Universal Transverse Mercator (Converter Mode)";
+        
+        document.getElementById('v2_gps_box').classList.add('hidden'); 
+        document.getElementById('m_gps_box').classList.add('hidden'); 
+        document.getElementById('g_gps_box').classList.add('hidden');
+        
+        document.getElementById('v2_mode').disabled = false; 
+        document.getElementById('m_mode').disabled = false; 
+        document.getElementById('m_zone').disabled = false; 
+        document.getElementById('g_mode').disabled = false;
+        
         window.toggleInputLock(false); window.resetBM('v2'); window.resetBM('m'); window.resetBM('g');
         window.currentRawAlt = 0; window.appliedPoleH = 0; window.latest_local_N = 0; window.latest_local_E = 0; window.latest_wgs_N = 0; window.latest_wgs_E = 0; window.latest_Z = 0; window.latest_lat = 0; window.latest_lon = 0; window.currentGeoidN = 0; window.currentGeoidModel = "Unknown";
-        document.getElementById('v2_gps_stat').innerText = "H: -- | V: --"; document.getElementById('m_gps_stat').innerText = "H: -- | V: --"; document.getElementById('g_gps_stat').innerText = "H: -- | V: --";
-        document.getElementById('v2_dop_info').innerText = "PDOP: -- | VDOP: --"; document.getElementById('m_dop_info').innerText = "PDOP: -- | VDOP: --"; document.getElementById('g_dop_info').innerText = "PDOP: -- | VDOP: --";
+        
+        document.getElementById('v2_gps_stat').innerText = "H.Acc: --"; document.getElementById('m_gps_stat').innerText = "H.Acc: --"; document.getElementById('g_gps_stat').innerText = "H.Acc: --"; document.getElementById('so_gps_stat').innerText = "H.Acc: --";
+        document.getElementById('v2_v_acc').innerText = "V.Acc: --"; document.getElementById('m_v_acc').innerText = "V.Acc: --"; document.getElementById('g_v_acc').innerText = "V.Acc: --"; document.getElementById('so_v_acc').innerText = "V.Acc: --";
+        document.getElementById('v2_sat').innerText = "🛰️ Sat: --"; document.getElementById('m_sat').innerText = "🛰️ Sat: --"; document.getElementById('g_sat').innerText = "🛰️ Sat: --"; document.getElementById('so_sat').innerText = "🛰️ Sat: --";
         document.getElementById('v2_geoid_val').innerText = "Geoid (N): --.--- m"; document.getElementById('m_geoid_val').innerText = "Geoid (N): --.--- m"; document.getElementById('g_geoid_val').innerText = "Geoid (N): --.--- m";
         document.getElementById('v2_raw_alt').innerText = "Raw GPS Alt: --.--- m"; document.getElementById('m_raw_alt').innerText = "Raw GPS Alt: --.--- m"; document.getElementById('g_raw_alt').innerText = "Raw GPS Alt: --.--- m";
-        if (window.activeApp === 1 || window.activeApp === 2 || window.activeApp === 5) { document.getElementById('record_panel').style.display = 'none'; document.getElementById('csv_panel').style.display = 'block'; window.updateTopoUI(); }
+        
+        if (window.activeApp === 1 || window.activeApp === 2 || window.activeApp === 5) { 
+            document.getElementById('record_panel').style.display = 'none'; 
+            document.getElementById('csv_panel').style.display = 'block'; 
+            window.updateTopoUI(); 
+        }
         if (window.webGPSWatchId !== null) { navigator.geolocation.clearWatch(window.webGPSWatchId); window.webGPSWatchId = null; }
     }
 };
@@ -260,9 +399,12 @@ window.toggleGlobalGPS = function() {
 function fetchGeoidDataFromNative(lat, lon) {
     if (window.AndroidNative && window.AndroidNative.getGeoidData) {
         let jsonStr = window.AndroidNative.getGeoidData(lat, lon);
-        try { let data = JSON.parse(jsonStr); if (data.geoid_n !== null) { window.currentGeoidN = data.geoid_n; window.currentGeoidModel = data.geoid_model; } else { window.currentGeoidN = 0; window.currentGeoidModel = "Unknown"; } } catch(e) { window.currentGeoidN = 0; window.currentGeoidModel = "Unknown"; }
+        try { 
+            let data = JSON.parse(jsonStr); 
+            if (data.geoid_n !== null) { window.currentGeoidN = data.geoid_n; window.currentGeoidModel = data.geoid_model; } 
+            else { window.currentGeoidN = 0; window.currentGeoidModel = "Unknown"; } 
+        } catch(e) { window.currentGeoidN = 0; window.currentGeoidModel = "Unknown"; }
     } else {
-        // WEB GEOID LOOKUP (JS)
         let n = window.webEgm2008 ? window.webEgm2008.getUndulation(lat, lon) : null;
         if (n !== null) { window.currentGeoidN = n; window.currentGeoidModel = "EGM2008"; }
         else {
@@ -279,32 +421,56 @@ window.onNativeGPSUpdate = function(d) {
     let t = (window.activeApp === 1) ? 'v2' : (window.activeApp === 2) ? 'm' : 'g';
     let lat = d.lat, lon = d.lon; window.currentLat = lat; window.currentLon = lon; window.latest_lat = lat; window.latest_lon = lon;
 
-    // Altitude smoothing
-    let rawIncomingAlt = d.alt || 0; window.altBuffer.push(rawIncomingAlt); if(window.altBuffer.length > window.BUFFER_SIZE) window.altBuffer.shift(); window.currentRawAlt = window.altBuffer.reduce((a,b) => a + b, 0) / window.altBuffer.length;
+    let rawIncomingAlt = d.alt || 0; 
+    window.altBuffer.push(rawIncomingAlt); 
+    if(window.altBuffer.length > window.BUFFER_SIZE) window.altBuffer.shift(); 
+    window.currentRawAlt = window.altBuffer.reduce((a,b) => a + b, 0) / window.altBuffer.length;
 
-    // Check Geoid
     if(d.geoid_n !== undefined && d.geoid_n !== null) { window.currentGeoidN = d.geoid_n; window.currentGeoidModel = d.geoid_model || "Unknown"; }
     else { fetchGeoidDataFromNative(lat, lon); }
 
-    // H Accuracy သာ ပြသမည်
     let hA = d.hAcc || d.acc || 0;
+    
+    // Web ကနေဆိုရင် "Web" လာမယ်၊ APK ကနေဆိုရင် ဂဏန်းအစစ် လာပါမယ်
+    let vA = d.vAcc !== undefined ? d.vAcc : "--"; 
+    let sats = d.satCount !== undefined ? d.satCount : "--";
+
+    // V.Acc ကို UI ပေါ်ပြရန် Format ပြင်ဆင်ခြင်း
+    let vAccDisplay;
+    if (vA === "Web") {
+        vAccDisplay = "Web";
+    } else if (typeof vA === 'number' && vA > 0) {
+        vAccDisplay = vA.toFixed(1) + "m";
+    } else {
+        vAccDisplay = "--";
+    }
 
     if(window.activeApp === 1 || window.activeApp === 2 || window.activeApp === 5) {
         document.getElementById(t+'_gps_stat').innerText = `H.Acc: ${hA.toFixed(1)}m`;
-        let pdop = d.pdop ? d.pdop.toFixed(1) : "--", vdop = d.vdop ? d.vdop.toFixed(1) : "--";
-        document.getElementById(t+'_dop_info').innerText = `PDOP: ${pdop} | VDOP: ${vdop}`;
+        document.getElementById(t+'_v_acc').innerText = `V.Acc: ${vAccDisplay}`;
+        document.getElementById(t+'_sat').innerText = `🛰️ Sat: ${sats}`;
+        
         let rawAltUI = document.getElementById(t+'_raw_alt'); let geoidUI = document.getElementById(t+'_geoid_val');
         if (rawAltUI) rawAltUI.innerText = `Raw GPS Alt: ${window.currentRawAlt.toFixed(3)} m`;
         if (geoidUI) geoidUI.innerText = `Geoid (N): ${window.currentGeoidN.toFixed(3)} m`;
+    } 
+    // 🔴 Set Out Tab အတွက်
+    else if (window.activeApp === 3) {
+        let soH = document.getElementById('so_gps_stat');
+        let soV = document.getElementById('so_v_acc');
+        let soS = document.getElementById('so_sat');
+        if (soH) soH.innerText = `H.Acc: ${hA.toFixed(1)}m`;
+        if (soV) soV.innerText = `V.Acc: ${vAccDisplay}`;
+        if (soS) soS.innerText = `🛰️ Sat: ${sats}`;
     }
     updateZDisplay(t);
 
-    if(window.activeApp === 1) { document.getElementById('v2_lat_dd').value = lat.toFixed(9); document.getElementById('v2_lon_dd').value = lon.toFixed(9); window.v2_sync('lat','dd'); window.v2_sync('lon','dd'); window.v2_run(); }
-    if(window.activeApp === 2) { window.autoDetectZone(lon); document.getElementById('m_lat_dd').value = lat.toFixed(9); document.getElementById('m_lon_dd').value = lon.toFixed(9); window.m_sync('lat','dd'); window.m_sync('lon','dd'); window.m_run(); }
-    if(window.activeApp === 5) { document.getElementById('g_lat_dd').value = lat.toFixed(9); document.getElementById('g_lon_dd').value = lon.toFixed(9); window.g_sync('lat','dd'); window.g_sync('lon','dd'); window.g_run(); }
+    if (window.activeApp === 1) { document.getElementById('v2_lat_dd').value = lat.toFixed(9); document.getElementById('v2_lon_dd').value = lon.toFixed(9); window.v2_sync('lat','dd'); window.v2_sync('lon','dd'); window.v2_run(); }
+    if (window.activeApp === 2) { window.autoDetectZone(lon); document.getElementById('m_lat_dd').value = lat.toFixed(9); document.getElementById('m_lon_dd').value = lon.toFixed(9); window.m_sync('lat','dd'); window.m_sync('lon','dd'); window.m_run(); }
+    if (window.activeApp === 5) { document.getElementById('g_lat_dd').value = lat.toFixed(9); document.getElementById('g_lon_dd').value = lon.toFixed(9); window.g_sync('lat','dd'); window.g_sync('lon','dd'); window.g_run(); }
 
-    if(window.activeApp !== 0 && window.activeApp !== 7 && window.leafletMap) {
-        if(!window.markerCurrent) {
+    if (window.activeApp !== 0 && window.activeApp !== 7 && window.leafletMap) {
+        if (!window.markerCurrent) {
             let currIcon = L.divIcon({
                 className: '', iconSize: [50, 50], iconAnchor: [25, 25],
                 html: `<div id="gps-heading-cone" style="width: 50px; height: 50px; transform: rotate(${window.compassAzimuth||0}deg); transform-origin: center center; transition: transform 0.1s ease-out;"><svg width="50" height="50" viewBox="0 0 50 50"><path d="M25,25 L10,0 A25,25 0 0,1 40,0 Z" fill="url(#gradCone)" opacity="0.5" /><circle cx="25" cy="25" r="6" fill="#2563eb" stroke="white" stroke-width="2.5" /><defs><linearGradient id="gradCone" x1="0%" y1="100%" x2="0%" y2="0%"><stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" /><stop offset="100%" style="stop-color:#60a5fa;stop-opacity:0" /></linearGradient></defs></svg></div>`
@@ -313,17 +479,17 @@ window.onNativeGPSUpdate = function(d) {
         } else {
             window.markerCurrent.setLatLng([window.currentLat, window.currentLon]);
         }
-        if(window.isAutoCenter) {
-            if(!window.targetPoint || window.activeApp !== 3) { window.leafletMap.panTo([window.currentLat, window.currentLon]); }
+        if (window.isAutoCenter) {
+            if (!window.targetPoint || window.activeApp !== 3) { window.leafletMap.panTo([window.currentLat, window.currentLon]); }
             else { let bounds = L.latLngBounds([window.currentLat, window.currentLon], [window.targetPoint.lat, window.targetPoint.lon]); window.leafletMap.fitBounds(bounds, {padding: [50, 50], maxZoom: 24}); }
         }
-        if(window.targetPoint && window.activeApp === 3) { window.updateSetOut(); }
+        if (window.targetPoint && window.activeApp === 3) { window.updateSetOut(); }
     }
 };
 
 window.onCompassUpdate = function(azimuth) {
     window.compassAzimuth = azimuth;
-    if(window.activeApp === 3 && window.targetPoint) window.updateSetOut();
+    if (window.activeApp === 3 && window.targetPoint) window.updateSetOut();
     let headingElement = document.getElementById('gps-heading-cone');
     if (headingElement) { headingElement.style.transform = `rotate(${azimuth}deg)`; }
 };
@@ -331,34 +497,54 @@ window.onCompassUpdate = function(azimuth) {
 // ==========================================
 // --- Z (MSL) & POLE/BM LOGIC ---
 // ==========================================
-function updateZDisplay(t) { if (!window.currentRawAlt) return; let finalZ = window.currentRawAlt - window.currentGeoidN - window.appliedPoleH; if (window.isBMMode) { finalZ += window.zOffset; } window.latest_Z = finalZ; if (window.activeApp === 1 || window.activeApp === 2 || window.activeApp === 5) { let zb = document.getElementById(t+'_z_val'); let modeText = window.isBMMode ? "Z (BM Mode)" : window.appliedPoleH > 0 ? `MSL (Pole -${window.appliedPoleH}m)` : `MSL (${window.currentGeoidModel})`; window.globalZText = `${modeText}: ${finalZ.toFixed(3)} m`; if (zb) { zb.innerText = window.globalZText; zb.style.color = window.isBMMode ? "#dc2626" : (window.activeApp === 5 ? "#0f766e" : "#059669"); } } }
-window.applyPole = function(val) { window.appliedPoleH = parseFloat(val) || 0; document.getElementById('v2_pole_val').value = document.getElementById('m_pole_val').value = document.getElementById('g_pole_val').value = val; updateZDisplay('v2'); updateZDisplay('m'); updateZDisplay('g'); };
-window.setBM = function(t) { let p_val = document.getElementById(t+'_pole_val').value; let b_val = document.getElementById(t+'_bm_val').value; if (b_val === '') return alert("Please enter a Benchmark (BM) value to SET!"); if (!window.isNativeGPSActive) return alert("Start GPS first!"); if (!window.currentRawAlt) return alert("Waiting for GPS Altitude..."); document.getElementById('v2_pole_val').value = document.getElementById('m_pole_val').value = document.getElementById('g_pole_val').value = p_val; document.getElementById('v2_bm_val').value = document.getElementById('m_bm_val').value = document.getElementById('g_bm_val').value = b_val; window.appliedPoleH = parseFloat(p_val) || 0; let bmValue = parseFloat(b_val); if (isNaN(bmValue)) return alert("Invalid BM value!"); window.zOffset = bmValue - (window.currentRawAlt - window.currentGeoidN - window.appliedPoleH); window.isBMMode = true; updateZDisplay(t); alert("Benchmark Calibration Successful!"); };
-window.resetBM = function(t) { window.appliedPoleH = 0; window.zOffset = 0; window.isBMMode = false; document.getElementById('v2_pole_val').value = ''; document.getElementById('m_pole_val').value = ''; document.getElementById('g_pole_val').value = ''; document.getElementById('v2_bm_val').value = ''; document.getElementById('m_bm_val').value = ''; document.getElementById('g_bm_val').value = ''; updateZDisplay(t); };
+function updateZDisplay(t) { 
+    if (!window.currentRawAlt) return; 
+    let finalZ = window.currentRawAlt - window.currentGeoidN - window.appliedPoleH; 
+    if (window.isBMMode) { finalZ += window.zOffset; } 
+    window.latest_Z = finalZ; 
+    
+    if (window.activeApp === 1 || window.activeApp === 2 || window.activeApp === 5) { 
+        let zb = document.getElementById(t+'_z_val'); 
+        let modeText = window.isBMMode ? "Z (BM Mode)" : window.appliedPoleH > 0 ? `MSL (Pole -${window.appliedPoleH}m)` : `MSL (${window.currentGeoidModel})`; 
+        window.globalZText = `${modeText}: ${finalZ.toFixed(3)} m`; 
+        if (zb) { zb.innerText = window.globalZText; zb.style.color = window.isBMMode ? "#dc2626" : (window.activeApp === 5 ? "#0f766e" : "#059669"); } 
+    } 
+}
 
-// ==========================================
-// --- SYSTEM BACK BUTTON & MODALS LOGIC ---
-// ==========================================
-
-window.openAbout = function() { document.getElementById('aboutModal').style.display='flex'; history.pushState({modal: true}, "Modal", ""); };
-window.closeAbout = function() {
-    if(document.getElementById('aboutModal').style.display === 'flex') {
-        history.back(); // 🔴 ဒီလိုရေးမှ ဖုန်း Back နှိပ်သလို သဘောသက်ရောက်ပြီး History အပိုတွေ မကျန်တော့မှာပါ
-    }
+window.applyPole = function(val) { 
+    window.appliedPoleH = parseFloat(val) || 0; 
+    document.getElementById('v2_pole_val').value = document.getElementById('m_pole_val').value = document.getElementById('g_pole_val').value = val; 
+    updateZDisplay('v2'); updateZDisplay('m'); updateZDisplay('g'); 
 };
 
-window.openPlayStore = function() {
-    if(window.AndroidNative && window.AndroidNative.openPlayStore) {
-        window.AndroidNative.openPlayStore();
-    } else {
-        window.open("https://play.google.com/store/apps/details?id=com.winaung.svy21converter", "_blank");
-    }
+window.setBM = function(t) { 
+    let p_val = document.getElementById(t+'_pole_val').value; 
+    let b_val = document.getElementById(t+'_bm_val').value; 
+    if (b_val === '') return alert("Please enter a Benchmark (BM) value to SET!"); 
+    if (!window.isNativeGPSActive) return alert("Start GPS first!"); 
+    if (!window.currentRawAlt) return alert("Waiting for GPS Altitude..."); 
+    
+    document.getElementById('v2_pole_val').value = document.getElementById('m_pole_val').value = document.getElementById('g_pole_val').value = p_val; 
+    document.getElementById('v2_bm_val').value = document.getElementById('m_bm_val').value = document.getElementById('g_bm_val').value = b_val; 
+    
+    window.appliedPoleH = parseFloat(p_val) || 0; 
+    let bmValue = parseFloat(b_val); 
+    if (isNaN(bmValue)) return alert("Invalid BM value!"); 
+    
+    window.zOffset = bmValue - (window.currentRawAlt - window.currentGeoidN - window.appliedPoleH); 
+    window.isBMMode = true; 
+    updateZDisplay(t); alert("Benchmark Calibration Successful!"); 
+};
+
+window.resetBM = function(t) { 
+    window.appliedPoleH = 0; window.zOffset = 0; window.isBMMode = false; 
+    document.getElementById('v2_pole_val').value = ''; document.getElementById('m_pole_val').value = ''; document.getElementById('g_pole_val').value = ''; 
+    document.getElementById('v2_bm_val').value = ''; document.getElementById('m_bm_val').value = ''; document.getElementById('g_bm_val').value = ''; 
+    updateZDisplay(t); 
 };
 
 window.addEventListener("popstate", function(e) {
-    // 🔴 ဤစာကြောင်းသည် Ghost Event (State မပါဘဲ Auto ပြန်ထွက်ခြင်း) ကို တားဆီးပေးပါမည်
     if (!e.state) return; 
-
     let modals = document.querySelectorAll('.modal');
     let modalClosed = false;
     modals.forEach(m => {
@@ -385,12 +571,8 @@ window.addEventListener("popstate", function(e) {
 // --- GPS TRACKING & ROUTE MANAGER (IndexedDB) ---
 // ==========================================
 
-window.isTrackingGPS = false;
-window.currentTrackCoords = [];
-window.activeTrackLine = null;
-window.renderedSavedTracks = {};
-window.trackDB = null;
-
+// 🔴 ဒီစာကြောင်းလေးကို အသစ်ထည့်ပေးလိုက်ပါ
+window.renderedSavedTracks = {}; 
 window.getTrackColor = function() {
     let inp = document.getElementById('track_color_input') || document.getElementById('track_save_color_input');
     return (inp && inp.value) ? inp.value : (localStorage.getItem('pref_track_color') || '#3b82f6');
@@ -409,23 +591,32 @@ window.onTrackColorChange = function(color) {
     window.syncTrackColorInputs(color);
 };
 
-// ၁။ Database တည်ဆောက်ခြင်း
+// ၁။ Database တည်ဆောက်ခြင်း (ပိုမို ခိုင်မာသော စနစ်)
 const initTrackDB = () => {
-    let request = indexedDB.open("SurveyProDB", 1);
+    let request = indexedDB.open("GPSConverterTrackDB", 1);
+    
     request.onupgradeneeded = (e) => {
         let db = e.target.result;
         if (!db.objectStoreNames.contains("tracks")) {
             db.createObjectStore("tracks", { keyPath: "id" });
         }
     };
+    
     request.onsuccess = (e) => {
         window.trackDB = e.target.result;
-        window.loadTracksFromDB();
+        // DB ရပြီဆိုတာနဲ့ ရှိပြီးသား Track တွေကို အရင်ဆုံး လှမ်းခေါ်ပြမယ်
+        if (typeof window.loadTracksFromDB === 'function') {
+            window.loadTracksFromDB();
+        }
+    };
+    
+    request.onerror = (e) => {
+        console.error("Track Database Error:", e.target.error);
     };
 };
+// Page Load ဖြစ်တာနဲ့ DB ကို စတင်ခေါ်မည်
 initTrackDB();
 
-// ၂။ Start/Stop ခလုတ် နှိပ်သောအခါ
 window.toggleTracking = function() {
     if (!window.isNativeGPSActive) return alert("⚠️ Please start GPS tracking first!");
     
@@ -434,16 +625,16 @@ window.toggleTracking = function() {
     
     if (window.isTrackingGPS) {
         alert("✅ Route Tracking Started!"); 
-        btn.innerHTML = "⏹️"; // 🔴 ရပ်ရန် ခလုတ်ပြောင်းမည်
+        btn.innerHTML = "⏹️"; 
         btn.style.background = "#ef4444";
         btn.style.borderColor = "#b91c1c";
         
         window.currentTrackCoords = [];
-        if(window.activeTrackLine && window.leafletMap) window.leafletMap.removeLayer(window.activeTrackLine);
+        if (window.activeTrackLine && window.leafletMap) window.leafletMap.removeLayer(window.activeTrackLine);
         let trackColor = window.getTrackColor();
         window.activeTrackLine = L.polyline([], {color: trackColor, weight: 4, opacity: 0.8}).addTo(window.leafletMap);
     } else {
-        btn.innerHTML = "👣"; // 🔴 ခြေရာပုံ ပြန်ပြောင်းမည်
+        btn.innerHTML = "👣"; 
         btn.style.background = "#3b82f6";
         btn.style.borderColor = "#2563eb";
         
@@ -461,7 +652,6 @@ window.toggleTracking = function() {
     }
 };
 
-// ၃။ GPS Data အသစ်ဝင်လာတိုင်း ကြားဖြတ်ဖမ်းယူခြင်း (Distance Filter ပါဝင်သည်)
 let originalGPSUpdateHook = window.onNativeGPSUpdate;
 window.onNativeGPSUpdate = function(d) {
     if(typeof originalGPSUpdateHook === 'function') originalGPSUpdateHook(d);
@@ -470,7 +660,6 @@ window.onNativeGPSUpdate = function(d) {
         let pts = window.currentTrackCoords;
         let shouldAdd = true;
         
-        // နောက်ဆုံးမှတ်နှင့် ၂ မီတာ ကွာမှသာ အမှတ်သစ်မှတ်မည်
         if (pts.length > 0) {
             let lastPt = pts[pts.length - 1];
             let dist = calcDistance(lastPt[0], lastPt[1], window.currentLat, window.currentLon);
@@ -484,7 +673,6 @@ window.onNativeGPSUpdate = function(d) {
     }
 };
 
-// ၄။ Popup တွင် Save/Discard လုပ်ခြင်း
 window.cancelSaveTrack = function() {
     document.getElementById('saveTrackModal').style.display = 'none';
     if(window.activeTrackLine && window.leafletMap) window.leafletMap.removeLayer(window.activeTrackLine);
@@ -494,28 +682,53 @@ window.cancelSaveTrack = function() {
 window.confirmSaveTrack = function() {
     let nameInp = document.getElementById('track_name_input').value.trim();
     let name = nameInp ? nameInp : `Track_${new Date().getHours()}${new Date().getMinutes()}`;
+    let trackId = new Date().getTime().toString();
     
     let trackObj = {
-        id: new Date().getTime().toString(),
+        id: trackId,
         name: name,
         date: new Date().toLocaleString(),
         color: window.getTrackColor(),
         coords: [...window.currentTrackCoords] 
     };
     
-    let tx = window.trackDB.transaction(["tracks"], "readwrite");
-    let store = tx.objectStore("tracks");
-    store.add(trackObj);
-    
-    tx.oncomplete = () => {
-        window.cancelSaveTrack(); 
-        document.getElementById('track_name_input').value = "";
-        window.loadTracksFromDB();
-        alert("Track saved successfully!");
-    };
+    // ချက်ချင်း Modal ပိတ်ပြီး ယာယီမျဉ်းကို ဖျောက်မည်
+    document.getElementById('saveTrackModal').style.display = 'none';
+    if (window.activeTrackLine && window.leafletMap) window.leafletMap.removeLayer(window.activeTrackLine);
+    window.currentTrackCoords = [];
+
+    if (!window.trackDB) {
+        alert("⚠️ Database is not ready. Please try again.");
+        return;
+    }
+
+    try {
+        let tx = window.trackDB.transaction(["tracks"], "readwrite");
+        let store = tx.objectStore("tracks");
+        store.add(trackObj);
+        
+        tx.oncomplete = () => {
+            document.getElementById('track_name_input').value = "";
+            window.loadTracksFromDB(); // ဇယားကို အသစ်ပြန်ခေါ်မည်
+            
+            // 🔴 ဖြည့်စွက်ချက်: Save ပြီးတာနဲ့ မြေပုံပေါ်မှာ ချက်ချင်း အလိုအလျောက် ပြန်ပေါ်လာအောင် လုပ်ပေးမည်
+            setTimeout(() => {
+                let trackPanel = document.getElementById('track_manager_panel');
+                if (trackPanel) trackPanel.style.display = 'block'; // Panel ကို အတင်းဖော်မည်
+                
+                // မြေပုံပေါ် Auto ဆွဲတင်မည်
+                if (typeof window.toggleTrackOnMap === 'function') {
+                    window.toggleTrackOnMap(trackId);
+                }
+            }, 300);
+
+            alert("✅ Track saved successfully!");
+        };
+    } catch (e) {
+        alert("⚠️ Error saving track: " + e.message);
+    }
 };
 
-// ၅။ Database မှ Data များပြန်ခေါ်၍ ဇယားဆွဲခြင်း
 window.loadTracksFromDB = function() {
     if (!window.trackDB) return;
     let tx = window.trackDB.transaction(["tracks"], "readonly");
@@ -539,32 +752,34 @@ window.renderTrackListUI = function() {
     
     let html = '';
     window.allSavedTracks.forEach(t => {
-        let isShowing = window.renderedSavedTracks[t.id] !== undefined;
+        // Track လေးတွေက Map ပေါ်မှာ ပြနေသလား စစ်မယ်
+        let isShowing = window.renderedSavedTracks && window.renderedSavedTracks[t.id] !== undefined;
         let btnColor = isShowing ? "#f59e0b" : "#10b981";
         let btnText = isShowing ? "🚫 Hide" : "👁️ Show";
         let trackColor = t.color || '#8b5cf6';
         
+        // 🔴 ဖုန်း Screen အသေးတွေမှာပါ သပ်သပ်ရပ်ရပ် ပေါ်အောင် Style ကို သေချာပြင်ထားပါတယ်
         html += `
-        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--input-border); padding:5px 0;">
-            <div style="flex:1; display:flex; align-items:center; gap:6px;">
-                <span style="display:inline-block; width:12px; height:12px; border-radius:50%; background:${trackColor}; border:1px solid rgba(0,0,0,0.2); flex-shrink:0;"></span>
-                <div>
-                    <b style="color:var(--primary); font-size:12px;">${t.name}</b><br>
-                    <span style="font-size:10px; color:var(--label-text);">${t.date} | Pts: ${t.coords.length}</span>
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--input-border); padding:8px 5px;">
+            <div style="flex:1; display:flex; align-items:center; gap:8px;">
+                <span style="display:inline-block; width:14px; height:14px; border-radius:50%; background:${trackColor}; border:1.5px solid rgba(0,0,0,0.3); flex-shrink:0;"></span>
+                <div style="line-height:1.3;">
+                    <b style="color:var(--primary); font-size:13px;">${t.name}</b><br>
+                    <span style="font-size:10px; color:var(--label-text);">${t.date} | Pts: ${t.coords ? t.coords.length : 0}</span>
                 </div>
             </div>
-            <div style="display:flex; gap:5px;">
-                <button class="top-btn" style="background:${btnColor}; color:white; padding:4px 8px; font-size:11px;" onclick="toggleTrackOnMap('${t.id}')">${btnText}</button>
-                <button class="top-btn" style="background:#ef4444; color:white; padding:4px 8px; font-size:11px;" onclick="deleteTrack('${t.id}')">🗑️</button>
+            <div style="display:flex; gap:6px;">
+                <button class="top-btn" style="background:${btnColor}; color:white; padding:5px 10px; font-size:11px;" onclick="toggleTrackOnMap('${t.id}')">${btnText}</button>
+                <button class="top-btn" style="background:#ef4444; color:white; padding:5px 10px; font-size:11px;" onclick="deleteTrack('${t.id}')">🗑️</button>
             </div>
         </div>`;
     });
     listDiv.innerHTML = html;
 };
 
-// ၆။ မြေပုံပေါ်တွင် လမ်းကြောင်း ဖော်ခြင်း/ဖျောက်ခြင်း
 window.toggleTrackOnMap = function(id) {
-    let track = window.allSavedTracks.find(t => t.id === id);
+    // 🔴 ပြင်ဆင်ချက်: Number နဲ့ String ပြဿနာမတက်အောင် String() ခံပြီး ရှာမည်
+    let track = window.allSavedTracks.find(t => String(t.id) === String(id));
     if (!track) return;
 
     if (window.renderedSavedTracks[id]) {
@@ -584,12 +799,18 @@ window.toggleTrackOnMap = function(id) {
 
 window.deleteTrack = function(id) {
     if(!confirm("Delete this track?")) return;
+    
     if (window.renderedSavedTracks[id]) {
         window.leafletMap.removeLayer(window.renderedSavedTracks[id]);
         delete window.renderedSavedTracks[id];
     }
+    
+    // 🔴 ပြင်ဆင်ချက်: Database ထဲက မူရင်း ID Type အမှန် (Number လား String လား) ကို ပြန်ရှာပြီးမှ ဖျက်မည်
+    let exactTrack = window.allSavedTracks.find(t => String(t.id) === String(id));
+    if (!exactTrack) return;
+
     let tx = window.trackDB.transaction(["tracks"], "readwrite");
-    tx.objectStore("tracks").delete(id);
+    tx.objectStore("tracks").delete(exactTrack.id);
     tx.oncomplete = () => window.loadTracksFromDB();
 };
 
@@ -602,30 +823,18 @@ window.clearAllTracks = function() {
     tx.oncomplete = () => window.loadTracksFromDB();
 };
 
-// ၇။ KML Export
 window.exportTrackToKML = function() {
     if (!window.allSavedTracks || window.allSavedTracks.length === 0) return alert("No tracks to export!");
     
-    let kmlString = `<?xml version="1.0" encoding="UTF-8"?>
-<kml xmlns="http://www.opengis.net/kml/2.2">
-<Document>
-<name>SurveyPro_Tracks</name>
-<description>Exported GPS Tracks</description>`;
+    let kmlString = `<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2">\n<Document>\n<name>GPS_Converter_Tracks</name>\n<description>Exported GPS Tracks</description>`;
 
     window.allSavedTracks.forEach(t => {
         let coordsStr = t.coords.map(c => `${c[1]},${c[0]},0`).join(" ");
-        kmlString += `
-<Placemark>
-  <name>${t.name}</name>
-  <description>Recorded: ${t.date}</description>
-  <LineString>
-    <coordinates>${coordsStr}</coordinates>
-  </LineString>
-</Placemark>`;
+        kmlString += `\n<Placemark>\n  <name>${t.name}</name>\n  <description>Recorded: ${t.date}</description>\n  <LineString>\n    <coordinates>${coordsStr}</coordinates>\n  </LineString>\n</Placemark>`;
     });
     kmlString += `\n</Document>\n</kml>`;
     
-    let fileName = `SurveyPro_Tracks_${new Date().getTime()}.kml`;
+    let fileName = `GPS_Converter_Tracks_${new Date().getTime()}.kml`;
     if (window.AndroidNative && window.AndroidNative.downloadConvertedKML) {
         window.AndroidNative.downloadConvertedKML(kmlString, fileName);
     } else {
@@ -635,27 +844,22 @@ window.exportTrackToKML = function() {
     }
 };
 
-// ၈။ UI အဖွင့်အပိတ်များကို ကြားဖြတ်ထိန်းချုပ်ခြင်း (Map View တွင်သာ ပေါ်ရန် ပြင်ဆင်ချက်)
 window.updateTrackUIVisibility = function() {
     let n = window.activeApp;
     let trackPanel = document.getElementById('track_manager_panel');
     let trackBtn = document.getElementById('trackBtn');
     
-    // Map View ပွင့်နေသလား စစ်ဆေးခြင်း
     let mapContainer = document.getElementById('shared_map_view');
     let isMapView = mapContainer && !mapContainer.classList.contains('hidden');
 
     if(trackPanel) {
-        // App 1, 2, 5 ဖြစ်ပြီး Map View ပွင့်နေမှသာ ဇယားပြမည်
         trackPanel.style.display = ((n === 1 || n === 2 || n === 5) && isMapView) ? 'block' : 'none';
     }
     if(trackBtn) {
-        // App 1, 2, 5 တွင် GPS ဖွင့်ထားပြီး Map View ဖြစ်နေမှသာ Track ခလုတ်ပြမည် (SO နှင့် DXF တွင် ဖြုတ်ထားသည်)
         trackBtn.style.display = ((n === 1 || n === 2 || n === 5) && window.isNativeGPSActive && isMapView) ? 'block' : 'none';
     }
 };
 
-// မူလ Function များကို ကြားဖြတ် ချိတ်ဆက်ခြင်း
 let hookSwitchAppForTrack = window.switchApp;
 window.switchApp = function(n) {
     if(typeof hookSwitchAppForTrack === 'function') hookSwitchAppForTrack(n);

@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Win Aung - Survey Pro</title>
+    <title>Win Aung - GPS Converter</title>
     <link rel="stylesheet" href="leaflet.css"/>
     <script src="leaflet.js"></script>
     <script src="https://unpkg.com/dxf-parser/dist/dxf-parser.js"></script>
@@ -20,19 +20,15 @@
             });
         }
     </script>
-<script src="https://unpkg.com/dxf-parser/dist/dxf-parser.js"></script>
+
     <!-- 🔴 အသစ်ထည့်ရန်: လုံးဝ Error ကင်းသော 3D Triangulation Library -->
     <script src="https://unpkg.com/delaunator@5.0.0/delaunator.min.js"></script>
-    <link rel="stylesheet" href="style.css">
-    <!-- 🔴 အသစ်ထည့်ရန်: Camera မှ စာဖတ်ရန် OCR AI Library -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
-    <link rel="stylesheet" href="style.css">
-   <script>
+      <script>
   // 🔴 ပိုမိုသေချာသော လမ်းကြောင်းလွှဲ Logic (Sub-folder ကော Cache ပါ ကျော်ဖြတ်နိုင်ရန်)
-    if (window.location.hostname !== "gpsconverter.site" && window.location.hostname !== "localhost") {
+    // if (window.location.hostname !== "gpsconverter.site" && window.location.hostname !== "localhost") {
     // လက်ရှိ ဝင်ထားတဲ့ Domain က gpsconverter.site မဟုတ်ရင် (github.io ဖြစ်နေရင်) Custom Domain ဆီ အတင်းလွှဲမည်
-     window.location.replace("https://gpsconverter.site/");
-    }
+     // window.location.replace("https://gpsconverter.site/");
+    // }
 </script>
 <!-- 🔴 3D Surface Rendering အတွက် Plotly.js -->
     <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
@@ -143,10 +139,11 @@
             <div class="card-body">
                 <div id="v2_gps_box" class="gps-box hidden">
                     <div class="gps-row"><span style="font-size:11px;font-weight:bold;color:#10b981;">Tracking Mode ON</span></div>
-                    <div class="gps-row">
-                        <span id="v2_gps_stat" class="gps-status">H.Acc: --</span>
+                    <div class="gps-row" style="display:flex; gap:5px; width: 100%;">
+                        <span id="v2_gps_stat" class="gps-status" style="flex:1; margin:0;">H.Acc: --</span>
+                        <span id="v2_v_acc" class="gps-status" style="flex:1; margin:0; background:#3b82f6;">V.Acc: --</span>
+                        <span id="v2_sat" class="gps-status" style="flex:0.8; margin:0; background:#8b5cf6;">🛰️ Sat: --</span>
                     </div>
-                    <div class="gps-row"><span id="v2_dop_info" class="gps-status" style="background:#3b82f6;">PDOP: -- | VDOP: --</span></div>
                     <div class="z-badge" id="v2_z_val">MSL: --.--- m</div>
                     <div class="geoid-text" id="v2_raw_alt" style="color:#d97706; font-weight:bold;">Raw GPS Alt: --.--- m</div>
                     <div class="geoid-text" id="v2_geoid_val">Geoid (N): --.--- m</div>
@@ -190,10 +187,11 @@
             <div class="card-body">
                 <div id="m_gps_box" class="gps-box hidden">
                     <div class="gps-row"><span style="font-size:11px;font-weight:bold;color:#10b981;">Tracking Mode ON</span></div>
-                    <div class="gps-row">
-                        <span id="m_gps_stat" class="gps-status">H.Acc: --</span>
+                    <div class="gps-row" style="display:flex; gap:5px; width: 100%;">
+                        <span id="m_gps_stat" class="gps-status" style="flex:1; margin:0;">H.Acc: --</span>
+                        <span id="m_v_acc" class="gps-status" style="flex:1; margin:0; background:#3b82f6;">V.Acc: --</span>
+                        <span id="m_sat" class="gps-status" style="flex:0.8; margin:0; background:#8b5cf6;">🛰️ Sat: --</span>
                     </div>
-                    <div class="gps-row"><span id="m_dop_info" class="gps-status" style="background:#3b82f6;">PDOP: -- | VDOP: --</span></div>
                     <div class="z-badge" id="m_z_val">MSL: --.--- m</div>
                     <div class="geoid-text" id="m_raw_alt" style="color:#d97706; font-weight:bold;">Raw GPS Alt: --.--- m</div>
                     <div class="geoid-text" id="m_geoid_val">Geoid (N): --.--- m</div>
@@ -241,10 +239,11 @@
             <div class="card-body">
                 <div id="g_gps_box" class="gps-box hidden">
                     <div class="gps-row"><span style="font-size:11px;font-weight:bold;color:#10b981;">Tracking Mode ON</span></div>
-                    <div class="gps-row">
-                        <span id="g_gps_stat" class="gps-status">H.Acc: --</span>
+                    <div class="gps-row" style="display:flex; gap:5px; width: 100%;">
+                        <span id="g_gps_stat" class="gps-status" style="flex:1; margin:0;">H.Acc: --</span>
+                        <span id="g_v_acc" class="gps-status" style="flex:1; margin:0; background:#3b82f6;">V.Acc: --</span>
+                        <span id="g_sat" class="gps-status" style="flex:0.8; margin:0; background:#8b5cf6;">🛰️ Sat: --</span>
                     </div>
-                    <div class="gps-row"><span id="g_dop_info" class="gps-status" style="background:#3b82f6;">PDOP: -- | VDOP: --</span></div>
                     <div class="z-badge" id="g_z_val" style="color:#0f766e; border-color:rgba(15,118,110,0.3); background:rgba(15,118,110,0.1);">MSL: --.--- m</div>
                     <div class="geoid-text" id="g_raw_alt" style="color:#d97706; font-weight:bold;">Raw GPS Alt: --.--- m</div>
                     <div class="geoid-text" id="g_geoid_val">Geoid (N): --.--- m</div>
@@ -343,6 +342,13 @@
                     <button class="btn-action" style="background:#ef4444; flex:0.4; padding:12px; height:max-content;" onclick="stopNavigation()">🛑 Stop</button>
                 </div>
                 <div class="setout-panel" style="margin-top:10px;">
+                    <!-- 🔴 အသစ်ထည့်ထားသော Set Out GPS Status -->
+                    <div style="display:flex; gap:5px; margin-bottom:10px; justify-content:center;">
+                        <span id="so_gps_stat" class="gps-status" style="margin:0; padding:3px 8px; font-size:11px;">H.Acc: --</span>
+                        <span id="so_v_acc" class="gps-status" style="margin:0; padding:3px 8px; font-size:11px; background:#3b82f6;">V.Acc: --</span>
+                        <span id="so_sat" class="gps-status" style="margin:0; padding:3px 8px; font-size:11px; background:#8b5cf6;">🛰️ Sat: --</span>
+                    </div>
+                    
                     <div style="font-size:14px;font-weight:bold;color:var(--label-text);" id="so_guidance_text">Waiting for Target...</div>
                     <div class="dist-text" id="so_dist">0.000 m</div>
                     <div class="arrow-box"><div class="arrow-icon" id="so_arrow">⬆</div></div>
@@ -433,11 +439,12 @@
                         <div style="border-top:1px dashed var(--input-border); margin-top:15px; padding-top:15px;">
                             <div style="font-size:12px; color:var(--label-text); margin-bottom:8px; font-weight:bold;">2. Select Points from Map or List (Min: 3)</div>
                             <div id="area_point_list" class="area-point-list"><p style="text-align:center; opacity:0.5; font-size:12px; margin: 10px 0;">No Set Out points available. Load CSV first.</p></div>
-                            <div id="area_selected_order" style="margin-top:8px; font-size:12px; font-weight:bold; color:#1e40af; word-wrap: break-word;">Selected: <span id="area_order_text" style="color:#ef4444;">None</span></div>
-                            <div style="display:flex; gap:5px; margin-top:10px;">
-                                <button class="btn-action" style="flex:1; padding:12px; font-size:13px; background:#10b981;" onclick="calculateAreaFromSelection()">📊 Calculate Area</button>
-                                <button class="btn-action" style="flex:0.5; padding:12px; font-size:13px; background:#ef4444;" onclick="clearAreaCalc()">🛑 Stop</button>
-                            </div>
+                            <div id="area_selected_order" style="margin-top:8px; font-size:12px; line-height:1.5; font-weight:bold; color:#1e40af; word-wrap: break-word; background: #f1f5f9; padding: 8px; border-radius: 6px; border: 1px solid #cbd5e1; max-height: 48px; overflow-y: auto;">
+    Selected: <span id="area_order_text" style="color:#ef4444;">None</span>
+</div>
+                           <div style="margin-top:10px;">
+    <button class="btn-action" style="width:100%; padding:12px; font-size:13px; background:#ef4444;" onclick="clearAreaCalc()">🗑️ Clear Area Selection</button>
+</div>
                             <div id="area_result_box" class="hidden" style="margin-top:10px; background:rgba(16, 185, 129, 0.1); border:1px solid #10b981; padding:10px; border-radius:8px;">
                                 <div style="font-size:13px; font-weight:bold; color:#059669; text-align:center; margin-bottom:8px;">✅ Area Results</div>
                                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px; font-size:12px; font-weight:bold; color:var(--text);">
@@ -1044,15 +1051,24 @@
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_dxf_lines" checked onchange="toggleDxfLayers()"> 〰️ Dxf Lines</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_dxf_texts" checked onchange="toggleDxfLayers()"> 🔠 Dxf Text</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_so_pts" checked onchange="toggleDxfLayers()"> 🎯 SO Pts</label>
-                    <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_so_texts" checked onchange="toggleDxfLayers()"> 🔠 SO Text</label>
+                    
+                    <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_so_texts" checked onchange="if(typeof updateMapPointTexts==='function') updateMapPointTexts()"> 🔠 SO Text</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_topo_pts" checked onchange="if(typeof toggleTopoLayers==='function') toggleTopoLayers()"> ⛰️ Topo Pts</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_topo_contours" checked onchange="if(typeof toggleTopoLayers==='function') toggleTopoLayers()"> 〰️ Contours</label>
+                    
                     <label style="font-size:12px; font-weight:bold; cursor:pointer;"><input type="checkbox" id="tgl_topo_tin" onchange="if(typeof toggleTopoLayers==='function') toggleTopoLayers()"> 🔺 TIN Surface</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer; color:#8b5cf6;"><input type="checkbox" id="tgl_show_pt_name" onchange="if(typeof updateMapPointTexts==='function') updateMapPointTexts()"> 🔤 Topo Name</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer; color:#059669;"><input type="checkbox" id="tgl_show_z_val" onchange="if(typeof updateMapPointTexts==='function') updateMapPointTexts()"> ↕️ Topo Z Val</label>
+                    
                     <label style="font-size:12px; font-weight:bold; cursor:pointer; color:#ea580c;"><input type="checkbox" id="tgl_surf2_pts" checked onchange="if(typeof toggleTopoLayers==='function') toggleTopoLayers()"> 🟠 Surf-2 Pts</label> 
                     <label style="font-size:12px; font-weight:bold; cursor:pointer; color:#0ea5e9;"><input type="checkbox" id="tgl_vol_bdys" checked onchange="if(typeof toggleVolBdyLayer==='function') toggleVolBdyLayer()"> 🟦 Vol BDYs</label>
                     <label style="font-size:12px; font-weight:bold; cursor:pointer; color:#2563eb;"><input type="checkbox" id="tgl_utm_zones" onchange="if(typeof toggleUTMZones==='function') toggleUTMZones()"> 🌐 UTM Zones</label>
+                    <label style="font-size:12px; font-weight:bold; cursor:pointer; color:#ef4444;"><input type="checkbox" id="tgl_equator" onchange="if(typeof toggleEquator==='function') toggleEquator()"> ➖ Equator Line</label>
+                    
+                    <!-- 🔴 အသစ်ထည့်ထားသော GPS အမှတ်နှင့် နာမည် အဖွင့်အပိတ် Checkbox (၂) ခု -->
+                    <label style="font-size:12px; font-weight:bold; cursor:pointer; color:#b91c1c;"><input type="checkbox" id="tgl_gps_pts" checked onchange="if(typeof toggleDxfLayers==='function') toggleDxfLayers()"> 📍 GPS Pts</label>
+                    <label style="font-size:12px; font-weight:bold; cursor:pointer; color:#d97706;"><input type="checkbox" id="tgl_gps_name" checked onchange="if(typeof updateMapPointTexts==='function') updateMapPointTexts()"> 🔤 GPS Name</label>
+                    
                     <label style="font-size:12px; font-weight:bold; cursor:pointer; grid-column: 1 / -1; border-top:1px dashed #ccc; padding-top:6px;"><input type="checkbox" id="tgl_dxf_dark" onchange="reRenderDXFColors()"> 🌙 Use Dark Colors for DXF</label>
                 </div>
                 <div class="map-wrapper" id="map_container">
@@ -1184,8 +1200,17 @@
                 <li style="margin-bottom: 5px;">📷 <b>Survey Camera:</b> Take photos with embedded GPS & Datum watermarks.</li>
             </ul>
 
-            <div style="text-align: center; margin-bottom: 10px;">
-                <button class="btn-action" style="background:#f59e0b; padding:10px 15px; font-size:13px;" onclick="window.open('https://play.google.com/store/apps/details?id=com.winaung.svy21converter', '_blank')">⭐ Rate Us on Play Store</button>
+            <!-- ခလုတ်များ နေရာ -->
+            <div style="text-align: center; margin-bottom: 10px; display:flex; flex-direction:column; gap:8px;">
+                <button class="btn-action" style="background:#f59e0b; width:100%; padding:10px 15px; font-size:13px;" onclick="window.open('https://play.google.com/store/apps/details?id=com.winaung.svy21converter', '_blank')">⭐ Rate Us on Play Store</button>
+                
+                <div style="display:flex; gap:8px; width:100%;">
+                    <!-- YouTube Link အစစ် ထည့်သွင်းပြီး -->
+                    <button class="btn-action" style="background:#ef4444; flex:1; padding:10px; font-size:13px;" onclick="window.open('https://youtube.com/@winaung4091?si=j4SOfIUmg3AhOYa3', '_blank')">▶️ YouTube</button>
+                    
+                    <!-- Facebook Link အစစ် ထည့်သွင်းပြီး -->
+                    <button class="btn-action" style="background:#1877f2; flex:1; padding:10px; font-size:13px;" onclick="window.open('https://www.facebook.com/share/1CoW6fFxAD/', '_blank')">📘 Facebook</button>
+                </div>
             </div>
 
             <div style="margin-top: 15px; border-top: 1px dashed var(--input-border); padding-top: 10px; text-align: center; font-size: 12px;">
@@ -1215,10 +1240,11 @@
 <script src="globals.js"></script>
 <script src="map_engine.js"></script>
 <script src="app_conversions.js"></script>
-<script src="app_survey_tools.js"></script>
+<!-- 🔴 AI မျက်စိမလည်စေရန် နာမည်ပြောင်းထားသော ဖိုင်အသစ်များ 🔴 -->
+<script src="module_cogo_stakeout.js"></script> 
+<script src="module_surface_volume.js"></script>
 <script src="app_camera.js"></script>
 <script src="app_logic.js"></script>
-<script src="app_topo_3d.js"></script>
 <script src="https://pl29905456.effectivecpmnetwork.com/7f/6e/47/7f6e47086726dcc7791f39e47405f88d.js"></script>
 </body>
 </html>
